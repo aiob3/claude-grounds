@@ -1,5 +1,6 @@
 import type { Categoria, Mutante } from '../types'
 import { CATEGORIAS, ehArquivoDeTeste } from './prova'
+import { testesQueAlcancam } from './alcance'
 
 /** Uma mutação no formato `trecho original` → `trecho mutado` (aceita também ``a`` com crases duplas). */
 export function lerMutacao(mutacao: string): { de: string; para: string } | null {
@@ -152,6 +153,13 @@ export function porMutante(rs: Resultado[]): { n: number; segundos: number; test
   }
 }
 
+/** Quantos dos aplicados começaram incrementais; nada quando a rodada não registrou escopo. */
+function incrementais(rs: Resultado[]): string {
+  const ap = rs.filter(r => r.situacao !== 'NÃO APLICADO')
+  if (!ap.some(r => r.escopo)) return ''
+  return `, ${ap.filter(r => r.escopo?.startsWith('incremental')).length} incrementais`
+}
+
 const kb = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`)
 const um = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1))
 
@@ -162,7 +170,7 @@ export function resumoCusto(e: Pick<Execucao, 'linhaDeBase' | 'resultados' | 'cu
   const testes = (n?: number) => (n === undefined ? '' : `, ${um(n)} testes`)
   return [
     `base ${e.linhaDeBase.segundos.toFixed(1)} s${testes(c?.testesNaBase)}`,
-    `por mutante ${pm.segundos.toFixed(1)} s${testes(pm.testes)} (n=${pm.n})`,
+    `por mutante ${pm.segundos.toFixed(1)} s${testes(pm.testes)} (n=${pm.n}${incrementais(e.resultados)})`,
     c?.repo ? `repositório ${c.repo.arquivos} arquivos, ${kb(c.repo.bytes)}` : 'repositório ?',
     c ? `diff ${c.diff.linhas} linhas em ${c.diff.arquivos} arquivos` : 'diff ?',
   ].join('; ')
@@ -190,6 +198,26 @@ export function detectarComando(r: ArquivosDoRepo, tocados: string[], raiz: stri
   return []
 }
 
+export type Mapa = { g: Map<string, string[]>; testes: string[] }
+
+/**
+ * Por mutante: os arquivos de teste que alcançam o arquivo mutado e os comandos que os cobrem.
+ * Sem `alcancam`, roda a suíte inteira, e `escopo` diz por quê.
+ */
+export function planoIncremental(alvo: string, mapa: Mapa | undefined, cobrem: Comando[]): { escopo: string; alcancam?: string[]; comandos: Comando[] } {
+  const inteira = (porque: string) => ({ escopo: `suíte inteira (${porque})`, comandos: cobrem })
+  if (!mapa) return inteira('sem mapa de imports')
+  const naPasta = (c: Comando, x: string) => c.pasta === undefined || c.pasta === '' || x.startsWith(`${c.pasta}/`)
+  // Só contam os testes que algum dos comandos roda: o de outro plugin não entra na conta.
+  const noEscopo = mapa.testes.filter(x => cobrem.some(c => naPasta(c, x)))
+  const t = testesQueAlcancam(alvo, mapa.g).filter(x => noEscopo.includes(x))
+  if (!t.length) return inteira('nenhum teste importa o arquivo')
+  if (t.length >= noEscopo.length) return inteira('todos os testes alcançam o arquivo')
+  // Um comando de plugin sem nenhum dos testes na pasta dele não tem o que rodar.
+  const comandos = cobrem.filter(c => t.some(x => naPasta(c, x)))
+  return { escopo: `incremental: ${t.length}/${noEscopo.length} arquivos de teste`, alcancam: t, comandos }
+}
+
 /** Os comandos que valem para um arquivo: os do plugin onde ele está e os do repositório todo. */
 export function comandosPara(arquivo: string, cs: Comando[]): Comando[] {
   return cs.filter(c => c.pasta === undefined || c.pasta === '' || arquivo.startsWith(`${c.pasta}/`))
@@ -204,6 +232,8 @@ export type Resultado = Mutante & {
   segundos: number
   /** Testes que a execução deste mutante rodou, pelo resumo do executor. */
   testes?: number
+  /** Onde o mutante rodou: incremental (k/N arquivos de teste) ou a suíte inteira, e por quê. */
+  escopo?: string
 }
 
 export type Execucao = {
@@ -303,7 +333,7 @@ export function relatorio(e: Execucao, data: string): string {
         : r.situacao === 'SOBREVIVENTE'
           ? 'SOBREVIVENTE → reforçar ou justificar como equivalente'
           : `NÃO APLICADO: ${r.motivo}`
-    return `  ${r.n} | ${onde} | ${r.categoria} | ${r.mutacao} | ${sit}`
+    return `  ${r.n} | ${onde} | ${r.categoria} | ${r.mutacao} | ${sit}${r.escopo && r.situacao !== 'NÃO APLICADO' ? ` [${r.escopo}]` : ''}`
   })
   return [
     `PROVA DE TESTE — ${e.tarefa} — ${data}  (executada pelo mod prova-de-teste)`,

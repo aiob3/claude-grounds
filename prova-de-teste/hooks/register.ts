@@ -2,10 +2,11 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Escolha, ExecucaoFeita } from '../types'
-import { aplicarTrecho, comandosPara, contarTestes, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
+import { aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
 import { avisoNovos, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
+import { cabeNoMapa, ehEntradaDeTeste, ehMapeavel, grafo, SUFIXO_FORA, testesQueAlcancam } from './alcance'
 
 const avisadoTurno = atom({ plugin: 'prova-de-teste', key: 'avisadoTurno' } as const, -1)
 const ultima = atom({ plugin: 'prova-de-teste', key: 'ultima' } as const, null)
@@ -203,6 +204,11 @@ const SPEC_EXECUTAR = {
       comando: { type: 'array', items: { type: 'string' }, description: 'Comando de teste, rodado na raiz da cópia. Padrão: detectado (claude plugin test, npm test, pytest).' },
       timeoutSegundos: { type: 'number', description: 'Limite por execução dos testes (padrão 120, máximo 600).' },
       repetir: { type: 'boolean', description: 'Reaplica a última lista escolhida às cegas (para provar um reforço com os mesmos mutantes) em vez de pedir outra.' },
+      incremental: {
+        type: 'boolean',
+        description:
+          'Por mutante, roda só os arquivos de teste que alcançam o arquivo mutado pelos imports (padrão true); sobrevivente é confirmado na suíte inteira. false roda a suíte inteira em todos (para comparar).',
+      },
     },
     required: ['tarefa'],
   },
@@ -228,7 +234,7 @@ async function pastasDePlugin($: EngineInterface, raiz: string, tocados: string[
 
 async function executar(
   $: EngineInterface,
-  a: { tarefa?: string; cwd?: string; base?: string; modelo?: string; novos?: boolean; comando?: string[]; timeoutSegundos?: number; repetir?: boolean },
+  a: { tarefa?: string; cwd?: string; base?: string; modelo?: string; novos?: boolean; comando?: string[]; timeoutSegundos?: number; repetir?: boolean; incremental?: boolean },
 ): Promise<{ texto: string; erro: boolean }> {
   const inicio = Date.now()
   if (!a.tarefa?.trim()) return { texto: 'Erro: falta tarefa.', erro: true }
@@ -260,6 +266,19 @@ async function executar(
     const cp = await $.process.run(['cp', '-a', '--reflink=auto', `${raiz}/.`, copia], { timeoutMs: 600_000 })
     if (cp.exitCode !== 0) return { texto: `Erro: a cópia falhou (${cp.stderr.trim()}).`, erro: true }
     const naCopia = comandos.map(c => ({ ...c, argv: c.argv.map(x => x.replaceAll('{COPIA}', copia)) }))
+    /** Os arquivos JS/TS/Python do repositório e quem importa quem; grande demais ou ilegível, nada. */
+    const mapear = async () => {
+      const ls = await git($, ['ls-files', '--cached', '--others', '--exclude-standard'], copia)
+      if (ls.exitCode !== 0) return undefined
+      const arquivos = [...new Set(ls.stdout.split('\n').filter(ehMapeavel))]
+      if (!cabeNoMapa(arquivos.length)) return undefined
+      const fontes = new Map<string, string>()
+      for (const f of arquivos) {
+        const t = await $.fs.read(`${copia}/${f}`).catch(() => undefined)
+        if (typeof t === 'string') fontes.set(f, t)
+      }
+      return { g: grafo(fontes), testes: [...fontes.keys()].filter(ehEntradaDeTeste) }
+    }
     const rodarUm = async (argv: string[]) =>
       $.process.run(argv, { cwd: copia, timeoutMs }).catch(err => ({
         exitCode: -1,
@@ -281,6 +300,25 @@ async function executar(
 
     const base = await rodar(naCopia)
     const lsTree = await git($, ['ls-tree', '-r', '-l', 'HEAD'], raiz)
+
+    // O mapa da execução incremental: lido da cópia uma vez; sem ele, cada mutante roda a suíte inteira.
+    const mapa = a.incremental === false || base.exitCode !== 0 ? undefined : await mapear()
+    const escondidos = new Set<string>()
+    /** Esconde na cópia os arquivos de teste fora de `quero`, renomeando; mexe só no que mudou desde a última vez. */
+    const ajustar = async (quero: Set<string>) => {
+      const mv = async (fs: string[], de: string, para: string) => {
+        if (!fs.length) return
+        const r = await $.process.run(['sh', '-c', `for f; do mv -- "$f${de}" "$f${para}"; done`, 'sh', ...fs], { cwd: copia })
+        if (r.exitCode !== 0) throw new Error(`não consegui ${para ? 'esconder' : 'mostrar'} testes na cópia: ${r.stderr.trim()}`)
+      }
+      const esconder = (mapa?.testes ?? []).filter(t => !quero.has(t) && !escondidos.has(t))
+      const mostrar = [...escondidos].filter(t => quero.has(t))
+      await mv(esconder, '', SUFIXO_FORA)
+      esconder.forEach(t => escondidos.add(t))
+      await mv(mostrar, SUFIXO_FORA, '')
+      mostrar.forEach(t => escondidos.delete(t))
+    }
+    const todos = () => ajustar(new Set(mapa?.testes ?? []))
     const exec: Execucao = {
       tarefa: a.tarefa.trim(),
       modelo: e.modelo,
@@ -330,7 +368,26 @@ async function executar(
         r.ocorrencias = ap.ocorrencias
         await $.fs.write(caminho, ap.texto)
         try {
-          const t = await rodar(cobrem)
+          const plano = planoIncremental(alvo.arquivo, mapa, cobrem)
+          r.escopo = plano.escopo
+          let t: Awaited<ReturnType<typeof rodar>>
+          if (plano.alcancam) {
+            await ajustar(new Set(plano.alcancam))
+            const inc = await rodar(plano.comandos)
+            const saidaInc = inc.stdout + '\n' + inc.stderr
+            // Morte só vale com um teste nomeado; sobrevivente, carga quebrada ou falha sem nome: a suíte inteira decide.
+            const morteNomeada = inc.exitCode !== 0 && !invalido(saidaInc) && !/^código de saída/.test(quemMatou(saidaInc, inc.exitCode))
+            if (morteNomeada) t = inc
+            else {
+              await todos()
+              const cheia = await rodar(cobrem)
+              r.escopo = `${plano.escopo}, ${inc.exitCode === 0 ? 'sobrevivente confirmado' : 'falha sem nome refeita'} na suíte inteira`
+              t = { ...cheia, segundos: inc.segundos + cheia.segundos, testes: somarTestes(inc.testes, cheia.testes) }
+            }
+          } else {
+            await todos()
+            t = await rodar(cobrem)
+          }
           r.segundos = t.segundos
           const saida = t.stdout + '\n' + t.stderr
           r.testes = t.testes
@@ -346,6 +403,8 @@ async function executar(
         }
       }
     }
+    // Os testes escondidos voltam antes de conferir a cópia; se um mv falhar, ajustar lança e a rodada não sai.
+    await todos()
     exec.originalIntocado = (await git($, ['status', '--porcelain'], raiz)).stdout === statusAntes
     exec.segundos = (Date.now() - inicio) / 1000
     const c = contar(exec.resultados)

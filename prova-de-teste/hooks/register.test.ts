@@ -197,10 +197,14 @@ test('sem HOME, /prova ~/pasta não inventa uma pasta', async ($, on) => {
 function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string } } = {}) {
   const fs = new Map<string, string>([
     ['/repo/src/a.ts', 'export const soma = (a, b) => a + b\n'],
-    ['/repo/src/a.test.ts', 'expect(soma(1, 2)).toBe(3)\n'],
+    ['/repo/src/a.test.ts', "import { soma } from './a'\nexpect(soma(1, 2)).toBe(3)\n"],
+    // Um módulo com o teste dele, que não alcança a.ts: a execução incremental o esconde nos mutantes de a.ts.
+    ['/repo/src/b.ts', 'export const um = 1\n'],
+    ['/repo/src/b.test.ts', "import { um } from './b.js'\nexpect(um).toBe(1)\n"],
     o.pluginNaRaiz ? ['/repo/.claude-plugin/plugin.json', '{"name":"x"}'] : ['/repo/package.json', '{"scripts":{"test":"vitest run"}}'],
   ])
   const apagadas: string[] = []
+  const sobrouEscondido: string[] = []
   const rodadas: string[][] = []
   const modelo = { chamadas: 0 }
   const TMP = '/tmp/prova-de-teste-abc'
@@ -213,6 +217,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       if (a === 'rev-parse --show-toplevel') return r('/repo\n')
       if (a === 'diff HEAD') return r(DIFF)
       if (a === 'status --porcelain') return r(' M src/a.ts\n')
+      if (a === 'ls-files --cached --others --exclude-standard') return r('src/a.ts\nsrc/a.test.ts\nsrc/b.ts\nsrc/b.test.ts\n')
       if (a === 'ls-tree -r -l HEAD') return r('100644 blob aaa     30\tsrc/a.ts\n100644 blob bbb     2018\tsrc/a.test.ts\n')
       return r('')
     }
@@ -221,7 +226,18 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       for (const [k, v] of [...fs]) if (k.startsWith('/repo/')) fs.set(`${TMP}/repo/${k.slice(6)}`, v)
       return r('')
     }
+    if (argv[0] === 'sh') {
+      // O for/mv do executor: renomeia cada arquivo com o sufixo indicado no script.
+      const [de, para] = /mv -- "\$f(.*?)" "\$f(.*?)"/.exec(argv[2]!)!.slice(1) as [string, string]
+      for (const f of argv.slice(4)) {
+        const k = `${init?.cwd}/${f}`
+        fs.set(k + para, fs.get(k + de)!)
+        fs.delete(k + de)
+      }
+      return r('')
+    }
     if (argv[0] === 'rm') {
+      sobrouEscondido.push(...[...fs.keys()].filter(k => k.endsWith('.prova-fora')))
       apagadas.push(argv.at(-1)!)
       for (const k of [...fs.keys()]) if (k.startsWith(argv.at(-1)!)) fs.delete(k)
       return r('')
@@ -232,7 +248,11 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       const fonte = fs.get(`${TMP}/repo/src/a.ts`) ?? ''
       if (o.baseFalha) return r('  ✕ soma dá 3 (1 ms)\n', 1)
       if (fonte.includes('=> a +\n')) return r("(fail) the file did not load\n\nSyntaxError: Unexpected token '\\n'\n", 1)
-      return fonte.includes('a - b') ? r('  ✕ soma dá 3 (1 ms)\nTests:  1 failed, 1 total\n', 1) : r('  ✓ soma dá 3\nTests:  1 passed, 1 total\n')
+      // Só os testes visíveis rodam; o de a.ts só pega a troca de + por -.
+      const visiveis = [...fs.keys()].filter(k => k.startsWith(`${TMP}/repo/`) && k.endsWith('.test.ts'))
+      const total = `Tests:  ${visiveis.length} total\n`
+      const pega = visiveis.includes(`${TMP}/repo/src/a.test.ts`) && fonte.includes('a - b')
+      return pega ? r(`  ✕ soma dá 3 (1 ms)\n${total}`, 1) : r(`  ✓ soma dá 3\n${total}`)
     }
     return r('', 127)
   })
@@ -267,15 +287,21 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       },
     }) as never,
   )
-  return { fs, apagadas, rodadas, TMP, modelo }
+  return { fs, apagadas, rodadas, TMP, modelo, sobrouEscondido }
 }
 
 test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver de verdade, restaura e não toca o original', async ($, on) => {
   const m = mundo(on)
   const original = m.fs.get('/repo/src/a.ts')
   const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
-  // npm test detectado pelo package.json, rodado na cópia: base + 2 mutantes aplicados.
-  expect(m.rodadas.length).toBe(3)
+  // npm test detectado pelo package.json, rodado na cópia: base, o morto só com o teste que alcança a.ts,
+  // o sobrevivente com esse teste e depois confirmado na suíte inteira.
+  expect(m.rodadas.length).toBe(4)
+  expect(r).toContain('MORTO por \\"soma dá 3\\" [incremental: 1/2 arquivos de teste]')
+  expect(r).toContain('SOBREVIVENTE → reforçar ou justificar como equivalente [incremental: 1/2 arquivos de teste, sobrevivente confirmado na suíte inteira]')
+  // Nenhum teste fica escondido na cópia, e a restauração confere.
+  expect(m.sobrouEscondido).toEqual([])
+  expect(r).toContain('cmp na cópia: idêntico')
   expect(m.rodadas.every(x => x.at(-1) === `${m.TMP}/repo`)).toBe(true)
   expect(r).toContain('1 | src/a.ts:1 | condição invertida | `a + b` → `a - b` | MORTO por \\"soma dá 3\\"')
   expect(r).toContain('2 | src/a.ts:1 | null/inválido')
@@ -297,11 +323,21 @@ test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver 
   expect(certo).toContain('mutantes: 2/1/1')
   expect(m.fs.get(LOG_PATH)).toContain('| soma | v1.2 | mutantes: 2/1/1 | reais: 1 | FRACO | 5 | instrumento: mod ')
   // O custo medido pelo mod vai ao relatório e ao log, sem o agente informar nada.
-  expect(r).toMatch(/Custo:      base \d+\.\d s, 1 testes; por mutante \d+\.\d s, 1 testes \(n=2\); repositório 2 arquivos, 2 KB; diff \d+ linhas em 1 arquivos/)
-  expect(m.fs.get(LOG_PATH)).toMatch(/\| custo: base \d+\.\d s, 1 testes; .*repositório 2 arquivos/)
+  // Base com os 2 testes; por mutante (1 + (1 + 2)) / 2 = 2.
+  expect(r).toMatch(/Custo:      base \d+\.\d s, 2 testes; por mutante \d+\.\d s, 2 testes \(n=2, 2 incrementais\); repositório 2 arquivos, 2 KB; diff \d+ linhas em 1 arquivos/)
+  expect(m.fs.get(LOG_PATH)).toMatch(/\| custo: base \d+\.\d s, 2 testes; .*repositório 2 arquivos/)
   // Gasta no registro: o próximo não fica preso aos números dela (sobrevivente #16 da rodada 5).
   const depois = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'soma', aplicados: 3, mortos: 3, sobreviventes: 0, reais: 0, estado: 'PROVADO', tempo: 5 } as never))
   expect(depois).toContain('mutantes: 3/3/0')
+})
+
+test('executar com incremental false roda a suíte inteira em todos os mutantes, sem esconder nada', async ($, on) => {
+  const m = mundo(on)
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma', incremental: false } as never))
+  expect(m.rodadas.length).toBe(3)
+  expect(r).toContain('MORTO por \\"soma dá 3\\" [suíte inteira (sem mapa de imports)]')
+  expect(r).toMatch(/por mutante \d+\.\d s, 2 testes \(n=2, 0 incrementais\)/)
+  expect(m.sobrouEscondido).toEqual([])
 })
 
 test('executar: com a linha de base vermelha, nenhum mutante é aplicado e o estado é NÃO VERIFICADO', async ($, on) => {
