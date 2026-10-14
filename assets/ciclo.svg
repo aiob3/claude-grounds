@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 270" width="1200" height="270" role="img" aria-label="O ciclo de uma rodada: objetivo, execução isolada, mutantes cegos, testes e registro" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>O ciclo de uma rodada: objetivo, execução isolada, mutantes cegos, testes e registro</title>
+<style>
+  .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
+  .t1 { fill: #0b0b0b; } .t2 { fill: #52514e; } .t3 { fill: #8a887f; }
+  .ac { fill: #2a78d6; } .acs { stroke: #2a78d6; } .acf { fill: #e8f1fb; }
+  .ok { fill: #0f7a3d; } .okf { fill: #e3f3e8; }
+  @media (prefers-color-scheme: dark) {
+    .sup { fill: #1a1a19; } .sup2 { fill: #232322; } .borda { stroke: #3a3936; }
+    .t1 { fill: #f0efec; } .t2 { fill: #c3c2b7; } .t3 { fill: #8f8d84; }
+    .ac { fill: #3987e5; } .acs { stroke: #3987e5; } .acf { fill: #1d2c40; }
+    .ok { fill: #4cc27a; } .okf { fill: #16301f; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+
+  .fluxo { stroke-dasharray: 6 8; animation: anda 1.2s linear infinite; }
+  @keyframes anda { to { stroke-dashoffset: -28; } }
+</style>
+<rect width="1200" height="270" rx="16" class="sup"/>
+  <rect x="26" y="70" width="206" height="104" rx="12" class="sup2 borda" stroke-width="1.5"/>
+  <text x="44" y="104" font-size="18" font-weight="700" class="t1">Objetivo</text>
+  <text x="44" y="128" font-size="12.5" class="t2" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">contexto-bar</text>
+  <text x="44" y="154" font-size="13.5" class="t3">declara o que é &quot;feito&quot;</text><line x1="236" y1="122" x2="252" y2="122" class="acs fluxo" stroke-width="2.5"/><path d="M250,116 L258,122 L250,128 Z" class="ac"/>
+  <rect x="262" y="70" width="206" height="104" rx="12" class="sup2 borda" stroke-width="1.5"/>
+  <text x="280" y="104" font-size="18" font-weight="700" class="t1">Executar</text>
+  <text x="280" y="128" font-size="12.5" class="t2" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">cópia isolada</text>
+  <text x="280" y="154" font-size="13.5" class="t3">o original não é tocado</text><line x1="472" y1="122" x2="488" y2="122" class="acs fluxo" stroke-width="2.5"/><path d="M486,116 L494,122 L486,128 Z" class="ac"/>
+  <rect x="498" y="70" width="206" height="104" rx="12" class="sup2 borda" stroke-width="1.5"/>
+  <text x="516" y="104" font-size="18" font-weight="700" class="t1">Mutantes cegos</text>
+  <text x="516" y="128" font-size="12.5" class="t2" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">modelo sem ferramentas</text>
+  <text x="516" y="154" font-size="13.5" class="t3">nunca vê os testes</text><line x1="708" y1="122" x2="724" y2="122" class="acs fluxo" stroke-width="2.5"/><path d="M722,116 L730,122 L722,128 Z" class="ac"/>
+  <rect x="734" y="70" width="206" height="104" rx="12" class="sup2 borda" stroke-width="1.5"/>
+  <text x="752" y="104" font-size="18" font-weight="700" class="t1">Testes</text>
+  <text x="752" y="128" font-size="12.5" class="t2" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">um mutante por vez</text>
+  <text x="752" y="154" font-size="13.5" class="t3">morto ou sobrevivente</text><line x1="944" y1="122" x2="960" y2="122" class="acs fluxo" stroke-width="2.5"/><path d="M958,116 L966,122 L958,128 Z" class="ac"/>
+  <rect x="970" y="70" width="206" height="104" rx="12" class="sup2 borda" stroke-width="1.5"/>
+  <text x="988" y="104" font-size="18" font-weight="700" class="t1">Registrar</text>
+  <text x="988" y="128" font-size="12.5" class="t2" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">log v1.2</text>
+  <text x="988" y="154" font-size="13.5" class="t3">medição ou calibração</text>
+  <path d="M837.0,178 C837.0,240 365.0,240 365.0,184" fill="none" class="acs fluxo" stroke-width="2.5"/>
+  <path d="M359.0,190 L365.0,180 L371.0,190 Z" class="ac"/>
+  <rect x="451.0" y="216" width="300" height="30" rx="15" class="sup borda" stroke-width="1.2"/>
+  <text x="601.0" y="236" font-size="13.5" class="t2" text-anchor="middle">sobrevivente → reforça o teste → repetir</text>
+</svg>

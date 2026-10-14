@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-label="claude-grounds: On what grounds?" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>claude-grounds: On what grounds?</title>
+<style>
+  .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
+  .t1 { fill: #0b0b0b; } .t2 { fill: #52514e; } .t3 { fill: #8a887f; }
+  .ac { fill: #2a78d6; } .acs { stroke: #2a78d6; } .acf { fill: #e8f1fb; }
+  .ok { fill: #0f7a3d; } .okf { fill: #e3f3e8; }
+  @media (prefers-color-scheme: dark) {
+    .sup { fill: #1a1a19; } .sup2 { fill: #232322; } .borda { stroke: #3a3936; }
+    .t1 { fill: #f0efec; } .t2 { fill: #c3c2b7; } .t3 { fill: #8f8d84; }
+    .ac { fill: #3987e5; } .acs { stroke: #3987e5; } .acf { fill: #1d2c40; }
+    .ok { fill: #4cc27a; } .okf { fill: #16301f; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+
+  .luz { opacity: 0; animation: acende 10s infinite; }
+  .e0 .luz { animation-delay: 0s; } .e1 .luz { animation-delay: 1.5s; }
+  .e2 .luz { animation-delay: 3s; } .e3 .luz { animation-delay: 4.5s; }
+  @keyframes acende { 0% { opacity: 0; } 6% { opacity: 1; } 75% { opacity: 1; } 85% { opacity: 0; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .luz { opacity: 1; } }
+</style>
+<rect width="1200" height="360" rx="16" class="sup"/>
+  <text x="56" y="120" font-size="54" font-weight="800" class="t1" letter-spacing="-1">claude-grounds</text>
+  <text x="58" y="168" font-size="26" class="ac" font-style="italic">On what grounds?</text>
+  <text x="58" y="222" font-size="18" class="t2">Toda afirmação de "feito" de um agente</text>
+  <text x="58" y="248" font-size="18" class="t2">precisa de fundamento que se possa conferir.</text>
+  <text x="58" y="306" font-size="14" class="t3">Mods para o Claude Code · EXP-001 Prova de Teste</text>
+  
+  <g class="etapa e0">
+    <rect x="640" y="40" width="520" height="60" rx="10" class="sup2 borda" stroke-width="1.5"/>
+    <rect x="640" y="40" width="520" height="60" rx="10" class="acf luz"/>
+    <rect x="640" y="40" width="5" height="60" rx="2" class="ac luz"/>
+    <text x="664" y="66" font-size="19" font-weight="700" class="t1" font-style="italic">claim</text>
+    <text x="664" y="87" font-size="14" class="t2">a afirmação</text>
+    <text x="1140" y="77" font-size="14" class="t2" text-anchor="end" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">&quot;a tarefa está feita&quot;</text>
+  </g><line x1="660" y1="100" x2="660" y2="114" class="acs" stroke-width="2"/>
+  <g class="etapa e1">
+    <rect x="640" y="114" width="520" height="60" rx="10" class="sup2 borda" stroke-width="1.5"/>
+    <rect x="640" y="114" width="520" height="60" rx="10" class="acf luz"/>
+    <rect x="640" y="114" width="5" height="60" rx="2" class="ac luz"/>
+    <text x="664" y="140" font-size="19" font-weight="700" class="t1" font-style="italic">grounds</text>
+    <text x="664" y="161" font-size="14" class="t2">a evidência</text>
+    <text x="1140" y="151" font-size="14" class="t2" text-anchor="end" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">red first + relatório por mutante</text>
+  </g><line x1="660" y1="174" x2="660" y2="188" class="acs" stroke-width="2"/>
+  <g class="etapa e2">
+    <rect x="640" y="188" width="520" height="60" rx="10" class="sup2 borda" stroke-width="1.5"/>
+    <rect x="640" y="188" width="520" height="60" rx="10" class="acf luz"/>
+    <rect x="640" y="188" width="5" height="60" rx="2" class="ac luz"/>
+    <text x="664" y="214" font-size="19" font-weight="700" class="t1" font-style="italic">rebuttal</text>
+    <text x="664" y="235" font-size="14" class="t2">a tentativa de refutar</text>
+    <text x="1140" y="225" font-size="14" class="t2" text-anchor="end" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">mutantes escolhidos às cegas</text>
+  </g><line x1="660" y1="248" x2="660" y2="262" class="acs" stroke-width="2"/>
+  <g class="etapa e3">
+    <rect x="640" y="262" width="520" height="60" rx="10" class="sup2 borda" stroke-width="1.5"/>
+    <rect x="640" y="262" width="520" height="60" rx="10" class="acf luz"/>
+    <rect x="640" y="262" width="5" height="60" rx="2" class="ac luz"/>
+    <text x="664" y="288" font-size="19" font-weight="700" class="t1" font-style="italic">qualifier</text>
+    <text x="664" y="309" font-size="14" class="t2">o quanto se afirma</text>
+    <text x="1140" y="299" font-size="14" class="t2" text-anchor="end" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">PROVADO · FRACO · NÃO VERIFICADO</text>
+  </g>
+</svg>

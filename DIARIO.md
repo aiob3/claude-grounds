@@ -1,0 +1,130 @@
+# Experimento: mods locais do Claude Code
+
+Diário de um experimento operacional: usar mods (plugins locais do Claude Code) no trabalho do dia a dia e observar, versão a versão, o que eles mudam na colaboração entre operador e Claude.
+
+- **Repositório:** um repositório privado de trabalho, instalado no escopo user a partir da pasta local
+- **Mods em teste:** `contexto-bar`; `prova-de-teste` (desde 0.1.0, instrumento do EXP-001 do harness)
+- **Início:** 2026-10-14
+
+## Hipóteses
+
+1. **Visibilidade da janela.** Mostrar acima do prompt quanto do contexto está ocupado, e por quê (sistema, memória, MCP, skills, hooks, conversa), ajuda a decidir quando compactar, delegar ou registrar o estado.
+2. **Objetivo compartilhado.** Uma segunda camada com o objetivo em curso, as pendências por dono (Claude ou operador) e a projeção de janela mantém os dois alinhados em tarefas longas e deixa claro de quem é a vez.
+3. **Projeção aprendida.** Medir o contexto gasto por pendência concluída, ponderado por tamanho (P=1, M=2, G=4), dá uma estimativa útil de se o resto do trabalho cabe na janela.
+
+## O que observar
+
+- O objetivo é definido no começo das tarefas com etapas, ou só quando o operador pede?
+- As pendências são marcadas na hora em que são feitas, ou ficam atrasadas ("sem atualização há N turnos")?
+- A estimativa por unidade converge? Quanto ela erra contra o consumo real?
+- O aviso de janela chega a tempo de mudar uma decisão?
+- O que o operador faz com o painel `/objetivo`: abre, ignora ou usa para cobrar?
+- Que atrito o mod cria: ruído no contexto, tokens gastos com a linha `[objetivo]`, chamadas extras.
+
+## Linha do tempo
+
+### 0.1.0 a 0.3.0 (2026-10-14, madrugada e manhã)
+- Barra de contexto em 8 grupos, atualizada no início do turno, depois de cada ferramenta e no fim do turno; a estimativa de Hooks zera na compactação.
+- Camada de objetivo: ferramenta `objetivo` para o Claude, comando `/objetivo` para o operador (sem argumento abre o painel), linha `[objetivo]` injetada a cada prompt e aviso de janela quando a projeção piora.
+- Decisão do operador: os dois definem o objetivo, e o aviso chega também ao Claude.
+
+### Incidente (2026-10-14, 14:20)
+- A interface gráfica travou durante uma sessão de desenvolvimento dos mods. Precisou reiniciar no botão.
+- **Causa:** não era o mod. A janela BAR1 da GPU NVIDIA tinha só 256 MiB (Resizable BAR desligado) e esgotou ao restaurar uma sessão pesada do Chrome. Resolvido ligando Above 4G Decoding e Re-Size BAR na BIOS: BAR1 passou a 16 GiB, sem erros.
+- **Lição para o experimento:** os arquivos do mod sobreviveram intactos, mas não havia controle de versão e `/home` não entra nos snapshots do sistema. Daí o repositório privado.
+
+### 0.3.0: o que a reinicialização mostrou
+- O mod continuou instalado e ativo em todas as sessões (escopo user, lido direto da pasta-fonte).
+- **Mas o objetivo se perdeu:** ele vivia só no `$.state` da sessão. Um objetivo em andamento ("Ativar Resizable BAR") sumiu quando a sessão recomeçou. Isso contraria a hipótese 2 para tarefas que atravessam sessões.
+
+### 0.4.0 (2026-10-14, tarde)
+- O objetivo passa a ser gravado no `$.store` do mod (um arquivo JSON do plugin, que dura entre sessões), sob a chave `objetivo:<raiz do projeto>`.
+- Ele é retomado ao abrir a sessão e a cada prompt, o que também cobre `/cd` entre projetos. Cada pasta tem o seu objetivo.
+- Na sessão nova, o marco de consumo, o contador de turnos e o aviso recomeçam: eram medidas da sessão anterior.
+- Gravar é melhor esforço: se o store falhar, o objetivo continua valendo na sessão.
+- Pego antes de usar: o primeiro `/reload-plugins` numa sessão já aberta encontraria o store vazio e apagaria o objetivo em curso. Correção: na primeira carga, um objetivo que só existe no `$.state` vale e passa a ser gravado (função pura `aoCarregar`, com teste unitário: o kit de testes não simula reload do módulo).
+- 15 testes passando, incluindo ida e volta entre duas pastas.
+
+### 0.5.0 (2026-10-14, fim da tarde)
+- Pedido do operador: um critério de continuidade para repriorizar o que já está em curso, sem burocracia. Um campo só, com três estados: **bloqueante** (trava outra pendência ou a entrega; vem primeiro), **requisito** (preciso para a entrega; é o padrão) e **melhoria** (pode esperar).
+- A fila sai na ordem nível → ordem de entrada. A barra mostra a **próxima** pendência (em vermelho se for bloqueante, com "(sua)" se for do operador). A linha ao modelo segue a ordem e marca só o que não é requisito. Repriorizar: ferramenta `priorizar` (ids + nível) ou `/objetivo bloqueante 3`.
+- Objetivos gravados antes da 0.5.0 não têm nível e contam como requisito.
+- Primeira tarefa sob o experimento **EXP-001 Prova de Teste** do harness: 9 mutantes manuais no diff, 9 mortos, cerca de 10 s; R1 feito quebrando a linha central do `ordenar`. O relatório foi contestado pelo agente que desenhou o EXP-001: só trazia a contagem, e 9/9 escolhidos por quem escreveu os testes sugere viés de seleção. **A auditoria confirmou:** 7 mutantes das categorias empate, vazio, null e condição invertida deram 4 sobreviventes (desempate por id, "tudo feito" devolvendo um item feito, nível inválido aceito, nível null). Testes reforçados: 7/7 mortos, 18 testes. Lição: o estado real da rodada era FRACO.
+
+### Observação lateral (2026-10-14)
+- O harness global (o harness local) estava desligado nesta máquina desde a reinstalação do sistema: sem `~/.claude/CLAUDE.md` e sem os hooks dele. O operador notou que, nesta sessão, a colaboração voltou ao comportamento esperado. **Hipótese, não verificada:** as regras e as injeções do harness pesavam contra. Vale comparar sessões com e sem ele antes de religar.
+
+## prova-de-teste
+
+### Por que um mod e não regra em texto (2026-10-14)
+- No harness, o EXP-001 é texto que o agente lê e segue: o relatório continua sendo o agente falando do próprio trabalho, o defeito que a rodada 1 expôs. Um mod percebe sozinho a tarefa com teste, isola fisicamente quem escolhe os mutantes e, na F2, aplica e roda os mutantes ele mesmo.
+- Entra como **instrumento do experimento, sem bloquear**. A promoção a padrão segue o critério de saída do EXP-001 (achados reais em ≥3 tarefas, tempo médio < 2 min) e é decisão do operador.
+
+### 0.1.0 — F1 (2026-10-14)
+- Lembrete: editar um arquivo de teste (convenções JS/TS, Python, Go, Rust) injeta o protocolo uma vez por turno. Falha no lembrete nunca atrapalha a edição.
+- `/prova [base]` e ferramenta `mutantes`: `git diff` do repositório (com arquivos novos), testes retirados, só o código-fonte vai a `$.model.complete`, **sem ferramentas e sem histórico**, que devolve `arquivo:linha | categoria | mutação`. O retorno diz o que foi enviado, o que foi retirado e quais categorias ficaram sem mutante.
+- Ferramenta `registrar`: valida e grava a linha v1.1 no log do EXP-001, com commit no git do harness.
+- Achados no próprio desenvolvimento: (1) mutações contêm `|` (como `||`), e a leitura cortava o texto; (2) o git do Omarchy usa `diff.mnemonicprefix=true` (prefixos `1/` e `2/`), o que trocaria os caminhos: o mod agora fixa o formato do diff.
+- **Rodada 2 do EXP-001 (v1.1):** R1 quebrando a linha que tira os testes do envio (3 testes falharam). R2.1 por subagente que leu só o diff: 13 mutantes, **4 sobreviventes reais** (arquivo renomeado, linha em branco, n/a sem motivo, `arquivo:` sem número). Reforço: 13/13. Concentração 4/13. 134 s de ponta a ponta.
+- Observação para a F2: o subagente errou o número de linha em 2 dos 13 mutantes (por 6 linhas). Aplicar por trecho, não por número, foi o que funcionou.
+
+### 0.1.1 (2026-10-14, noite)
+- Primeiro uso real pelo operador: `/prova` falhou com "~/Work não é um repositório git", mesmo depois de `/add-dir um repositório local (o mod só olhava a pasta da sessão). Num repositório, funcionou: o modelo isolado mandou 8 mutantes para um tema do Obsidian (JSON e CSS) e marcou corretamente 3 categorias como não aplicáveis. Mas o diff **não tinha teste nenhum**: mutantes sem teste não provam nada.
+- Correções: `/prova [pasta] [base]` em qualquer ordem (`~`, `/`, `./`, `../`); a mensagem de erro ensina a passar a pasta; aviso quando o diff não tem teste ("não registre como rodada").
+- **Rodada 3, a primeira com isolamento real** (`$.model.complete`, sem ferramentas; os 2 arquivos de teste retirados antes do envio): 17 mutantes, 7 sobreviventes no 1º passe → **4 reais** (`../` não reconhecido; aviso errado com exatamente 1 teste; sem HOME, `~/x` virava `/x`, um bug que já existia; falha ao ler HOME derrubava o comando), 2 lacunas de especificação (argumento repetido: agora vale o último) e 1 equivalente (dica de interface). Final 16/17. 135 s. Registrada pela própria ferramenta `registrar`, com commit no harness.
+- Com isso: **3 tarefas com sobreviventes reais** (rodadas 1, 2 e 3), o mínimo do critério de saída; o tempo médio passa um pouco de 2 min (a decisão é do operador).
+
+### 0.2.x — F2: o mod executa a rodada (2026-10-14, fim da tarde)
+- Ferramenta `executar`: cópia isolada (`cp --reflink`), linha de base, mutantes pelo trecho, testes por plugin tocado, restauração conferida, original intocado (`git status` antes e depois), relatório v1.1 escrito pelo mod. O `registrar` passou a recusar números diferentes dos executados.
+- **Rodada 4, executada pelo próprio mod sobre si, em 3 execuções.** Na 1ª, o mod falhou honestamente: caminhos curtos vindos do modelo fizeram 18 mutantes não serem aplicados, e o estado foi NÃO VERIFICADO, sem resultado inventado. Na 2ª: 17/15/2, com 2 sobreviventes reais e **1 morte falsa** (o mutante nem carregou e foi contado como morto). Na 3ª, com lista nova: 19/16/3, com 3 sobreviventes reais, um deles um **laço infinito** com trecho vazio. Todos foram reforçados. A prova de que o reforço mata os mesmos mutantes ficou para a rodada 5.
+- O instrumento se corrigiu com o próprio protocolo: caminho curto, dois plugins no mesmo diff, arquivo sem teste, mutante inválido, trecho com seta, plugin na raiz.
+- Pedido do operador: o painel do objetivo abre sozinho a cada pedido (contexto-bar 0.6.0).
+- **Pedido do operador: recarga automática na lista de validação.** Foram 4 `/reload-plugins` manuais na rodada 4. Os mods passaram a ser carregados por `CLAUDE_CODE_PLUGIN_DIRS` (pasta vigiada): salvar recarrega antes da próxima ferramenta do mod. É isso que permite ao ciclo de auto-correção se validar sem o operador. Efeito colateral encontrado antes de virar problema: o `$.store` é por id de plugin, então o objetivo salvo precisa ser migrado de @marketplace para `@inline`.
+
+### Sessão nova com recarga automática (2026-10-14, noite)
+- **Migração do `$.store`:** editar o JSON do store por fora **não funciona com a sessão aberta**. O host guarda o store em memória e, na recarga seguinte do mod, regravou o arquivo com a cópia dele (44 ms depois de salvar o fonte), apagando a mesclagem. O que funcionou foi passar pelo próprio mod: `definir` com os 18 itens na mesma ordem (os ids se mantiveram) e `concluir` nos que já estavam feitos. Perdeu-se só o histórico de consumo (marco/consumo).
+- **Recarga automática validada (#16):** uma marca temporária no texto do resumo (`objetivo.ts`) apareceu já na chamada seguinte da ferramenta, no mesmo turno, e o objetivo sobreviveu à recarga. Só `touch` não basta: é preciso mudar o conteúdo.
+- **Painel automático:** no 1º pedido da sessão ele não abriu, porque o objetivo ainda não estava no store novo; abriu logo depois do `definir`. Falta conferir no próximo pedido.
+- **Rodada 5 (executada pelo mod, base 52f6a98):** 15/13/2, com **2 sobreviventes reais**: `package.json` sem script de teste virava `npm test`, e nada conferia que a execução é gasta no `registrar`. Reforço com 2 testes; `executar` com `repetir` (mesma lista) deu **15/15/0, PROVADO**, em 19 s. O mutante #1 veio do escolhedor com o caminho malformado (`execucao.ts:prova-de-teste/hooks/execucao.ts:204`); o mod recusou e ele foi aplicado à mão: morto. Melhoria para o instrumento: aceitar `arquivo:caminho:linha` pegando o último segmento que resolve.
+- Pela 1ª vez o ciclo editar → testar → executar → registrar rodou inteiro **sem nenhum `/reload-plugins`**.
+
+### contexto-bar 0.7.0 + prova-de-teste 0.2.2 — objetivo por projeto (2026-10-14, noite)
+- **Achado do 1º uso em paralelo** (operador num projeto privado + esta sessão em `~/Work`): o objetivo de `~/Work` sumiu do disco. O `$.store` é um arquivo só para todos os projetos; cada sessão guarda o arquivo inteiro na memória e o regrava inteiro, então quem grava por último apaga as chaves da outra. Não dava para prever com uma sessão só.
+- **Correção estrutural:** o objetivo saiu do `$.store` e passou a um arquivo por projeto, `~/.claude/objetivos/<encodeURIComponent(raiz)>.json` (`{ raiz, objetivo }`). O nome nunca repete para pastas diferentes. Se o arquivo existe, vale ele, mesmo dizendo "sem objetivo"; senão, o objetivo migra do store uma vez, e a chave só é apagada depois de o arquivo ser gravado. Sem `HOME`, cai no store. O store ficou só com o `painel-auto`. As duas sessões migraram sozinhas na recarga.
+- **O objetivo F2** (16/18) foi fechado aqui: o #8 o operador fez no repositório real e a decisão do EXP-001 passou ao objetivo novo.
+- **Instrumento** (retorno do agente de um projeto privado + a mesma falha nesta rodada): o "não carregou" procurava `SyntaxError` na saída inteira. Uma morte cujo teste falhava com `JSON.parse` virava "inválido": 2 mortes reais escondidas aqui, 2 no `server.js` de lá. Agora só vale o erro na coluna 0, onde o carregador escreve. A atribuição ganhou o `node --test` (spec e TAP), que antes dava sempre "código de saída 1" e um alarme falso de concentração.
+- **Rodada 6:** 12/7/5 na 1ª execução (com 3 falsos "não carregou"); reforço + instrumento corrigido → 15/14/1, com o único sobrevivente equivalente (`undefined` ≡ `null` no `aoCarregar`) e +1 mutante manual fora da área concentrada, morto. PROVADO.
+- **Ainda abertos no instrumento:** `test/helpers/` contado como teste (a correção do operador não foi mutada); arquivos fora do git e não-código (`.gitignore`, `.spec/*.md`, `EXPERIMENTO.md`) enviados ao escolhedor; caminho malformado `arquivo:caminho:linha`.
+
+### prova-de-teste 0.3.0 — o que o repositório real mostrou (2026-10-14, noite)
+- **Helper é código:** dentro da pasta de teste, `helpers/`, `support/` e `utils/` passam a ser fonte, porque podem ser a correção da tarefa. O nome de teste (`.test.`, `test_*.py`) continua valendo, e `fixtures/` segue como teste, porque traz os valores esperados.
+- **Não-código fora do envio:** documentação, dotfiles de ferramenta, lockfiles e imagens não vão ao escolhedor; são listados no relatório. JSON, YAML e CSS continuam, porque podem ter comportamento.
+- **Fora do git:** aviso quando mais da metade do envio é de arquivos não versionados (o caso do `src/` de um projeto privado), e parâmetro `novos: false` para deixá-los de fora.
+- **"Não carregou" diz por quê:** o relatório mostra a primeira linha do erro de carga. Foi isso que, logo na rodada 7, denunciou mais 2 falsos "não carregou": o `the file did not load` citado no código de um teste que falhava também casava. Agora vale só na coluna 0, como o `(fail)` do executor.
+- **Caminho:** `arquivo:caminho` resolve se os pedaços derem num arquivo só (senão, "ambíguo"), e a pasta repetida na frente (`mod/mod/hooks/x.ts`) também resolve.
+- **Rodada 7** (o mod sobre si): 18/11/7, com 6 sobreviventes reais e 1 equivalente (uma checagem redundante, removida); reforço 18/18/0 com a mesma lista; +1 mutante manual na regra nova, morto. PROVADO.
+- **Padrão que se repete:** desde a rodada 4, cada rodada do mod sobre si acha ao menos um defeito do próprio instrumento. O sinal sempre veio do relatório: um número que não fechava, ou um motivo estranho. Expor o motivo foi o que tornou o defeito visível.
+
+### Decisão do operador sobre o EXP-001 (2026-10-14, noite)
+- **Seguir até 10 rodadas** antes de promover ou ajustar. O operador validou o uso em paralelo: viu, na sessão de um projeto privado, cada recarga dos mods acontecer no momento em que foi feita aqui, e os dois objetivos sobreviveram (#5 do objetivo "arquivo por projeto").
+- Até aqui: rodadas 1–7 sobre os próprios mods, mais 3 tarefas reais de um projeto privado (travamento do `npm test`, reforço do `src/` anterior, T-007). Todas tiveram sobreviventes reais.
+
+### EXP-001 v1.2 + prova-de-teste 0.4.0 — calibração × medição (2026-10-14, noite)
+- **Decisão do operador:** a contagem das 10 rodadas pondera as versões que nasceram dos próprios testes. A rodada que acha defeito do instrumento, ou que o altera, é **calibração** e não conta; só contam as **medições**, rodadas num instrumento que não mudou e sem defeito dele. O instrumento fica estável após 3 medições seguidas na mesma versão. O protocolo virou v1.2 e o log foi reclassificado com linhas novas: hoje são 9 calibrações e 2 medições (uma rota manual, uma no mod 0.2.2).
+- **O `registrar` preenche a classe sozinho:** grava o instrumento (`mod <versão que executou>` ou `manual v1.2`) e marca calibração quando o diff mexe no próprio mod, quando a versão muda entre `executar` e `registrar`, ou quando o agente informa `defeitoInstrumento`.
+- **Rodada 8:** 15/8/7 na 1ª execução. Entre os 6 sobreviventes reais, uma execução gravada antes da 0.4.0, sem versão, viraria "instrumento alterado: undefined→…". Reforço 11/11/0, mais 4 mutantes manuais no código que mudou de lugar com a refatoração, todos mortos. Foi a primeira linha v1.2, classificada pelo mod como calibração (o diff altera o próprio instrumento).
+- **Repositório público:** decidido um repositório novo e público de avaliação, com os dois mods num mono repo (o marketplace já é assim e os mods não dependem um do outro). O log público leva só as rodadas sobre os mods.
+
+### prova-de-teste 0.5.0 — instalável fora desta máquina (2026-10-14, noite)
+- **Log configurável:** `PROVA_DE_TESTE_LOG`, ou `~/.claude/prova-de-teste/EXP-001-log.md`, criado com cabeçalho v1.2 se não existir. Se o caminho for um link, a linha vai ao arquivo real e o `git add` e o commit rodam na pasta dele. Aqui, o caminho padrão é um link para o log do harness, e as duas sessões abertas seguiram gravando no mesmo lugar sem reiniciar.
+- **O protocolo viaja com o instrumento:** `prova-de-teste/PROTOCOLO.md` é o canônico; a cópia do harness aponta para ele.
+- **Rodada 9:** 20/12/8 na 1ª execução, com 7 reais (a variável perdia para o HOME; variável vazia virava caminho vazio; HOME com falha derrubava o registrar...) e 1 equivalente; reforço 20/19/1. O mutante #18, aplicado à mão, sobreviveu: sem `git add`, um log novo nunca seria commitado. Reforçado e morto. Classificada pelo mod como calibração.
+
+## Próximas observações
+- [x] Confirmar numa sessão nova que o objetivo de `~/Work` volta sozinho. **Validado pelo operador em 2026-10-14:** a sessão nova recebeu o objetivo da F1 inteiro (título, conclusão, 8 itens), sem restauração manual; ali o objetivo foi fechado em 8/8.
+- [ ] Ver se a média por unidade (hoje cerca de 11k tokens por P) se estabiliza entre sessões. Ela é gravada junto do objetivo e passa para o próximo objetivo definido por cima, mas se perde quando o objetivo é encerrado: o seguinte começa sem histórico.
+- [ ] Avaliar se o histórico de consumo deveria ser por projeto, independente do objetivo.
+- [ ] O nível é ajustado no meio do trabalho (priorizar), ou só definido no começo?
+- [ ] A "próxima" na barra bate com o que de fato é feito em seguida?
+- [ ] O `/prova` com `$.model.complete` (isolamento real) acha tanto quanto o subagente (isolamento por instrução)?
+- [ ] O lembrete do prova-de-teste chega na hora certa ou vira ruído?

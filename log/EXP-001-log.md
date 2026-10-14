@@ -1,0 +1,27 @@
+# EXP-001: log público
+
+Só as rodadas sobre os próprios mods (as de projetos privados ficam fora). Uma linha por rodada; correções e reclassificações entram como linha nova, nunca reescrevendo a anterior.
+
+v1.0: `<data> | <tarefa> | mutantes: aplicados/mortos/sobreviventes | estado | tempo (s)`  
+v1.1: `<data> | <tarefa> | versão do protocolo | mutantes | reais | estado | tempo (s)`  
+v1.2: v1.1 + `| instrumento: <mod x.y.z | manual> | <medição | calibração: defeito do instrumento>`
+
+2026-10-14 | contexto-bar 0.5.0 prioridade (bloqueante/requisito/melhoria) | mutantes: 9/9/0 | PROVADO (R1: linha central do ordenar quebrada → teste falhou → restaurada) | ~10
+2026-10-14 | AUDITORIA da linha anterior (pedida pelo revisor) | mutantes de categoria: 7/3/4 → testes reforçados → 7/7/0 | estado real da rodada 1: FRACO; após reforço: PROVADO | 6.5 + 7.0
+2026-10-14 | prova-de-teste 0.1.0 (F1) — rodada 2 | v1.1 | mutantes: 13/9/4 → reforço → 13/13/0 | reais: 4 | PROVADO (R2.1 por subagente, cego por instrução: declarou ler só o diff) | 134
+2026-10-14 | prova-de-teste 0.1.1: /prova [pasta] [base] + aviso sem teste — rodada 3, 1º passe 17/10/7, #17 equivalente (dica de UI), R2.1 por $.model.complete isolado | v1.1 | mutantes: 17/16/1 | reais: 4 | PROVADO | 135
+2026-10-14 | prova-de-teste 0.2.0 rodada 4, 1ª execução: falha do instrumento (modelo devolveu caminhos curtos; 18 mutantes não aplicados) | v1.1 | mutantes: 0/0/0 | reais: 0 | NÃO VERIFICADO | 38
+2026-10-14 | rodada 4 (2ª execução, pelo mod): prova-de-teste 0.2.0 + contexto-bar 0.6.0 — 2 sobreviventes reais; #9 morte falsa (mutante não carregou) | v1.1 | mutantes: 17/15/2 | reais: 2 | FRACO | 54
+2026-10-14 | rodada 4 (3ª execução): nova lista cega após reforço — 3 sobreviventes reais (plugin na raiz no laço, auto xyz, trecho vazio = laço infinito) | v1.1 | mutantes: 19/16/3 | reais: 3 | FRACO | 66
+2026-10-14 | rodada 5: prova-de-teste 0.2.1 + contexto-bar 0.6.0 (base 52f6a98) | v1.1 | mutantes: 15/15/0 | reais: 2 | PROVADO | 100
+2026-10-14 | rodada 6: contexto-bar objetivo em arquivo por projeto + instrumento (invalido ancorado na coluna 0, node:test) — #2 equivalente (undefined≡null no aoCarregar); +1 manual fora da concentração, morto | v1.1 | mutantes: 15/14/1 | reais: 4 | PROVADO | 140
+2026-10-14 | rodada 7: prova-de-teste 0.3.0 (helpers como fonte, não-código fora, aviso fora do git + novos:false, motivo do não carregou, caminho com dois-pontos/pasta repetida) — 1ª exec 18/11/7 (6 reais, 1 equivalente→código simplificado) + 2 falsos "não carregou" do instrumento achados e corrigidos; reforço 18/18/0; +1 manual na regra nova, morto | v1.1 | mutantes: 18/18/0 | reais: 6 | PROVADO | 200
+2026-10-14 | RECLASSIFICAÇÃO v1.2 (calibração × medição; linhas originais intactas) — rodada 1 (contexto-bar 0.5.0): instrumento manual v1.0 → calibração: relatório PROVADO, real FRACO; gerou a v1.1 | v1.2 | — | — | — | — | instrumento: manual v1.0 | calibração: protocolo sem categorias nem escolha cega
+2026-10-14 | RECLASSIFICAÇÃO v1.2 — rodada 2 (prova-de-teste 0.1.0) | v1.2 | — | — | — | — | instrumento: mod 0.1.0 | calibração: mutação com `|` cortada na leitura; prefixo do diff com mnemonicprefix
+2026-10-14 | RECLASSIFICAÇÃO v1.2 — rodada 3 (prova-de-teste 0.1.1) | v1.2 | — | — | — | — | instrumento: mod 0.1.1 | calibração: /prova só via pasta da sessão; diff sem teste aceito
+2026-10-14 | RECLASSIFICAÇÃO v1.2 — rodada 4 (3 execuções) | v1.2 | — | — | — | — | instrumento: mod 0.2.0 | calibração: caminho curto (18 não aplicados); morte falsa de mutante que não carregou; trecho com seta
+2026-10-14 | RECLASSIFICAÇÃO v1.2 — rodada 5 | v1.2 | — | — | — | — | instrumento: mod 0.2.1 | calibração: caminho malformado arquivo:caminho:linha recusado
+2026-10-14 | RECLASSIFICAÇÃO v1.2 — rodada 6 | v1.2 | — | — | — | — | instrumento: mod 0.2.1→0.2.2 | calibração: "não carregou" falso (#9/#12); instrumento alterado na rodada
+2026-10-14 | RECLASSIFICAÇÃO v1.2 — rodada 7 | v1.2 | — | — | — | — | instrumento: mod 0.2.2→0.3.0 | calibração: "não carregou" falso (#4/#8); caminho com pasta repetida; instrumento alterado na rodada
+2026-10-14 | rodada 8: prova-de-teste 0.4.0 (log v1.2: instrumento + calibração × medição) — 1ª exec 15/8/7 (6 reais + execução antiga sem versão viraria "alterado"); reforço 11/11/0 + 4 manuais no código realocado, mortos | v1.2 | mutantes: 11/11/0 | reais: 6 | PROVADO | 150 | instrumento: mod 0.3.0 | calibração: o diff altera o próprio instrumento
+2026-10-14 | rodada 9: prova-de-teste 0.5.0 (log configurável PROVA_DE_TESTE_LOG / padrão com link; protocolo viaja com o mod) — 1ª exec 20/12/8 (7 reais + #3 equivalente: cwd com barra final); reforço 20/19/1; #18 manual (sem git add) sobreviveu, reforçado e morto | v1.2 | mutantes: 20/19/1 | reais: 8 | PROVADO | 160 | instrumento: mod 0.4.0 | calibração: o diff altera o próprio instrumento

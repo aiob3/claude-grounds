@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 412" width="1200" height="412" role="img" aria-label="Relatório de uma rodada executada pelo mod prova-de-teste" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>Relatório de uma rodada executada pelo mod prova-de-teste</title>
+<style>
+  .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
+  .t1 { fill: #0b0b0b; } .t2 { fill: #52514e; } .t3 { fill: #8a887f; }
+  .ac { fill: #2a78d6; } .acs { stroke: #2a78d6; } .acf { fill: #e8f1fb; }
+  .ok { fill: #0f7a3d; } .okf { fill: #e3f3e8; }
+  @media (prefers-color-scheme: dark) {
+    .sup { fill: #1a1a19; } .sup2 { fill: #232322; } .borda { stroke: #3a3936; }
+    .t1 { fill: #f0efec; } .t2 { fill: #c3c2b7; } .t3 { fill: #8f8d84; }
+    .ac { fill: #3987e5; } .acs { stroke: #3987e5; } .acf { fill: #1d2c40; }
+    .ok { fill: #4cc27a; } .okf { fill: #16301f; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+
+  .linha { animation: surge 10.2s infinite backwards; }
+  @keyframes surge { 0% { opacity: 0; } 2% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
+</style>
+<rect width="1200" height="412" rx="14" class="sup2"/>
+  <rect width="1200" height="40" rx="14" class="sup"/><rect y="26" width="1200" height="14" class="sup"/>
+  <circle cx="28" cy="20" r="6" fill="#e34948"/><circle cx="50" cy="20" r="6" fill="#eda100"/><circle cx="72" cy="20" r="6" fill="#1baf7a"/>
+  <text x="600" y="25" font-size="13" class="t3" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">mcp__prova-de-teste__executar</text>
+  <text x="40" y="78" font-size="15" class="t1 linha" style="animation-delay:0.00s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">PROVA DE TESTE — rodada 9: prova-de-teste 0.5.0 — reforço</text><text x="40" y="103" font-size="15" class="t1 linha" style="animation-delay:0.35s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">Escolha:    R2.1 às cegas via $.model.complete (sem ferramentas, sem histórico)</text><text x="40" y="128" font-size="15" class="t1 linha" style="animation-delay:0.70s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">Comando:    claude plugin test &lt;cópia&gt;/prova-de-teste — linha de base passou (1.6 s)</text><text x="40" y="153" font-size="15" class="t1 linha" style="animation-delay:1.05s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">Mutantes:   20 aplicados | 19 mortos | 1 sobrevivente</text><text x="40" y="178" font-size="15" class="t2 linha" style="animation-delay:1.40s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">  1 | borda/vazio        | `: CABECALHO_LOG` -&gt; `: &#x27;&#x27;`              | MORTO</text><text x="40" y="203" font-size="15" class="t2 linha" style="animation-delay:1.75s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">  5 | empate/ordem       | variável vence o HOME -&gt; HOME vence       | MORTO</text><text x="40" y="228" font-size="15" class="t2 linha" style="animation-delay:2.10s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">  6 | null/inválido      | `if (doEnv)` -&gt; `if (doEnv !== undefined)` | MORTO</text><text x="40" y="253" font-size="15" class="t2 linha" style="animation-delay:2.45s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace"> 13 | condição invertida | `log !== caminho` -&gt; `log === caminho`     | MORTO</text><text x="40" y="278" font-size="15" class="t2 linha" style="animation-delay:2.80s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">  3 | borda/vazio        | cwd com barra no fim                     | equivalente</text><text x="40" y="303" font-size="15" class="t1 linha" style="animation-delay:3.15s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">Categorias: borda/vazio ✔ | empate/ordem ✔ | null/inválido ✔ | condição invertida ✔</text><text x="40" y="328" font-size="15" class="t1 linha" style="animation-delay:3.50s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">Restauração: cmp na cópia: idêntico; original ✔ intocado</text><text x="40" y="353" font-size="15" class="ok linha" style="animation-delay:3.85s" xml:space="preserve" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">Estado:     PROVADO</text>
+</svg>

@@ -1,0 +1,17 @@
+{
+  "name": "claude-grounds",
+  "owner": {
+    "name": "aiob3"
+  },
+  "plugins": [
+    {
+      "name": "contexto-bar",
+      "source": "./contexto-bar"
+    },
+    {
+      "name": "prova-de-teste",
+      "source": "./prova-de-teste"
+    }
+  ],
+  "description": "claude-grounds: toda afirmação de \"feito\" de um agente precisa de fundamento, com o objetivo visível na jornada e a prova de que os testes pegam bug (EXP-001)"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "contexto-bar",
+  "version": "0.7.0",
+  "description": "Barra de contexto acima do prompt, com uma segunda camada de objetivo e pendências compartilhada entre o operador e o Claude",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "aiob3"
+  }
+}

@@ -1,0 +1,41 @@
+export type Categoria = 'borda/vazio' | 'empate/ordem' | 'null/inválido' | 'condição invertida' | 'livre'
+
+export type Mutante = { arquivo: string; linha: number; categoria: Categoria; mutacao: string }
+
+/** A última lista escolhida às cegas: o que foi enviado e o que voltou. */
+export type Escolha = {
+  /** Raiz do repositório de onde saiu o diff. */
+  raiz: string
+  base: string
+  modelo: string
+  /** Arquivos-fonte cujo diff foi enviado ao modelo. */
+  enviados: string[]
+  /** Arquivos de teste retirados do diff antes do envio. */
+  excluidos: string[]
+  /** Arquivos que não são código (docs, dotfiles, lockfiles), fora do envio. */
+  naoCodigo?: string[]
+  /** Aviso de envio dominado por arquivos fora do git. */
+  avisoNovos?: string
+  mutantes: Mutante[]
+  /** Categorias que o modelo declarou não aplicáveis, com o motivo. */
+  naoAplicaveis: string[]
+}
+
+/** Os números da última rodada que o próprio mod executou: o registrar só aceita estes. */
+export type ExecucaoFeita = {
+  tarefa: string
+  aplicados: number
+  mortos: number
+  sobreviventes: number
+  estado: string
+  quando: string
+  /** v1.2: versão do mod que executou, e se o diff mexia no próprio mod. */
+  versao?: string
+  alteraInstrumento?: boolean
+}
+
+declare module 'claude-code' {
+  interface PluginState {
+    'prova-de-teste': { avisadoTurno: number; ultima: Escolha | null; execucao: ExecucaoFeita | null }
+  }
+}

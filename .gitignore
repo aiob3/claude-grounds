@@ -1,0 +1,6 @@
+node_modules/
+*.log
+# saída de tsc sem noEmit; o engine carrega o .ts/.tsx
+*/hooks/*.js
+# tipos gerados pelo claude plugin
+*/.claude-plugin/types/
