@@ -140,6 +140,11 @@ Diário de um experimento operacional: usar mods (plugins locais do Claude Code)
 - **A alavanca:** como no equivalente falso, a falha virou mecanismo. Ao definir ou acrescentar pendências, a ferramenta devolve uma checagem ("a conclusão descreve o efeito? cada pendência aproxima dela? alguma mostra que o efeito aconteceu?"), e a linha de cada pedido pergunta se a próxima ação aproxima da conclusão. O objetivo do lançamento foi redefinido pelo efeito (gente de fora entende o ciclo e experimenta, com sinais medidos).
 - **Rodada 11, a primeira medição:** 11/6/5 com 4 reais (conclusão só com espaços contava como preenchida; conclusão ausente derrubava a função; a ordem da resposta não estava fixada); reforço 11/10/1, com 1 equivalente justificado no log e +1 mutante manual fora da concentração. Como o diff mexeu só no contexto-bar, o instrumento (prova-de-teste 0.6.0) ficou parado e a rodada é a primeira medição do EXP-001.
 
+### Fim da preparação do lançamento; a publicação espera a prova (2026-10-14, noite)
+- **Feito nesta fase:** vitrine pelo ciclo único (PT e EN), demo gravada, sincronização automática com CI, busca do GitHub (descrição e 20 tópicos, incluindo `claude-code-mod` para o catálogo de mods), o diferencial na categoria certa (a etapa omitida entra no ciclo, sem gate; não é guarda de segurança) e a checagem de alinhamento no contexto-bar (rodada 11, a primeira medição).
+- **Decisão do operador:** o fio só sai depois de pôr à prova o ponto de inflexão, a auto-homologação incremental, e conta o resultado, provado ou não. A publicação, a medição dos sinais e os canais seguintes passam para o objetivo da execução incremental.
+- **Teste da continuidade:** a próxima etapa começa numa sessão nova, para conferir na prática que o objetivo volta sozinho (o "5. Continuar").
+
 ## Próximas observações
 - [x] Confirmar numa sessão nova que o objetivo de `~/Work` volta sozinho. **Validado pelo operador em 2026-10-14:** a sessão nova recebeu o objetivo da F1 inteiro (título, conclusão, 8 itens), sem restauração manual; ali o objetivo foi fechado em 8/8.
 - [ ] Ver se a média por unidade (hoje cerca de 11k tokens por P) se estabiliza entre sessões. Ela é gravada junto do objetivo e passa para o próximo objetivo definido por cima, mas se perde quando o objetivo é encerrado: o seguinte começa sem histórico.
