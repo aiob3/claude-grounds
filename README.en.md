@@ -122,8 +122,11 @@ The honesty guarantees are mechanical, not promises:
 
 ## No hooks to wire up
 
-No settings hooks to configure and nothing that blocks the agent, with a guard's rigor where it matters: no
-ungrounded "done" makes it into the record.
+No settings hooks to configure and no gate that stops the agent. The step agents tend to skip, proving what they
+did, could until now only be enforced by a gate in a hook at some point of the process, stopping the agent there.
+Here it lives inside the loop: it is declared in the goal, comes back in front of the agent on every prompt and is
+the condition for closing. It doesn't disappear, and nothing stops. (Blocking destructive actions is a different,
+safety problem, and not what these mods do.)
 
 Claude Code settings hooks are shell commands, HTTP requests or prompts you attach to events in `settings.json`. They
 work well to block or annotate an action, but they run outside Claude Code: they don't draw, keep no state of their
@@ -138,8 +141,7 @@ official docs have the [full comparison](https://code.claude.com/docs/en/plugins
 | On screen | terminal text | band above the prompt and side panel |
 | Checking the behavior | by hand | `claude plugin test` on every version (CI in this repo) |
 
-And no hook in either mod blocks the agent. Many community mods are guards: they hold a command and ask for
-confirmation. Nothing is held here. The handlers only observe and add a line of context, and the rigor lives
+No hook in either mod holds a call. The handlers only observe and add a line of context, and the rigor lives
 elsewhere: in tools the agent calls because it declared it would, and in a record that refuses inflated numbers and
 unjustified equivalents. The agent works freely, and an ungrounded "done" doesn't get through.
 

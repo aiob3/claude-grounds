@@ -119,8 +119,10 @@ As garantias de honestidade são mecânicas, não promessas:
 
 ## Sem hooks para configurar
 
-Sem settings hooks para configurar e sem nada que bloqueie o agente, com o rigor de um guarda onde ele importa:
-nenhum "pronto" sem fundamento chega ao registro.
+Sem settings hooks para configurar e sem gate que trave o agente. A etapa que o agente costuma pular, provar o que
+fez, até agora só era garantida com um gate num hook, em algum ponto do processo, travando o agente ali. Aqui ela
+entra no próprio ciclo: é declarada no objetivo, volta à frente do agente a cada pedido e é a condição para fechar.
+Não some, e nada trava. (Impedir ações destrutivas é outro problema, de segurança, e não é o que estes mods fazem.)
 
 Os settings hooks do Claude Code são comandos de shell, chamadas HTTP ou prompts que você liga a eventos no
 `settings.json`. Funcionam bem para bloquear ou anotar uma ação, mas rodam fora do Claude Code: não desenham na
@@ -135,8 +137,7 @@ mods trazem tudo isso no pacote (a documentação oficial tem a [comparação co
 | Na tela | texto no terminal | faixa acima do prompt e painel lateral |
 | Verificar o comportamento | à mão | `claude plugin test` em cada versão (CI neste repositório) |
 
-E nenhum hook dos dois mods bloqueia o agente. Muitos mods da comunidade são guardas: seguram um comando e pedem
-confirmação. Aqui nada é segurado. Os handlers só observam e acrescentam uma linha de contexto, e o rigor está em
+Nenhum hook dos dois mods segura uma chamada. Os handlers só observam e acrescentam uma linha de contexto, e o rigor está em
 outro lugar: nas ferramentas que o agente chama porque declarou que chamaria, e num registro que recusa número
 inflado e equivalente sem justificativa. O agente trabalha livre, e o "pronto" sem fundamento não passa.
 
