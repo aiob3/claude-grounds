@@ -1,0 +1,25 @@
+name: testes
+
+# A cada push: o marketplace e os dois mods passam na validação e nos próprios testes,
+# na mesma versão do Claude Code em que foram desenvolvidos.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  mods:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Claude Code 2.1.300
+        run: npm install -g @anthropic-ai/claude-code@2.1.300
+      - name: Validar o marketplace
+        run: claude plugin validate .
+      - name: Testes do prova-de-teste
+        run: claude plugin test prova-de-teste
+      - name: Testes do contexto-bar
+        run: claude plugin test contexto-bar
