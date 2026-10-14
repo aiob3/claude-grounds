@@ -132,6 +132,11 @@ mods trazem tudo isso no pacote (a documentação oficial tem a [comparação co
 | Na tela | texto no terminal | faixa acima do prompt e painel lateral |
 | Verificar o comportamento | à mão | `claude plugin test` em cada versão (CI neste repositório) |
 
+E nenhum hook dos dois mods bloqueia o agente. Muitos mods da comunidade são guardas: seguram um comando e pedem
+confirmação. Aqui nada é segurado. Os handlers só observam e acrescentam uma linha de contexto, e o rigor está em
+outro lugar: nas ferramentas que o agente chama porque declarou que chamaria, e num registro que recusa número
+inflado e equivalente sem justificativa. O agente trabalha livre, e o "pronto" sem fundamento não passa.
+
 ## Instalar
 
 ```sh

@@ -135,6 +135,11 @@ official docs have the [full comparison](https://code.claude.com/docs/en/plugins
 | On screen | terminal text | band above the prompt and side panel |
 | Checking the behavior | by hand | `claude plugin test` on every version (CI in this repo) |
 
+And no hook in either mod blocks the agent. Many community mods are guards: they hold a command and ask for
+confirmation. Nothing is held here. The handlers only observe and add a line of context, and the rigor lives
+elsewhere: in tools the agent calls because it declared it would, and in a record that refuses inflated numbers and
+unjustified equivalents. The agent works freely, and an ungrounded "done" doesn't get through.
+
 ## Install
 
 ```sh
