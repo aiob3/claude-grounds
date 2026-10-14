@@ -2,7 +2,7 @@ import { atom, read } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { buildSnapshot, cellsFor, chaveObjetivo, groupOf } from './register'
+import { buildSnapshot, cellsFor, chaveObjetivo, groupOf, TOOL } from './register'
 
 const categories = [
   { name: 'System prompt', tokens: 3000, kind: 'used' },
@@ -330,4 +330,18 @@ test('arquivo do objetivo: HOME vazio cai no store; pasta sem objetivo não cria
   // Arquivo corrompido: sem objetivo, e a chave velha do store não volta.
   fs.set('/home/u/.claude/objetivos/%2Fproj%2Fe.json', '{corrompido')
   expect(await linha('/proj/e')).toContain('Nenhum objetivo ativo')
+})
+
+test('definir e adicionar devolvem a checagem de alinhamento; concluir não', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('session.root', () => ({ value: '/proj/al' }) as never)
+  mock.store(on)
+  const chamar = async (a: object) => JSON.stringify(await $.tool.call({ tool: TOOL, ...a } as never))
+  const def = await chamar({ acao: 'definir', titulo: 'Lançar', conclusao: 'gente de fora experimenta o ciclo', itens: [{ texto: 'fio', tamanho: 'P' }] })
+  expect(def).toContain('Alinhamento')
+  expect(def).toContain('gente de fora experimenta o ciclo')
+  // O estado vem primeiro; a checagem fecha a resposta (rodada 11, #3).
+  expect(def.indexOf('Objetivo:')).toBeLessThan(def.indexOf('Alinhamento'))
+  expect(await chamar({ acao: 'adicionar', itens: [{ texto: 'readme em inglês', tamanho: 'M' }] })).toContain('Alinhamento')
+  expect(await chamar({ acao: 'concluir', ids: [1] })).not.toContain('Alinhamento')
 })

@@ -181,6 +181,20 @@ export function projetar(g: Goal, snap: Snapshot | null): Projecao {
 const k = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
 
 /** Linha curta que acompanha cada prompt, para o modelo saber o que está em curso. */
+/**
+ * A checagem de alinhamento, devolvida ao definir ou acrescentar pendências: a conclusão é o efeito que se quer, e
+ * cada pendência precisa aproximar dele. Nasceu de uma falha real (lançamento do claude-grounds, 14/10/2026): as
+ * pendências saíram do texto do pedido (artefatos) e não do efeito, e a entrega repetiu o molde errado duas vezes.
+ */
+export function alinhamento(g: Goal): string {
+  if (!g.conclusao?.trim()) return 'Alinhamento: sem conclusão. Antes de começar, defina o passo que encerra pelo efeito que se quer (para quem, o que muda).'
+  return (
+    `Alinhamento: a conclusão "${g.conclusao}" descreve o efeito que se quer, e não só um artefato entregue? ` +
+    'Cada pendência aproxima dela, e pelo menos uma mostra que o efeito aconteceu? ' +
+    'Se alguma saiu do texto do pedido e não do efeito, reescreva antes de começar.'
+  )
+}
+
 export function linhaContexto(g: Goal | null, snap: Snapshot | null, tool: string): string {
   if (!g) {
     return `[objetivo] Nenhum objetivo ativo. Se este pedido for uma tarefa com etapas, defina-o com ${tool} (acao "definir": titulo, conclusao = o passo que encerra, itens com dono claude|operador e tamanho P|M|G).`
@@ -198,6 +212,7 @@ export function linhaContexto(g: Goal | null, snap: Snapshot | null, tool: strin
     (g.conclusao ? ` · conclui quando: ${g.conclusao}` : '') +
     ` · ${p.feitas}/${p.total} feitas.` +
     (prox ? ` Próxima: #${prox.id} (${prox.dono === 'claude' ? 'sua' : 'do operador'}).` : '') +
+    (g.conclusao?.trim() ? ` Antes da próxima ação: ela aproxima de "${g.conclusao}"?` : '') +
     ` Pendências do Claude: ${lista('claude')}. Pendências do operador: ${lista('operador')}. ` +
     `Janela: ~${k(p.necessario)} estimados para as suas, ${k(p.livre)} livres (${p.estado}). ` +
     `Ao concluir cada pendência, marque com ${tool} (acao "concluir", ids); se o trabalho mostrar que uma trava outra ou pode esperar, ajuste com acao "priorizar" (ids, nivel bloqueante|requisito|melhoria); ao fechar o ciclo, diga ao operador o que ainda é dele.`

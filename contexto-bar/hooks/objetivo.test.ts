@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { aoCarregar, aplicar, avisoJanela, comando, linhaContexto, nivelDe, ordenar, projetar, proxima, UNIDADE_PADRAO } from './objetivo'
+import { alinhamento, aoCarregar, aplicar, avisoJanela, comando, linhaContexto, nivelDe, ordenar, projetar, proxima, UNIDADE_PADRAO } from './objetivo'
 import type { Snapshot } from '../types'
 
 const snapCom = (livre: number): Snapshot => ({
@@ -158,4 +158,17 @@ test('bordas da prioridade: empate fora de ordem, tudo feito, nível inválido o
   const inval = aplicar(null, { acao: 'definir', titulo: 'x', itens: [{ texto: 'a', nivel: 'urgente' as never }] }, 'claude', 0, 1).goal!
   expect(nivelDe(inval.itens[0]!)).toBe('requisito')
   expect(nivelDe(item(5, null))).toBe('requisito')
+})
+
+test('alinhamento: a conclusão é o efeito, e a linha de cada pedido pergunta se a próxima ação aproxima dele (lançamento do claude-grounds)', () => {
+  const g = definido()
+  expect(alinhamento(g)).toContain('"/reload-plugins mostra a versão instalada"')
+  expect(alinhamento(g)).toContain('mostra que o efeito aconteceu')
+  expect(alinhamento({ ...g, conclusao: '' })).toContain('sem conclusão')
+  expect(linhaContexto(g, snapCom(100000), 'TOOL')).toContain('Antes da próxima ação: ela aproxima de "/reload-plugins mostra a versão instalada"?')
+  expect(linhaContexto({ ...g, conclusao: '' }, snapCom(100000), 'TOOL')).not.toContain('Antes da próxima ação')
+  // Só espaços conta como vazia; ausente não derruba (rodada 11, #1 #2 #5).
+  expect(alinhamento({ ...g, conclusao: '   ' })).toContain('sem conclusão')
+  expect(alinhamento({ ...g, conclusao: undefined as never })).toContain('sem conclusão')
+  expect(linhaContexto({ ...g, conclusao: '   ' }, snapCom(100000), 'TOOL')).not.toContain('Antes da próxima ação')
 })

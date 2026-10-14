@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Goal, GroupKey, Segment, Snapshot } from '../types'
-import { aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, ordenar, projetar, proxima, resumo, usado } from './objetivo'
+import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
 
 const snapshot = atom({ plugin: 'contexto-bar', key: 'snapshot' } as const, null)
@@ -261,7 +261,8 @@ async function mudarObjetivo($: EngineInterface, a: Acao, origem: 'claude' | 'op
   const r = aplicar(atual, a, origem, usado(snap), n)
   if (r.erro) return { texto: `Erro: ${r.erro}\n${resumo(atual, snap)}`, erro: true }
   await gravarObjetivo($, () => r.goal)
-  return { texto: resumo(r.goal, snap), erro: false }
+  const checagem = r.goal && (a.acao === 'definir' || a.acao === 'adicionar') ? `\n${alinhamento(r.goal)}` : ''
+  return { texto: resumo(r.goal, snap) + checagem, erro: false }
 }
 
 /** Texto de aviso de janela, quando a projeção piorou desde o último aviso. */

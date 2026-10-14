@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/capa.svg" alt="claude-grounds: On what grounds?" width="100%"></p>
 
-<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 45" src="https://img.shields.io/badge/falhas_reais_achadas-45-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
+<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 49" src="https://img.shields.io/badge/falhas_reais_achadas-49-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
 
 Quando o agente do Claude Code diz "pronto, testado", como você confere? O claude-grounds transforma essa frase num
 ciclo. Antes de começar, o agente declara o que é "pronto", com a prova dentro. A cada pedido, a prova pendente
@@ -23,7 +23,9 @@ texto. O projeto está em [claude-grounds-demo](https://github.com/aiob3/claude-
 
 O objetivo nasce com a prova dentro dele: ler o código, mostrar o teste falhando, corrigir, provar com o
 `executar`, registrar a rodada. A conclusão declarada não é "corrigi". É "a rodada de prova registrada com os
-números do relatório". Cada pendência tem dono, tamanho e prioridade.
+números do relatório". Cada pendência tem dono, tamanho e prioridade. Ao declarar, o agente recebe uma checagem
+de alinhamento: a conclusão descreve o efeito que se quer, e não só um artefato? Cada pendência aproxima dela? E a
+cada pedido a linha do objetivo pergunta se a próxima ação serve à conclusão.
 
 ### 2. Acompanhar
 
@@ -101,7 +103,7 @@ como morto, um caminho devolvido pelo modelo que fazia 18 mutantes não serem ap
 teste. A demo gravada acrescentou o último da lista: o `registrar` aceitava um estado melhor que o executado sem
 justificativa.
 
-<p align="center"><img src="assets/rodadas.svg" alt="45 falhas reais de teste encontradas" width="100%"></p>
+<p align="center"><img src="assets/rodadas.svg" alt="49 falhas reais de teste encontradas" width="100%"></p>
 
 As garantias de honestidade são mecânicas, não promessas:
 
@@ -136,7 +138,7 @@ claude plugin install prova-de-teste@claude-grounds
 
 | Mod | Versão | Papel |
 |---|---|---|
-| [`contexto-bar`](contexto-bar/) | 0.7.0 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
+| [`contexto-bar`](contexto-bar/) | 0.8.0 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
 | [`prova-de-teste`](prova-de-teste/) | 0.6.0 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
 
 O log do `prova-de-teste` vai para `PROVA_DE_TESTE_LOG` ou, sem essa variável, para
@@ -175,7 +177,7 @@ abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
 - A projeção da janela é uma estimativa: a média das últimas 8 entregas por unidade de tamanho.
 - Os mods usam o runtime de plugins do Claude Code e foram testados na versão 2.1.300.
 
-Em aberto: chegar a 10 medições com o instrumento parado (0 até agora) antes de decidir se o método
+Em aberto: chegar a 10 medições com o instrumento parado (1 até agora) antes de decidir se o método
 vira critério; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 
