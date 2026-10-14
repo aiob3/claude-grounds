@@ -24,7 +24,7 @@
   <text x="58" y="168" font-size="26" class="ac" font-style="italic">On what grounds?</text>
   <text x="58" y="222" font-size="18" class="t2">Toda afirmação de "feito" de um agente</text>
   <text x="58" y="248" font-size="18" class="t2">precisa de fundamento que se possa conferir.</text>
-  <text x="58" y="306" font-size="14" class="t3">Mods para o Claude Code · EXP-001 Prova de Teste</text>
+  <text x="58" y="306" font-size="14" class="t3">Dois mods para o Claude Code: contexto-bar e prova-de-teste</text>
   
   <g class="etapa e0">
     <rect x="640" y="40" width="520" height="60" rx="10" class="sup2 borda" stroke-width="1.5"/>
