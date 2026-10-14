@@ -32,6 +32,9 @@ export type ExecucaoFeita = {
   /** v1.2: versão do mod que executou, e se o diff mexia no próprio mod. */
   versao?: string
   alteraInstrumento?: boolean
+  /** 0.6.0: o teto do estado com os sobreviventes justificados, e quais sobreviveram. */
+  estadoSeEquivalentes?: string
+  sobreviventesN?: number[]
 }
 
 declare module 'claude-code' {

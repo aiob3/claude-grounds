@@ -155,6 +155,8 @@ export type Registro = {
   instrumento?: string
   /** v1.2: defeitos do instrumento nesta rodada; algum faz dela calibração, nenhum faz dela medição. */
   defeitos?: string[]
+  /** Sobreviventes alegados como equivalentes, com o motivo: vão à linha do log, para quem audita. */
+  equivalentes?: { n: number; motivo: string }[]
 }
 
 /**
@@ -201,6 +203,7 @@ export function linhaLog(r: Partial<Registro>, data: string): { linha?: string; 
   return {
     linha:
       `${data} | ${t} | v${VERSAO} | mutantes: ${r.aplicados}/${r.mortos}/${r.sobreviventes} | reais: ${r.reais} | ${r.estado} | ${r.tempo}` +
-      ` | instrumento: ${r.instrumento ?? `manual v${VERSAO}`} | ${r.defeitos?.length ? `calibração: ${r.defeitos.join('; ').replace(/\s*\|\s*/g, ' / ')}` : 'medição'}`,
+      ` | instrumento: ${r.instrumento ?? `manual v${VERSAO}`} | ${r.defeitos?.length ? `calibração: ${r.defeitos.join('; ').replace(/\s*\|\s*/g, ' / ')}` : 'medição'}` +
+      (r.equivalentes?.length ? ` | equivalentes: ${r.equivalentes.map(q => `#${q.n} ${q.motivo.trim()}`).join('; ').replace(/\s*\|\s*/g, ' / ')}` : ''),
   }
 }

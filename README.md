@@ -1,11 +1,24 @@
 <p align="center"><img src="assets/capa.svg" alt="claude-grounds: On what grounds?" width="100%"></p>
 
-<p align="center"><img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="EXP-001: em andamento" src="https://img.shields.io/badge/EXP--001-em_andamento-52514e?style=flat-square"> <img alt="falhas reais achadas: 43" src="https://img.shields.io/badge/falhas_reais_achadas-43-0f7a3d?style=flat-square"> <img alt="medições: 0 de 10" src="https://img.shields.io/badge/medições-0_de_10-52514e?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
+<p align="center"><img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="EXP-001: em andamento" src="https://img.shields.io/badge/EXP--001-em_andamento-52514e?style=flat-square"> <img alt="falhas reais achadas: 45" src="https://img.shields.io/badge/falhas_reais_achadas-45-0f7a3d?style=flat-square"> <img alt="medições: 0 de 10" src="https://img.shields.io/badge/medições-0_de_10-52514e?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
 
 Quando um agente de IA escreve o código e o teste, "os testes passam" diz pouco: o teste tende a confirmar o que o
 próprio agente supôs. claude-grounds são dois mods para o Claude Code que transformam essa desconfiança em rotina.
 O objetivo da tarefa fica visível acima do prompt, e cada teste novo passa por mutantes escolhidos por um modelo
 que nunca viu os testes.
+
+## Uma sessão real
+
+<p align="center"><img src="assets/demo/sessao.webp" alt="Sessão do Claude Code corrigindo um bug com o claude-grounds, acelerada" width="100%"></p>
+
+Uma sessão nova no repositório [claude-grounds-demo](https://github.com/aiob3/claude-grounds-demo), com um pedido só:
+corrigir `mediana([10, 9, 2])`, que devolvia 2 em vez de 9 porque `sort()` ordenava os números como texto.
+
+| | |
+|---|---|
+| <img src="assets/demo/01.webp" alt="Objetivo definido"> **1. Objetivo.** O agente declara o que é "feito" e a faixa acima do prompt passa a acompanhar. | <img src="assets/demo/02.webp" alt="Red first"> **2. Red first.** O teste novo falha antes da correção: 2 em vez de 9. |
+| <img src="assets/demo/03.webp" alt="Correção e executar"> **3. Correção e prova.** Com o comparador numérico, o agente chama `executar`. | <img src="assets/demo/04.webp" alt="Estado FRACO e reforço"> **4. FRACO.** Um sobrevivente era falha real: nenhum teste via o primeiro elemento descartado. O teste é reforçado e a mesma lista roda de novo. |
+| <img src="assets/demo/05.webp" alt="Registro com equivalente falso"> **5. O equivalente falso.** O agente registrou PROVADO-PARCIAL alegando que a ordem decrescente era equivalente. Não era: com lista par, `mediana([1,2,3,4])` dá 3 e o mutante dá 2. O log ganhou uma linha de correção (FRACO) e o `registrar` passou a exigir a justificativa de cada sobrevivente. | <img src="assets/demo/06.webp" alt="Painel do objetivo"> **6. Painel.** O objetivo fechado em 5 de 5, aberto ao lado da sessão. |
 
 ## Como funciona
 
@@ -16,7 +29,7 @@ reforçado e a mesma lista roda de novo, até não sobrar falha sem tratamento.
 
 ## O que já encontrou
 
-<p align="center"><img src="assets/rodadas.svg" alt="43 falhas reais de teste encontradas" width="100%"></p>
+<p align="center"><img src="assets/rodadas.svg" alt="45 falhas reais de teste encontradas" width="100%"></p>
 
 Cada barra é uma rodada do experimento sobre os próprios mods. Os testes passavam em todas elas antes dos
 mutantes. O instrumento também se corrigiu pelo caminho, e por isso essas rodadas contam como calibração, não como
@@ -39,7 +52,7 @@ essa variável, para `~/.claude/prova-de-teste/EXP-001-log.md`.
 
 | Mod | Versão | Papel |
 |---|---|---|
-| [`prova-de-teste`](prova-de-teste/) | 0.5.0 | executa a rodada numa cópia isolada, escreve o relatório e classifica a rodada |
+| [`prova-de-teste`](prova-de-teste/) | 0.6.0 | executa a rodada numa cópia isolada, escreve o relatório e classifica a rodada |
 | [`contexto-bar`](contexto-bar/) | 0.7.0 | mostra o contexto e o objetivo da tarefa acima do prompt, com painel e pendências |
 
 ## Avaliar

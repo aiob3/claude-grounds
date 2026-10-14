@@ -44,6 +44,7 @@ Para o código **alterado nesta tarefa** (só o diff), aplique **pelo menos 1 mu
 - Aplique um mutante por vez, rode só os testes afetados e reverta.
 - Confirme a restauração com `git diff` limpo no código-fonte. Sem commit, use `cmp` contra uma cópia e registre qual dos dois usou.
 - Todo SOBREVIVENTE gera uma das duas saídas: reforçar o teste até matá-lo (e o teste novo passa pela R1), ou justificar em uma linha que ele é equivalente.
+- **Equivalente** quer dizer que nenhuma entrada distingue o mutante do original. "Fora do escopo desta tarefa" não é equivalência: se uma entrada válida mostra a diferença (como uma lista de tamanho par), o sobrevivente é real. Com o mod, registrar um estado melhor que o executado exige a justificativa de cada sobrevivente (`equivalentes`), que vai para a linha do log.
 
 ### R2.1 — Mutantes escolhidos às cegas (obrigatória quando houver subagente disponível)
 Quem escolhe os mutantes **não pode ter visto os testes**.

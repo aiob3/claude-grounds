@@ -416,3 +416,16 @@ test('registrar: a variável vence o HOME; vazia, vale o padrão; HOME que falha
   expect(r).toContain('PROVA_DE_TESTE_LOG')
   expect(escritos).toHaveLength(2)
 })
+
+test('registrar 0.6.0: estado acima do executado exige justificar cada sobrevivente, e as justificativas vão ao log', async ($, on) => {
+  const m = mundo(on)
+  await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never)
+  m.fs.set(LOG_PATH, '# log\n')
+  const base = { tool: 'mcp__prova-de-teste__registrar', tarefa: 'soma', aplicados: 2, mortos: 1, sobreviventes: 1, reais: 0, tempo: 5 }
+  const sem = JSON.stringify(await $.tool.call({ ...base, estado: 'PROVADO-PARCIAL' } as never))
+  expect(sem).toContain('sem justificativa: #2')
+  expect(m.fs.get(LOG_PATH)).toBe('# log\n')
+  const com = JSON.stringify(await $.tool.call({ ...base, estado: 'PROVADO', equivalentes: [{ n: 2, motivo: 'soma comuta' }] } as never))
+  expect(com).toContain('equivalentes: #2 soma comuta')
+  expect(m.fs.get(LOG_PATH)).toContain('| PROVADO | 5 | instrumento: mod ')
+})

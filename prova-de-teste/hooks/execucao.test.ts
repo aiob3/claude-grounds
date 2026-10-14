@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import {
   aplicarTrecho,
+  conferirEstado,
   erroDeCarga,
   invalido,
   lerMutacoes,
@@ -212,4 +213,25 @@ test('o mutante que não carrega diz por quê: a primeira linha do erro de carga
   expect(erroDeCarga('SyntaxError: A\nerror TS1005: B\n')).toBe('SyntaxError: A')
   // O texto citado no código de um teste que falhou não é carga (rodada 7: #4 e #8 falsos).
   expect(erroDeCarga("(fail) diz por quê [1ms]\n  12 |   expect(erroDeCarga('(fail) the file did not load\\n')).toBe(x)\n  Received: undefined\n")).toBeUndefined()
+})
+
+test('conferirEstado: estado acima do executado só com cada sobrevivente justificado (demo do claude-grounds: equivalente falso)', () => {
+  const feita = { estado: 'FRACO', estadoSeEquivalentes: 'PROVADO', sobreviventesN: [3, 5] }
+  // Igual ou pior que o executado: passa sem justificativa.
+  expect(conferirEstado(feita, 'FRACO')).toBeUndefined()
+  expect(conferirEstado(feita, 'NÃO VERIFICADO')).toBeUndefined()
+  // Melhor: cada sobrevivente precisa de motivo.
+  expect(conferirEstado(feita, 'PROVADO')).toContain('sem justificativa: #3, #5')
+  expect(conferirEstado(feita, 'PROVADO', [{ n: 3, motivo: 'x' }, { n: 5, motivo: '  ' }])).toContain('sem justificativa: #5')
+  expect(conferirEstado(feita, 'PROVADO', [{ n: 3, motivo: 'a' }, { n: 5, motivo: 'b' }])).toBeUndefined()
+  // Justificar o que não sobreviveu é erro.
+  expect(conferirEstado(feita, 'PROVADO', [{ n: 3, motivo: 'a' }, { n: 5, motivo: 'b' }, { n: 7, motivo: 'c' }])).toContain('#7 não sobreviveu')
+  // O mod aplicou a escolha às cegas: PROVADO-PARCIAL não cabe numa execução dele.
+  expect(conferirEstado(feita, 'PROVADO-PARCIAL', [{ n: 3, motivo: 'a' }, { n: 5, motivo: 'b' }])).toContain('o estado é PROVADO')
+  // Com categoria descoberta, justificar sobreviventes não basta.
+  expect(conferirEstado({ ...feita, estadoSeEquivalentes: 'FRACO' }, 'PROVADO', [{ n: 3, motivo: 'a' }, { n: 5, motivo: 'b' }])).toContain('estado máximo é FRACO')
+  // Sem sobrevivente, mas com categoria descoberta: subir de estado continua barrado (rodada 10, #2).
+  expect(conferirEstado({ estado: 'FRACO', estadoSeEquivalentes: 'FRACO', sobreviventesN: [] }, 'PROVADO')).toContain('estado máximo é FRACO')
+  // Execução gravada antes da 0.6.0 (sem a lista): não há como conferir.
+  expect(conferirEstado({ estado: 'FRACO' }, 'PROVADO')).toBeUndefined()
 })

@@ -52,6 +52,9 @@ test('a linha do log segue o formato v1.1 e recusa registro incoerente', () => {
   // v1.2: o instrumento e a classe da rodada; o defeito do instrumento faz dela calibração (o | vira /).
   expect(linhaLog({ ...ok, instrumento: 'mod 0.3.0', defeitos: ['trecho | seta', 'alterado'] }, 'd').linha).toEndWith('| instrumento: mod 0.3.0 | calibração: trecho / seta; alterado')
   expect(linhaLog({ ...ok, instrumento: 'mod 0.3.0', defeitos: [] }, 'd').linha).toEndWith('| instrumento: mod 0.3.0 | medição')
+  // Os equivalentes alegados vão na linha, para quem audita (0.6.0).
+  expect(linhaLog({ ...ok, equivalentes: [{ n: 3, motivo: 'cwd | barra' }, { n: 5, motivo: 'x' }] }, 'd').linha).toEndWith('| medição | equivalentes: #3 cwd / barra; #5 x')
+  expect(linhaLog({ ...ok, equivalentes: [] }, 'd').linha).toEndWith('| medição')
   expect(linhaLog({ ...ok, tarefa: ' ' }, 'd').erro).toContain('tarefa')
   expect(linhaLog({ ...ok, mortos: -1, sobreviventes: 8 }, 'd').erro).toContain('mortos')
   expect(linhaLog({ ...ok, mortos: 4 }, 'd').erro).toContain('aplicados')

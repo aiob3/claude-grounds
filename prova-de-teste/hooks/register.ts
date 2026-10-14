@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Escolha, ExecucaoFeita } from '../types'
-import { aplicarTrecho, comandosPara, erroDeCarga, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
+import { aplicarTrecho, comandosPara, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
 import { avisoNovos, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
@@ -50,6 +50,12 @@ const SPEC_REGISTRAR = {
       reais: { type: 'integer', description: 'Sobreviventes reais encontrados (falhas de teste de verdade, não equivalentes).' },
       estado: { type: 'string', enum: ['PROVADO', 'PROVADO-PARCIAL', 'FRACO', 'NÃO VERIFICADO'] },
       tempo: { type: 'number', description: 'Segundos gastos na prova.' },
+      equivalentes: {
+        type: 'array',
+        description:
+          'Sobreviventes que você alega equivalentes (n do relatório + motivo de uma linha). Obrigatório para registrar estado melhor que o executado; vai à linha do log. Fora do escopo não é equivalência.',
+        items: { type: 'object', properties: { n: { type: 'integer' }, motivo: { type: 'string' } }, required: ['n', 'motivo'] },
+      },
       defeitoInstrumento: {
         type: 'string',
         description:
@@ -160,7 +166,7 @@ async function registrar($: EngineInterface, r: Partial<Registro> & { defeitoIns
   })
   const { linha, erro } = linhaLog({ ...r, instrumento, defeitos }, data)
   if (erro || !linha) return { texto: `Erro: ${erro}`, erro: true }
-  const divergente = feita && conferir(feita, r)
+  const divergente = feita && (conferir(feita, r) ?? conferirEstado(feita, r.estado!, r.equivalentes ?? []))
   if (divergente) return { texto: `Erro: ${divergente}`, erro: true }
   const caminho = await caminhoDoLog($)
   if (!caminho) return { texto: `Erro: sem ${LOG_ENV} nem HOME, não sei onde fica o log.`, erro: true }
@@ -336,6 +342,8 @@ async function executar(
       tarefa: exec.tarefa,
       ...c,
       estado: estadoDe(exec),
+      estadoSeEquivalentes: estadoSeEquivalentes(exec),
+      sobreviventesN: exec.resultados.filter(x => x.situacao === 'SOBREVIVENTE').map(x => x.n),
       quando: new Date().toISOString(),
       versao: await versaoDoMod($),
       // O diff mexe no próprio mod: a rodada mede o instrumento enquanto ele muda (v1.2: calibração).

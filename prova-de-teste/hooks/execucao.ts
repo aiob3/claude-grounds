@@ -174,6 +174,34 @@ export function estadoDe(e: Execucao): 'PROVADO' | 'FRACO' | 'NÃO VERIFICADO' {
   return 'PROVADO'
 }
 
+/** O estado se os sobreviventes forem equivalentes: o teto do que o agente pode alegar, justificando cada um. */
+export function estadoSeEquivalentes(e: Execucao): 'PROVADO' | 'FRACO' | 'NÃO VERIFICADO' {
+  return estadoDe({ ...e, resultados: e.resultados.map(r => (r.situacao === 'SOBREVIVENTE' ? { ...r, situacao: 'MORTO' as const } : r)) })
+}
+
+const GRAU = ['NÃO VERIFICADO', 'FRACO', 'PROVADO-PARCIAL', 'PROVADO']
+
+/**
+ * O estado registrado contra o que o mod executou. Igual ou pior passa. Melhor só com cada sobrevivente justificado
+ * como equivalente e sem passar do teto: "fora do escopo" não é equivalência (demo do claude-grounds, 14/10/2026).
+ */
+export function conferirEstado(
+  feita: { estado: string; estadoSeEquivalentes?: string; sobreviventesN?: number[] },
+  estado: string,
+  equivalentes: { n: number; motivo: string }[] = [],
+): string | undefined {
+  if (!feita.sobreviventesN) return undefined
+  const estranhos = equivalentes.filter(q => !feita.sobreviventesN!.includes(q.n)).map(q => `#${q.n}`)
+  if (estranhos.length) return `${estranhos.join(', ')} não sobreviveu: só se justifica sobrevivente.`
+  if (GRAU.indexOf(estado) <= GRAU.indexOf(feita.estado)) return undefined
+  const faltam = feita.sobreviventesN.filter(n => !equivalentes.some(q => q.n === n && q.motivo.trim())).map(n => `#${n}`)
+  if (faltam.length)
+    return `o mod executou ${feita.estado}; para registrar ${estado}, justifique cada sobrevivente como equivalente (sem justificativa: ${faltam.join(', ')}). Fora do escopo não é equivalência: reforce o teste ou registre ${feita.estado}.`
+  if (feita.estadoSeEquivalentes !== 'PROVADO') return `há categoria sem mutante: o estado máximo é ${feita.estadoSeEquivalentes ?? feita.estado}.`
+  if (estado !== 'PROVADO') return 'a escolha às cegas foi aplicada pelo mod: com os sobreviventes justificados, o estado é PROVADO.'
+  return undefined
+}
+
 const marca = (ok: boolean) => (ok ? '✔' : '✘')
 
 /** O relatório no formato do protocolo v1.1, escrito pelo mod a partir do que ele executou. */
