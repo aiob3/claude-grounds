@@ -1,5 +1,7 @@
 <p align="center"><img src="assets/capa.svg" alt="claude-grounds: On what grounds?" width="100%"></p>
 
+<p align="center"><a href="README.en.md">English</a> · <b>Português</b></p>
+
 <p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 49" src="https://img.shields.io/badge/falhas_reais_achadas-49-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
 
 Quando o agente do Claude Code diz "pronto, testado", como você confere? O claude-grounds transforma essa frase num

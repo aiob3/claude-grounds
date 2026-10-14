@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 726" width="1200" height="726" role="img" aria-label="Timeline of the instrument calibration rounds" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>Timeline of the instrument calibration rounds</title>
+<style>
+  .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
+  .t1 { fill: #0b0b0b; } .t2 { fill: #52514e; } .t3 { fill: #8a887f; }
+  .ac { fill: #2a78d6; } .acs { stroke: #2a78d6; } .acf { fill: #e8f1fb; }
+  .ok { fill: #0f7a3d; } .okf { fill: #e3f3e8; }
+  @media (prefers-color-scheme: dark) {
+    .sup { fill: #1a1a19; } .sup2 { fill: #232322; } .borda { stroke: #3a3936; }
+    .t1 { fill: #f0efec; } .t2 { fill: #c3c2b7; } .t3 { fill: #8f8d84; }
+    .ac { fill: #3987e5; } .acs { stroke: #3987e5; } .acf { fill: #1d2c40; }
+    .ok { fill: #4cc27a; } .okf { fill: #16301f; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+<rect width="1200" height="726" rx="16" class="sup"/>
+  <text x="56" y="50" font-size="24" font-weight="800" class="t1">Built with itself</text>
+  <text x="56" y="74" font-size="15" class="t2">Every version went through its own method. In every round the instrument found a bug in itself or gained a new rule.</text>
+  <line x1="74" y1="126" x2="74" y2="164" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="118" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="123" font-size="16" font-weight="700" class="t1">R1</text>
+  <text x="152" y="123" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">manual v1.0</text>
+  <text x="100" y="144" font-size="14.5" class="t2">protocol had no categories and no blind choice</text><text x="1150" y="123" font-size="14" class="ac" text-anchor="end" font-weight="700">4 real test gaps</text><line x1="74" y1="180" x2="74" y2="218" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="172" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="177" font-size="16" font-weight="700" class="t1">R2</text>
+  <text x="152" y="177" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.1.0</text>
+  <text x="100" y="198" font-size="14.5" class="t2">mutations containing `|` were cut when parsed; diff prefix broken by mnemonicprefix</text><text x="1150" y="177" font-size="14" class="ac" text-anchor="end" font-weight="700">4 real test gaps</text><line x1="74" y1="234" x2="74" y2="272" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="226" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="231" font-size="16" font-weight="700" class="t1">R3</text>
+  <text x="152" y="231" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.1.1</text>
+  <text x="100" y="252" font-size="14.5" class="t2">/prova only worked from the session folder; a diff without tests was accepted</text><text x="1150" y="231" font-size="14" class="ac" text-anchor="end" font-weight="700">4 real test gaps</text><line x1="74" y1="288" x2="74" y2="326" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="280" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="285" font-size="16" font-weight="700" class="t1">R4</text>
+  <text x="152" y="285" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.2.0</text>
+  <text x="100" y="306" font-size="14.5" class="t2">short paths left 18 mutants unapplied; a mutant that failed to load counted as killed</text><text x="1150" y="285" font-size="14" class="ac" text-anchor="end" font-weight="700">5 real test gaps</text><line x1="74" y1="342" x2="74" y2="380" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="334" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="339" font-size="16" font-weight="700" class="t1">R5</text>
+  <text x="152" y="339" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.2.1</text>
+  <text x="100" y="360" font-size="14.5" class="t2">malformed file:path:line refused</text><text x="1150" y="339" font-size="14" class="ac" text-anchor="end" font-weight="700">2 real test gaps</text><line x1="74" y1="396" x2="74" y2="434" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="388" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="393" font-size="16" font-weight="700" class="t1">R6</text>
+  <text x="152" y="393" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.2.1→0.2.2</text>
+  <text x="100" y="414" font-size="14.5" class="t2">false &quot;failed to load&quot; (#9/#12); instrument changed during the round</text><text x="1150" y="393" font-size="14" class="ac" text-anchor="end" font-weight="700">4 real test gaps</text><line x1="74" y1="450" x2="74" y2="488" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="442" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="447" font-size="16" font-weight="700" class="t1">R7</text>
+  <text x="152" y="447" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.2.2→0.3.0</text>
+  <text x="100" y="468" font-size="14.5" class="t2">false &quot;failed to load&quot; (#4/#8); path with a repeated folder; instrument changed</text><text x="1150" y="447" font-size="14" class="ac" text-anchor="end" font-weight="700">6 real test gaps</text><line x1="74" y1="504" x2="74" y2="542" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="496" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="501" font-size="16" font-weight="700" class="t1">R8</text>
+  <text x="152" y="501" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.3.0</text>
+  <text x="100" y="522" font-size="14.5" class="t2">new version: log v1.2 with instrument and calibration vs measurement</text><text x="1150" y="501" font-size="14" class="ac" text-anchor="end" font-weight="700">6 real test gaps</text><line x1="74" y1="558" x2="74" y2="596" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="550" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="555" font-size="16" font-weight="700" class="t1">R9</text>
+  <text x="152" y="555" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.4.0</text>
+  <text x="100" y="576" font-size="14.5" class="t2">new version: configurable log (PROVA_DE_TESTE_LOG); protocol ships with the mod</text><text x="1150" y="555" font-size="14" class="ac" text-anchor="end" font-weight="700">8 real test gaps</text><line x1="74" y1="612" x2="74" y2="650" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="604" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="609" font-size="16" font-weight="700" class="t1">demo</text>
+  <text x="152" y="609" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.5.0</text>
+  <text x="100" y="630" font-size="14.5" class="t2">the logger accepted a better state than the run (FRACO) with no justification per survivor</text>
+  <circle cx="74" cy="658" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="663" font-size="16" font-weight="700" class="t1">R10</text>
+  <text x="152" y="663" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.5.0</text>
+  <text x="100" y="684" font-size="14.5" class="t2">new version: a better state than the run needs every survivor justified in the log</text><text x="1150" y="663" font-size="14" class="ac" text-anchor="end" font-weight="700">2 real test gaps</text>
+</svg>
