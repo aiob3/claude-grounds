@@ -119,6 +119,9 @@ As garantias de honestidade são mecânicas, não promessas:
 
 ## Sem hooks para configurar
 
+Sem settings hooks para configurar e sem nada que bloqueie o agente, com o rigor de um guarda onde ele importa:
+nenhum "pronto" sem fundamento chega ao registro.
+
 Os settings hooks do Claude Code são comandos de shell, chamadas HTTP ou prompts que você liga a eventos no
 `settings.json`. Funcionam bem para bloquear ou anotar uma ação, mas rodam fora do Claude Code: não desenham na
 tela, não guardam estado próprio e não dão ao agente uma ferramenta para chamar. Um mod roda dentro dele, e os dois

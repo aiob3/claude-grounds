@@ -122,6 +122,9 @@ The honesty guarantees are mechanical, not promises:
 
 ## No hooks to wire up
 
+No settings hooks to configure and nothing that blocks the agent, with a guard's rigor where it matters: no
+ungrounded "done" makes it into the record.
+
 Claude Code settings hooks are shell commands, HTTP requests or prompts you attach to events in `settings.json`. They
 work well to block or annotate an action, but they run outside Claude Code: they don't draw, keep no state of their
 own and give the agent no tool to call. A mod runs inside it, and the two mods ship all of that in the package (the
