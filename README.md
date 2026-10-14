@@ -2,55 +2,71 @@
 
 <p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 45" src="https://img.shields.io/badge/falhas_reais_achadas-45-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
 
-claude-grounds são dois mods para o Claude Code. O `contexto-bar` mantém o objetivo da tarefa à vista e guardado,
-para você e para o agente, de uma sessão para outra. O `prova-de-teste` não deixa um teste novo virar "pronto" sem
-antes enfrentar mutantes escolhidos por um modelo que nunca viu esse teste. Os dois se instalam com um comando e
-trazem os próprios eventos, ferramentas e telas: não há hook para escrever nem `settings.json` para editar.
+Quando o agente do Claude Code diz "pronto, testado", como você confere? O claude-grounds transforma essa frase num
+ciclo. Antes de começar, o agente declara o que é "pronto", com a prova dentro. A cada pedido, a prova pendente
+volta à frente dele. A prova roda às cegas, e o objetivo só fecha quando o registro cumpre o que foi declarado. O
+objetivo e a prova ficam gravados, e a próxima sessão retoma com a evidência junto.
 
-## O que muda no dia a dia
+São dois mods que funcionam em par: o `contexto-bar` guarda e mostra a afirmação, o `prova-de-teste` produz o
+fundamento dela. Cada um se instala sozinho, e não há hook para configurar.
 
-- O agente declara o objetivo e as pendências, e você acompanha numa faixa acima do prompt e num painel ao lado.
-- O objetivo fica gravado por projeto. Fechar a sessão, reiniciar a máquina ou abrir outra sessão em paralelo não
-  apaga nada: na próxima vez, ele volta inteiro.
-- A cada pedido, o agente recebe uma linha com o objetivo e o que falta. Ninguém precisa reexplicar onde parou.
-- A barra mostra o progresso e estima quanto da janela de contexto o restante vai custar, aprendendo com as
-  entregas já feitas. Se não couber, o agente é avisado antes da compactação, e a estimativa se refaz depois dela.
-- A fila é compartilhada: cada pendência tem dono, e a faixa mostra quantas abertas são suas ("sua vez").
-- Um teste novo passa por mutantes às cegas numa cópia do repositório, e o relatório mostra o que sobreviveu.
-- O agente não consegue registrar um resultado melhor que o executado sem justificar, por escrito, cada mutante que
-  sobreviveu.
+## O ciclo, numa sessão real
 
-## contexto-bar: o objetivo que não se perde
+<p align="center"><img src="assets/demo/sessao.webp" alt="Sessão real do Claude Code percorrendo o ciclo, acelerada" width="100%"></p>
 
-<p align="center"><img src="assets/demo/faixa.webp" alt="A faixa do contexto-bar em quatro momentos da mesma sessão: 0/5, 1/5, 3/5 e 5/5" width="100%"></p>
+O pedido era corrigir `mediana([10, 9, 2])`, que devolvia 2 em vez de 9 porque `sort()` ordenava os números como
+texto. O projeto está em [claude-grounds-demo](https://github.com/aiob3/claude-grounds-demo) para quem quiser repetir.
 
-Quatro momentos da mesma sessão, recortados da gravação. A primeira linha divide a janela de contexto por origem
-(sistema, CLAUDE.md e memória, MCP, skills, hooks, conversa, espaço livre e a reserva da compactação). A segunda
-mostra o objetivo e o progresso, que sobe de 0/5 para 5/5 à medida que o agente conclui as pendências. A terceira é
-a projeção: começa na estimativa padrão de 6k tokens por unidade (o asterisco) e, depois das primeiras entregas,
-passa a usar a média medida na própria sessão, 3,4k.
+### 1. Declarar
+
+<p align="center"><img src="assets/demo/01.webp" alt="O agente define o objetivo com a prova dentro" width="100%"></p>
+
+O objetivo nasce com a prova dentro dele: ler o código, mostrar o teste falhando, corrigir, provar com o
+`executar`, registrar a rodada. A conclusão declarada não é "corrigi". É "a rodada de prova registrada com os
+números do relatório". Cada pendência tem dono, tamanho e prioridade.
+
+### 2. Acompanhar
+
+<p align="center"><img src="assets/demo/faixa.webp" alt="A faixa em quatro momentos: 0/5, 1/5, 3/5 e 5/5" width="100%"></p>
+
+A cada pedido, o agente recebe uma linha com o objetivo e o que falta, então a prova pendente fica na frente dele
+até o fim. A faixa divide a janela de contexto por origem, mostra o progresso (0/5, 1/5, 3/5, 5/5 nos recortes
+acima) e projeta se o restante cabe antes da compactação. A projeção aprende com a sessão: começa no padrão de 6k
+tokens por item (o asterisco) e passa à média medida, 3,4k. Se não couber, o agente é avisado antes.
+
+### 3. Provar
 
 <table>
 <tr>
-<td width="44%"><img src="assets/demo/painel.webp" alt="Painel do objetivo com as cinco pendências concluídas"></td>
-<td>
-
-**Memória por projeto.** Cada pasta de projeto tem o seu arquivo em `~/.claude/objetivos/`. Duas sessões em projetos
-diferentes não se sobrescrevem.
-
-**Atualização pelos dois lados.** O agente usa a ferramenta `objetivo` (definir, concluir, adicionar, priorizar,
-reabrir, encerrar). Você usa `/objetivo`. A fila fica ordenada por prioridade: bloqueante, requisito, melhoria.
-
-**Projeção da janela.** Cada pendência tem um tamanho (P vale 1 unidade, M vale 2, G vale 4). O consumo real de
-cada entrega entra na média, e a soma do que falta é comparada com o espaço livre: cabe, apertado ou não cabe.
-
-**Painel automático.** Com um objetivo ativo, o painel abre a cada pedido (`/objetivo auto off` desliga).
-
-</td>
+<td width="50%"><img src="assets/demo/02.webp" alt="Red first: o teste falha antes da correção"></td>
+<td width="50%"><img src="assets/demo/04.webp" alt="FRACO: um sobrevivente real, o teste é reforçado"></td>
 </tr>
 </table>
 
-Um trecho do arquivo que guardou o objetivo da sessão acima. Ele continua lá depois que a sessão termina:
+Primeiro o red first: o teste novo falha antes da correção, 2 em vez de 9. Depois da correção, o `executar` copia o
+repositório para uma pasta temporária, pede mutantes a um modelo sem ferramentas e sem histórico, que só vê o diff
+do código, e roda os testes contra cada um. Deu FRACO: um mutante sobreviveu porque nenhum teste via o primeiro
+elemento da lista. O teste foi reforçado e a mesma lista rodou de novo. Enquanto isso, a pendência "provar" seguia
+aberta na faixa.
+
+### 4. Registrar e fechar
+
+<table>
+<tr>
+<td width="56%"><img src="assets/demo/05.webp" alt="O agente registra alegando um equivalente"></td>
+<td><img src="assets/demo/painel.webp" alt="Painel do objetivo em 5 de 5"></td>
+</tr>
+</table>
+
+O `registrar` só aceita os números da última execução. A demo mostrou o que faltava: o agente registrou
+PROVADO-PARCIAL alegando que um sobrevivente era equivalente, e não era (com lista par, `mediana([1,2,3,4])` dá 3 e
+o mutante dá 2). O log ganhou uma linha de correção, e o `registrar` passou a exigir a justificativa escrita de cada
+sobrevivente, gravada no log. O objetivo chega a 5/5 quando a conclusão declarada se cumpre.
+
+### 5. Continuar
+
+O objetivo fica num arquivo por projeto, e a prova fica no log. Fechar a sessão, reiniciar a máquina ou abrir outra
+sessão em paralelo não apaga nada. Um trecho do arquivo que guardou o objetivo da sessão acima:
 
 ```json
 {
@@ -66,35 +82,14 @@ Um trecho do arquivo que guardou o objetivo da sessão acima. Ele continua lá d
 }
 ```
 
-| Você digita | O que acontece |
-|---|---|
-| `/objetivo` | abre o painel |
-| `/objetivo Migrar o login :: testes verdes em produção` | define o objetivo e o passo que o encerra |
-| `/objetivo feito 2 3` | conclui as pendências 2 e 3 |
-| `/objetivo bloqueante 4` | sobe a pendência 4 para o topo da fila |
-| `/objetivo meu revisar o contrato` | acrescenta uma pendência sua |
-| `/objetivo encerrar` | encerra o objetivo do projeto |
+<p align="center"><img src="assets/ciclo.svg" alt="O ciclo: objetivo, execução isolada, mutantes cegos, testes e registro" width="100%"></p>
 
-## prova-de-teste: "pronto" com evidência
+### Por que os dois juntos
 
-<p align="center"><img src="assets/demo/sessao.webp" alt="Sessão real do Claude Code corrigindo um bug com os dois mods, acelerada" width="100%"></p>
-
-A mesma sessão, acelerada. O pedido era corrigir `mediana([10, 9, 2])`, que devolvia 2 em vez de 9 porque `sort()`
-ordenava os números como texto. O projeto está em [claude-grounds-demo](https://github.com/aiob3/claude-grounds-demo)
-para quem quiser repetir.
-
-| | |
-|---|---|
-| <img src="assets/demo/01.webp" alt="Objetivo definido"> 1. O agente declara o objetivo e a faixa passa a acompanhar. | <img src="assets/demo/02.webp" alt="Red first"> 2. Red first: o teste novo falha antes da correção, 2 em vez de 9. |
-| <img src="assets/demo/03.webp" alt="Correção e executar"> 3. Com o comparador numérico, o agente chama `executar`. | <img src="assets/demo/04.webp" alt="Estado FRACO e reforço"> 4. FRACO: um sobrevivente era falha real. O teste é reforçado e a mesma lista roda de novo. |
-| <img src="assets/demo/05.webp" alt="Registro com equivalente falso"> 5. O agente alegou que um sobrevivente era equivalente. Não era: com lista par, `mediana([1,2,3,4])` dá 3 e o mutante dá 2. O log ganhou uma correção, e o `registrar` passou a exigir a justificativa de cada sobrevivente. | <img src="assets/demo/06.webp" alt="Painel do objetivo"> 6. O objetivo fechado em 5 de 5, com o painel aberto ao lado. |
-
-<p align="center"><img src="assets/ciclo.svg" alt="Objetivo, execução isolada, mutantes cegos, testes e registro" width="100%"></p>
-
-O `executar` copia o repositório para uma pasta temporária, pede os mutantes a um modelo sem ferramentas e sem
-histórico, roda a linha de base, aplica um mutante por vez, roda os testes e restaura. O original não é tocado. O
-`registrar` só aceita os números dessa execução, e um estado melhor que o executado exige a justificativa de cada
-sobrevivente, gravada no log.
+Um objetivo sem prova é uma lista que o agente marca como feita sozinho. Uma prova sem objetivo é um relatório que
+ninguém pediu e que se perde quando a sessão acaba. Juntos, a afirmação de "pronto" vem declarada antes, fica à
+vista durante o trabalho e só fecha com fundamento registrado. Os mods não chamam um ao outro: o elo é o próprio
+fluxo do agente, que recebe o objetivo a cada pedido e registra a prova no fim.
 
 ## Construído com ele mesmo
 
@@ -145,7 +140,17 @@ claude plugin install prova-de-teste@claude-grounds
 | [`prova-de-teste`](prova-de-teste/) | 0.6.0 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
 
 O log do `prova-de-teste` vai para `PROVA_DE_TESTE_LOG` ou, sem essa variável, para
-`~/.claude/prova-de-teste/EXP-001-log.md`.
+`~/.claude/prova-de-teste/EXP-001-log.md`. O agente usa as ferramentas `objetivo`, `executar` e `registrar`; você usa
+o `/objetivo`:
+
+| Você digita | O que acontece |
+|---|---|
+| `/objetivo` | abre o painel |
+| `/objetivo Migrar o login :: testes verdes em produção` | define o objetivo e o passo que o encerra |
+| `/objetivo feito 2 3` | conclui as pendências 2 e 3 |
+| `/objetivo bloqueante 4` | sobe a pendência 4 para o topo da fila |
+| `/objetivo meu revisar o contrato` | acrescenta uma pendência sua |
+| `/objetivo encerrar` | encerra o objetivo do projeto |
 
 ## Primeiros cinco minutos
 
