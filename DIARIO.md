@@ -130,6 +130,11 @@ Diário de um experimento operacional: usar mods (plugins locais do Claude Code)
 - **Por que passou:** o `registrar` conferia os números da execução, mas aceitava qualquer estado declarado. Agora um estado melhor que o executado exige a justificativa de cada sobrevivente (`equivalentes`), que vai para a linha do log; PROVADO-PARCIAL não cabe numa execução do mod (ele aplica a escolha às cegas), e com categoria descoberta o teto é FRACO. O protocolo ganhou a regra: fora do escopo não é equivalência.
 - **Rodada 10:** 15/11/4, com 2 reais, 1 código morto removido e 1 equivalente; reforço 13/12/1; o #13, aplicado à mão, morreu. Foi registrada como PROVADO pela regra nova, com a justificativa do #7 na linha.
 
+### Sincronização e CI (2026-10-14, noite)
+- **Ganchos `post-commit`** no repositório dos mods e no do log: a cada commit (ou rodada nova), o claude-grounds é regerado, sanitizado e publicado sozinho. O primeiro teste real mostrou um defeito do próprio script: um commit pendente não subia quando não havia mudança nova. Corrigido para sempre tentar o push.
+- **CI público:** GitHub Action com o Claude Code 2.1.300, que valida o marketplace e roda os testes dos dois mods a cada push. Passou na primeira execução, e o selo aparece no topo do README.
+- **A sessão real gravada pelo operador** entrou no README como animação e seis quadros, revisados à mão e por OCR. O operador cobrou com razão: eu tinha anunciado como pronto o que o GitHub ainda recusava (falta do escopo `workflow`). A lição é só dizer "publicado" depois de conferir o que está no ar.
+
 ## Próximas observações
 - [x] Confirmar numa sessão nova que o objetivo de `~/Work` volta sozinho. **Validado pelo operador em 2026-10-14:** a sessão nova recebeu o objetivo da F1 inteiro (título, conclusão, 8 itens), sem restauração manual; ali o objetivo foi fechado em 8/8.
 - [ ] Ver se a média por unidade (hoje cerca de 11k tokens por P) se estabiliza entre sessões. Ela é gravada junto do objetivo e passa para o próximo objetivo definido por cima, mas se perde quando o objetivo é encerrado: o seguinte começa sem histórico.
