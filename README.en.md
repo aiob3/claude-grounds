@@ -9,8 +9,9 @@ Before starting, the agent declares what "done" means, with the proof inside it.
 comes back in front of it. The proof runs blind, and the goal only closes when the record meets what was declared.
 The goal and the proof are saved, so the next session picks up with the evidence.
 
-It is two mods that work as a pair: `contexto-bar` keeps and shows the claim, `prova-de-teste` produces its grounds.
-Each installs on its own, and there are no hooks to wire up.
+It is two Claude Code mods (plugins whose code runs inside Claude Code, available since version 2.1.287) that work
+as a pair: `contexto-bar` keeps and shows the claim, `prova-de-teste` produces its grounds. Each installs on its own,
+and there are no hooks to wire up.
 
 ## The loop, in a real session
 
@@ -121,11 +122,12 @@ The honesty guarantees are mechanical, not promises:
 
 ## No hooks to wire up
 
-Claude Code hooks are shell commands you attach to events in `settings.json`. They work well to block or annotate an
-action, but each one is a loose script, with no UI, no state of its own and no tool the agent can call. The two mods
-ship all of that in the package:
+Claude Code settings hooks are shell commands, HTTP requests or prompts you attach to events in `settings.json`. They
+work well to block or annotate an action, but they run outside Claude Code: they don't draw, keep no state of their
+own and give the agent no tool to call. A mod runs inside it, and the two mods ship all of that in the package (the
+official docs have the [full comparison](https://code.claude.com/docs/en/plugins/mods#compare-mods-settings-hooks-skills-and-mcp-servers)):
 
-| | Hooks in `settings.json` | The claude-grounds mods |
+| | Settings hooks (`settings.json`) | The claude-grounds mods |
 |---|---|---|
 | Install | edit the file and write the scripts | `claude plugin install` |
 | What the agent can call | nothing | `objetivo`, `executar`, `registrar`, `mutantes` |
@@ -183,7 +185,8 @@ session, open another one in the same folder and type `/objetivo`: the goal is s
 - Whether a survivor is equivalent is still judged by the agent. The mod requires the justification and saves it to
   the log for auditing, but does not prove it.
 - The window projection is an estimate: the average of the last 8 deliveries per size unit.
-- The mods use the Claude Code plugin runtime and were tested on version 2.1.300.
+- The mods need Claude Code 2.1.287 or later (the version mods shipped in) and were tested on 2.1.300. They
+  work in the terminal and in the Code tab of the Desktop app.
 
 Open: reach 10 measurements with a frozen instrument (1 so far) before deciding whether the method
 becomes a criterion; keep the consumption history per project, independent of the goal; see whether the per-unit

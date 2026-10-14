@@ -9,8 +9,9 @@ ciclo. Antes de começar, o agente declara o que é "pronto", com a prova dentro
 volta à frente dele. A prova roda às cegas, e o objetivo só fecha quando o registro cumpre o que foi declarado. O
 objetivo e a prova ficam gravados, e a próxima sessão retoma com a evidência junto.
 
-São dois mods que funcionam em par: o `contexto-bar` guarda e mostra a afirmação, o `prova-de-teste` produz o
-fundamento dela. Cada um se instala sozinho, e não há hook para configurar.
+São dois mods do Claude Code (plugins cujo código roda dentro dele, disponíveis desde a versão 2.1.287) que
+funcionam em par: o `contexto-bar` guarda e mostra a afirmação, o `prova-de-teste` produz o fundamento dela. Cada um
+se instala sozinho, e não há hook para configurar.
 
 ## O ciclo, numa sessão real
 
@@ -118,11 +119,12 @@ As garantias de honestidade são mecânicas, não promessas:
 
 ## Sem hooks para configurar
 
-Hooks do Claude Code são comandos de shell que você liga a eventos no `settings.json`. Funcionam bem para bloquear
-ou anotar uma ação, mas cada um é um script solto, sem tela, sem estado próprio e sem ferramenta que o agente possa
-chamar. Os dois mods trazem tudo isso dentro do pacote:
+Os settings hooks do Claude Code são comandos de shell, chamadas HTTP ou prompts que você liga a eventos no
+`settings.json`. Funcionam bem para bloquear ou anotar uma ação, mas rodam fora do Claude Code: não desenham na
+tela, não guardam estado próprio e não dão ao agente uma ferramenta para chamar. Um mod roda dentro dele, e os dois
+mods trazem tudo isso no pacote (a documentação oficial tem a [comparação completa](https://code.claude.com/docs/en/plugins/mods#compare-mods-settings-hooks-skills-and-mcp-servers)):
 
-| | Hooks no `settings.json` | Os mods do claude-grounds |
+| | Settings hooks (`settings.json`) | Os mods do claude-grounds |
 |---|---|---|
 | Instalar | editar o arquivo e escrever os scripts | `claude plugin install` |
 | O agente pode chamar | nada | `objetivo`, `executar`, `registrar`, `mutantes` |
@@ -177,7 +179,8 @@ abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
 - A equivalência de um sobrevivente continua sendo julgada pelo agente. O mod exige a justificativa e a grava no
   log, para auditoria, mas não a prova.
 - A projeção da janela é uma estimativa: a média das últimas 8 entregas por unidade de tamanho.
-- Os mods usam o runtime de plugins do Claude Code e foram testados na versão 2.1.300.
+- Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
+  2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
 Em aberto: chegar a 10 medições com o instrumento parado (1 até agora) antes de decidir se o método
 vira critério; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
