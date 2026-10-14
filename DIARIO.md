@@ -120,6 +120,11 @@ Diário de um experimento operacional: usar mods (plugins locais do Claude Code)
 - **O protocolo viaja com o instrumento:** `prova-de-teste/PROTOCOLO.md` é o canônico; a cópia do harness aponta para ele.
 - **Rodada 9:** 20/12/8 na 1ª execução, com 7 reais (a variável perdia para o HOME; variável vazia virava caminho vazio; HOME com falha derrubava o registrar...) e 1 equivalente; reforço 20/19/1. O mutante #18, aplicado à mão, sobreviveu: sem `git add`, um log novo nunca seria commitado. Reforçado e morto. Classificada pelo mod como calibração.
 
+### Publicação: claude-grounds (2026-10-14, noite)
+- O repositório público de avaliação está no ar em https://github.com/aiob3/claude-grounds (MIT), com autorização do operador. O nome vem do modelo de Toulmin: *claim* (o objetivo), *grounds* (a prova), *rebuttal* (os mutantes cegos), *qualifier* (o estado). O operador rejeitou "Bulletproof" por prometer o que o método nega e preferiu o prefixo `claude-`, porque o projeto parte do harness do Claude Code.
+- O repositório é gerado por `publico/gerar.py`, que não vai a público: mods, protocolo, log só com as rodadas sobre os mods, diário anonimizado, critérios com a contagem calculada do log, e uma checagem que barra termos privados. Os visuais SVG animados (capa, ciclo, rodadas e terminal) também saem do log, e o gráfico de rodadas se atualiza a cada geração.
+- O README e os critérios passaram pela skill humanizer (blader/humanizer), a pedido do operador.
+
 ## Próximas observações
 - [x] Confirmar numa sessão nova que o objetivo de `~/Work` volta sozinho. **Validado pelo operador em 2026-10-14:** a sessão nova recebeu o objetivo da F1 inteiro (título, conclusão, 8 itens), sem restauração manual; ali o objetivo foi fechado em 8/8.
 - [ ] Ver se a média por unidade (hoje cerca de 11k tokens por P) se estabiliza entre sessões. Ela é gravada junto do objetivo e passa para o próximo objetivo definido por cima, mas se perde quando o objetivo é encerrado: o seguinte começa sem histórico.
