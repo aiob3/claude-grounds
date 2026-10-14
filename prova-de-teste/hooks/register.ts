@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Escolha, ExecucaoFeita } from '../types'
-import { aplicarTrecho, comandosPara, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
+import { aplicarTrecho, comandosPara, contarTestes, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
 import { avisoNovos, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
@@ -117,6 +117,7 @@ async function escolher(
     naoCodigo,
     avisoNovos: avisoNovos(fonte.map(b => b.arquivo), novos),
     mutantes: lido.mutantes,
+    linhasDoDiff: fonte.reduce((t, b) => t + linhasDoDiff(b.texto), 0),
     naoAplicaveis: lido.naoAplicaveis,
   }
   await update($, ultima, () => escolha)
@@ -164,7 +165,8 @@ async function registrar($: EngineInterface, r: Partial<Registro> & { defeitoIns
     versaoNaExecucao: feita?.versao,
     versaoAgora: feita ? await versaoDoMod($) : undefined,
   })
-  const { linha, erro } = linhaLog({ ...r, instrumento, defeitos }, data)
+  // O custo vem do que o mod mediu, nunca do agente.
+  const { linha, erro } = linhaLog({ ...r, instrumento, defeitos, custo: feita?.custo }, data)
   if (erro || !linha) return { texto: `Erro: ${erro}`, erro: true }
   const divergente = feita && (conferir(feita, r) ?? conferirEstado(feita, r.estado!, r.equivalentes ?? []))
   if (divergente) return { texto: `Erro: ${divergente}`, erro: true }
@@ -264,18 +266,21 @@ async function executar(
         stdout: '',
         stderr: `não rodou: ${err instanceof Error ? err.message : String(err)}`,
       }))
-    /** Roda os comandos em ordem e para no primeiro que falhar. */
+    /** Roda os comandos em ordem e para no primeiro que falhar; os testes somam os de cada comando que rodou. */
     const rodar = async (cs: Comando[]) => {
       const t = Date.now()
       let ultimo = { exitCode: 0, stdout: '', stderr: '' }
+      let testes: number | undefined = 0
       for (const c of cs) {
         ultimo = await rodarUm(c.argv)
+        testes = somarTestes(testes, contarTestes(`${ultimo.stdout}\n${ultimo.stderr}`))
         if (ultimo.exitCode !== 0) break
       }
-      return { ...ultimo, segundos: (Date.now() - t) / 1000 }
+      return { ...ultimo, testes, segundos: (Date.now() - t) / 1000 }
     }
 
     const base = await rodar(naCopia)
+    const lsTree = await git($, ['ls-tree', '-r', '-l', 'HEAD'], raiz)
     const exec: Execucao = {
       tarefa: a.tarefa.trim(),
       modelo: e.modelo,
@@ -290,6 +295,11 @@ async function executar(
       restauracao: 'cmp na cópia: idêntico',
       originalIntocado: true,
       segundos: 0,
+      custo: {
+        repo: lsTree.exitCode === 0 ? tamanhoDoRepo(lsTree.stdout) : undefined,
+        diff: { arquivos: e.enviados.length, linhas: e.linhasDoDiff ?? 0 },
+        testesNaBase: base.testes,
+      },
     }
     if (exec.linhaDeBase.passou) {
       let n = 0
@@ -323,6 +333,7 @@ async function executar(
           const t = await rodar(cobrem)
           r.segundos = t.segundos
           const saida = t.stdout + '\n' + t.stderr
+          r.testes = t.testes
           if (t.exitCode !== 0 && invalido(saida)) {
             r.motivo = `mutante inválido: o código mutado não carregou (${erroDeCarga(saida)}); não conta como morto`
           } else {
@@ -348,6 +359,7 @@ async function executar(
       versao: await versaoDoMod($),
       // O diff mexe no próprio mod: a rodada mede o instrumento enquanto ele muda (v1.2: calibração).
       alteraInstrumento: tocaOInstrumento(raiz, e.enviados, $.plugin.root),
+      custo: resumoCusto(exec),
     }
     await update($, execucao, () => feita)
     const texto = relatorio(exec, new Date().toISOString().slice(0, 10))

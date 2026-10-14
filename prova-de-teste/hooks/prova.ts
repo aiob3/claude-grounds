@@ -8,7 +8,7 @@ export const LOG_ENV = 'PROVA_DE_TESTE_LOG'
 export const logPadrao = (home: string) => `${home}/.claude/prova-de-teste/EXP-001-log.md`
 export const CABECALHO_LOG =
   '# EXP-001 — log\n\n' +
-  `v${VERSAO}: \`<data> | <tarefa> | versão do protocolo | mutantes: aplicados/mortos/sobreviventes | reais: <n> | estado | tempo (s) | instrumento: <mod x.y.z | manual> | <medição | calibração: defeito>\`\n\n`
+  `v${VERSAO}: \`<data> | <tarefa> | versão do protocolo | mutantes: aplicados/mortos/sobreviventes | reais: <n> | estado | tempo (s) | instrumento: <mod x.y.z | manual> | <medição | calibração: defeito> [| custo: base, por mutante, repositório, diff]\`\n\n`
 
 export const CATEGORIAS: Exclude<Categoria, 'livre'>[] = ['borda/vazio', 'empate/ordem', 'null/inválido', 'condição invertida']
 
@@ -157,6 +157,8 @@ export type Registro = {
   defeitos?: string[]
   /** Sobreviventes alegados como equivalentes, com o motivo: vão à linha do log, para quem audita. */
   equivalentes?: { n: number; motivo: string }[]
+  /** 0.7.0: o custo medido pelo mod na execução (nunca informado pelo agente). */
+  custo?: string
 }
 
 /**
@@ -204,6 +206,7 @@ export function linhaLog(r: Partial<Registro>, data: string): { linha?: string; 
     linha:
       `${data} | ${t} | v${VERSAO} | mutantes: ${r.aplicados}/${r.mortos}/${r.sobreviventes} | reais: ${r.reais} | ${r.estado} | ${r.tempo}` +
       ` | instrumento: ${r.instrumento ?? `manual v${VERSAO}`} | ${r.defeitos?.length ? `calibração: ${r.defeitos.join('; ').replace(/\s*\|\s*/g, ' / ')}` : 'medição'}` +
-      (r.equivalentes?.length ? ` | equivalentes: ${r.equivalentes.map(q => `#${q.n} ${q.motivo.trim()}`).join('; ').replace(/\s*\|\s*/g, ' / ')}` : ''),
+      (r.equivalentes?.length ? ` | equivalentes: ${r.equivalentes.map(q => `#${q.n} ${q.motivo.trim()}`).join('; ').replace(/\s*\|\s*/g, ' / ')}` : '') +
+      (r.custo ? ` | custo: ${r.custo.replace(/\s*\|\s*/g, ' / ')}` : ''),
   }
 }

@@ -11,7 +11,8 @@ export function lerMutacao(mutacao: string): { de: string; para: string } | null
  * "` → `" é um ponto de corte candidato. Quem aplica fica com o maior original que existe no arquivo.
  */
 export function lerMutacoes(mutacao: string): { de: string; para: string }[] {
-  const t = mutacao.trim()
+  // O escolhedor às vezes explica a mutação depois dela: `a` → `b` (remove a guarda). A nota não faz parte do trecho.
+  const t = mutacao.trim().replace(/(`)\s+\([^`]*\)$/, '$1')
   const dupla = /^``\s(.+?)\s``\s*→\s*``\s(.*?)\s``$/.exec(t)
   if (dupla) return [{ de: dupla[1]!, para: dupla[2]! }]
   if (!t.startsWith('`') || !t.endsWith('`')) return []
@@ -86,6 +87,87 @@ export function quemMatou(saida: string, codigo: number): string {
   return `código de saída ${codigo}`
 }
 
+/**
+ * Quantos testes a execução rodou, pelo resumo final dos formatos comuns; sem resumo, nada.
+ * É o número que diz se a execução incremental rodou menos testes por mutante.
+ */
+export function contarTestes(saida: string): number | undefined {
+  const num = (re: RegExp) => {
+    const m = re.exec(saida)
+    return m ? Number(m[1]) : undefined
+  }
+  // claude plugin test e bun test: "Ran 46 tests across 3 files."
+  const ran = num(/^Ran (\d+) tests? across/m)
+  if (ran !== undefined) return ran
+  // jest e vitest: "Tests:  1 failed, 11 passed, 12 total" / "Tests  12 passed (12)"
+  const jest = num(/^\s*Tests:.*?(\d+) total/m) ?? num(/^\s*Tests\s+.*\((\d+)\)\s*$/m)
+  if (jest !== undefined) return jest
+  // node --test: "# tests 12" (tap) ou "ℹ tests 12" (spec)
+  const node = num(/^(?:#|ℹ) tests (\d+)/m)
+  if (node !== undefined) return node
+  // pytest: "3 failed, 9 passed, 1 skipped in 0.31s" (a linha final, com ou sem os "=")
+  const py = /^[= ]*((?:\d+ (?:passed|failed|errors?|skipped|xfailed|xpassed)(?:, )?)+) in [\d.]+s/m.exec(saida)
+  if (py) return [...py[1]!.matchAll(/(\d+) (passed|failed|errors?)/g)].reduce((t, m) => t + Number(m[1]), 0)
+  return undefined
+}
+
+/** Soma os testes de dois comandos; um sem resumo deixa a soma desconhecida, em vez de contar zero. */
+export const somarTestes = (a: number | undefined, b: number | undefined) => (a === undefined || b === undefined ? undefined : a + b)
+
+/** Linhas adicionadas ou removidas num diff: só dentro dos hunks, para "--- x" removido não passar por cabeçalho. */
+export function linhasDoDiff(texto: string): number {
+  let noHunk = false
+  let n = 0
+  for (const l of texto.split('\n')) {
+    if (l.startsWith('diff --git ')) noHunk = false
+    else if (l.startsWith('@@')) noHunk = true
+    else if (noHunk && /^[+-]/.test(l)) n++
+  }
+  return n
+}
+
+/** Arquivos e bytes do repositório, pela saída de `git ls-tree -r -l HEAD`. */
+export function tamanhoDoRepo(lsTree: string): { arquivos: number; bytes: number } {
+  const linhas = lsTree.split('\n').filter(l => /\sblob\s/.test(l))
+  const bytes = linhas.reduce((t, l) => t + (Number(/\sblob\s+\S+\s+(\d+)\t/.exec(l)?.[1]) || 0), 0)
+  return { arquivos: linhas.length, bytes }
+}
+
+/** O que a rodada custou e sobre o quê: os números da hipótese "o custo acompanha o diff, não o código". */
+export type Custo = {
+  repo?: { arquivos: number; bytes: number }
+  diff: { arquivos: number; linhas: number }
+  testesNaBase?: number
+}
+
+/** Médias por mutante aplicado (os não aplicados não rodaram). */
+export function porMutante(rs: Resultado[]): { n: number; segundos: number; testes?: number } {
+  const ap = rs.filter(r => r.situacao !== 'NÃO APLICADO')
+  if (!ap.length) return { n: 0, segundos: 0 }
+  const comTestes = ap.filter(r => r.testes !== undefined)
+  return {
+    n: ap.length,
+    segundos: ap.reduce((t, r) => t + r.segundos, 0) / ap.length,
+    testes: comTestes.length === ap.length ? comTestes.reduce((t, r) => t + r.testes!, 0) / ap.length : undefined,
+  }
+}
+
+const kb = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`)
+const um = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1))
+
+/** Uma linha só, igual no relatório e no log: base, por mutante, repositório e diff. */
+export function resumoCusto(e: Pick<Execucao, 'linhaDeBase' | 'resultados' | 'custo'>): string {
+  const pm = porMutante(e.resultados)
+  const c = e.custo
+  const testes = (n?: number) => (n === undefined ? '' : `, ${um(n)} testes`)
+  return [
+    `base ${e.linhaDeBase.segundos.toFixed(1)} s${testes(c?.testesNaBase)}`,
+    `por mutante ${pm.segundos.toFixed(1)} s${testes(pm.testes)} (n=${pm.n})`,
+    c?.repo ? `repositório ${c.repo.arquivos} arquivos, ${kb(c.repo.bytes)}` : 'repositório ?',
+    c ? `diff ${c.diff.linhas} linhas em ${c.diff.arquivos} arquivos` : 'diff ?',
+  ].join('; ')
+}
+
 export type ArquivosDoRepo = { pacote?: string; temPytest: boolean; pastasDePlugin: string[] }
 
 /** Um comando de teste; `pasta` é o plugin que ele cobre ('' = a raiz; ausente = o repositório todo). */
@@ -120,6 +202,8 @@ export type Resultado = Mutante & {
   situacao: 'MORTO' | 'SOBREVIVENTE' | 'NÃO APLICADO'
   motivo?: string
   segundos: number
+  /** Testes que a execução deste mutante rodou, pelo resumo do executor. */
+  testes?: number
 }
 
 export type Execucao = {
@@ -136,6 +220,7 @@ export type Execucao = {
   restauracao: 'cmp na cópia: idêntico' | 'cmp na cópia: DIFERENTE'
   originalIntocado: boolean
   segundos: number
+  custo?: Custo
 }
 
 export type Contagem = { aplicados: number; mortos: number; sobreviventes: number }
@@ -233,6 +318,7 @@ export function relatorio(e: Execucao, data: string): string {
     `Concentração: ${conc.maior}/${conc.total}${conc.alerta ? ` ⚠ concentração em "${conc.teste}": aplique mais 1 mutante fora dessa área` : ''}`,
     `Restauração: ${e.restauracao}; original ${marca(e.originalIntocado)} ${e.originalIntocado ? 'intocado (git status igual antes e depois)' : 'ALTERADO'}`,
     `Tempo:      ${e.segundos.toFixed(1)} s`,
+    `Custo:      ${resumoCusto(e)}`,
     `Estado:     ${est}${est === 'FRACO' ? ' (sobrevivente sem tratamento ou categoria descoberta: a tarefa não é Done)' : ''}`,
   ]
     .filter(Boolean)

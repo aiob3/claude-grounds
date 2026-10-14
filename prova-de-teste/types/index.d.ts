@@ -17,6 +17,8 @@ export type Escolha = {
   /** Aviso de envio dominado por arquivos fora do git. */
   avisoNovos?: string
   mutantes: Mutante[]
+  /** 0.7.0: linhas adicionadas ou removidas no diff do código-fonte enviado. */
+  linhasDoDiff?: number
   /** Categorias que o modelo declarou não aplicáveis, com o motivo. */
   naoAplicaveis: string[]
 }
@@ -35,6 +37,8 @@ export type ExecucaoFeita = {
   /** 0.6.0: o teto do estado com os sobreviventes justificados, e quais sobreviveram. */
   estadoSeEquivalentes?: string
   sobreviventesN?: number[]
+  /** 0.7.0: o resumo do custo da rodada (base, por mutante, repositório, diff), que vai ao log. */
+  custo?: string
 }
 
 declare module 'claude-code' {

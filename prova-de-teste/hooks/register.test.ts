@@ -213,6 +213,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       if (a === 'rev-parse --show-toplevel') return r('/repo\n')
       if (a === 'diff HEAD') return r(DIFF)
       if (a === 'status --porcelain') return r(' M src/a.ts\n')
+      if (a === 'ls-tree -r -l HEAD') return r('100644 blob aaa     30\tsrc/a.ts\n100644 blob bbb     2018\tsrc/a.test.ts\n')
       return r('')
     }
     if (argv[0] === 'mktemp') return r(`${TMP}\n`)
@@ -231,7 +232,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       const fonte = fs.get(`${TMP}/repo/src/a.ts`) ?? ''
       if (o.baseFalha) return r('  ✕ soma dá 3 (1 ms)\n', 1)
       if (fonte.includes('=> a +\n')) return r("(fail) the file did not load\n\nSyntaxError: Unexpected token '\\n'\n", 1)
-      return fonte.includes('a - b') ? r('  ✕ soma dá 3 (1 ms)\n', 1) : r('  ✓ soma dá 3\n')
+      return fonte.includes('a - b') ? r('  ✕ soma dá 3 (1 ms)\nTests:  1 failed, 1 total\n', 1) : r('  ✓ soma dá 3\nTests:  1 passed, 1 total\n')
     }
     return r('', 127)
   })
@@ -295,6 +296,9 @@ test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver 
   const certo = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'soma', aplicados: 2, mortos: 1, sobreviventes: 1, reais: 1, estado: 'FRACO', tempo: 5 } as never))
   expect(certo).toContain('mutantes: 2/1/1')
   expect(m.fs.get(LOG_PATH)).toContain('| soma | v1.2 | mutantes: 2/1/1 | reais: 1 | FRACO | 5 | instrumento: mod ')
+  // O custo medido pelo mod vai ao relatório e ao log, sem o agente informar nada.
+  expect(r).toMatch(/Custo:      base \d+\.\d s, 1 testes; por mutante \d+\.\d s, 1 testes \(n=2\); repositório 2 arquivos, 2 KB; diff \d+ linhas em 1 arquivos/)
+  expect(m.fs.get(LOG_PATH)).toMatch(/\| custo: base \d+\.\d s, 1 testes; .*repositório 2 arquivos/)
   // Gasta no registro: o próximo não fica preso aos números dela (sobrevivente #16 da rodada 5).
   const depois = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'soma', aplicados: 3, mortos: 3, sobreviventes: 0, reais: 0, estado: 'PROVADO', tempo: 5 } as never))
   expect(depois).toContain('mutantes: 3/3/0')

@@ -11,7 +11,13 @@ import {
   concentracao,
   conferir,
   contar,
+  contarTestes,
   detectarComando,
+  linhasDoDiff,
+  porMutante,
+  resumoCusto,
+  somarTestes,
+  tamanhoDoRepo,
   estadoDe,
   lerMutacao,
   quemMatou,
@@ -199,6 +205,10 @@ test('mutante que não carrega é inválido, não morto', () => {
 
 test('trecho original vazio nunca vira leitura: buscaria "" para sempre (sobrevivente #11 da 3ª execução da rodada 4)', () => {
   expect(lerMutacoes('`` → `x`')).toEqual([])
+  // A nota do escolhedor depois da mutação sai (rodada 0.7.0, #1, #5, #7); parênteses dentro do trecho ficam.
+  expect(lerMutacoes('`if (x) return 1` → `` (remove a guarda)')).toEqual([{ de: 'if (x) return 1', para: '' }])
+  expect(lerMutacoes('`a + n` → `n` (guarda só o último)')).toEqual([{ de: 'a + n', para: 'n' }])
+  expect(lerMutacoes('`f(a)` → `f(b)`')).toEqual([{ de: 'f(a)', para: 'f(b)' }])
   expect(lerMutacoes('` → `x`')).toEqual([])
   expect(aplicarTrecho('abc\n', 1, '`` → `x`')).toEqual({ erro: 'mutação fora do formato `original` → `mutado`' })
 })
@@ -234,4 +244,51 @@ test('conferirEstado: estado acima do executado só com cada sobrevivente justif
   expect(conferirEstado({ estado: 'FRACO', estadoSeEquivalentes: 'FRACO', sobreviventesN: [] }, 'PROVADO')).toContain('estado máximo é FRACO')
   // Execução gravada antes da 0.6.0 (sem a lista): não há como conferir.
   expect(conferirEstado({ estado: 'FRACO' }, 'PROVADO')).toBeUndefined()
+})
+
+test('contarTestes lê o resumo de cada executor; sem resumo, não inventa', () => {
+  expect(contarTestes('(pass) a [1ms]\n\n 46 pass\n 0 fail\nRan 46 tests across 3 files. [0.96s]\n')).toBe(46)
+  expect(contarTestes('Tests:       1 failed, 11 passed, 12 total\n')).toBe(12)
+  expect(contarTestes('      Tests  9 passed (9)\n')).toBe(9)
+  expect(contarTestes('# tests 7\n# suites 1\n# pass 7\n')).toBe(7)
+  expect(contarTestes('ℹ tests 5\nℹ pass 4\n')).toBe(5)
+  // pytest: só os que rodaram (passed, failed, errors); pulados não contam.
+  expect(contarTestes('==== 3 failed, 9 passed, 2 skipped in 0.31s ====\n')).toBe(12)
+  expect(contarTestes('12 passed in 1.02s\n')).toBe(12)
+  expect(contarTestes('1 error in 0.10s\n')).toBe(1)
+  expect(contarTestes('  ✓ soma dá 3\n')).toBeUndefined()
+  expect(contarTestes('')).toBeUndefined()
+})
+
+test('linhasDoDiff conta só + e -, sem os cabeçalhos; tamanhoDoRepo soma os blobs do ls-tree', () => {
+  expect(linhasDoDiff('--- a/x.ts\n+++ b/x.ts\n@@ -1 +1 @@\n-a\n+b\n+c\n contexto\n')).toBe(3)
+  // Uma linha removida que começa com "--" (comentário SQL) ainda conta.
+  expect(linhasDoDiff('diff --git a/q.sql b/q.sql\n--- a/q.sql\n+++ b/q.sql\n@@ -1 +0,0 @@\n--- comentário\ndiff --git a/r b/r\n--- a/r\n+++ b/r\n')).toBe(1)
+  expect(linhasDoDiff('')).toBe(0)
+  const ls = '100644 blob aaa     120\tsrc/a.ts\n100644 blob bbb    2048\tREADME.md\n160000 commit ccc       -\tsub\n'
+  expect(tamanhoDoRepo(ls)).toEqual({ arquivos: 2, bytes: 2168 })
+  expect(tamanhoDoRepo('')).toEqual({ arquivos: 0, bytes: 0 })
+  // Blob sem tamanho legível conta o arquivo e zero bytes, sem virar NaN.
+  expect(tamanhoDoRepo('100644 blob aaa\tx\n100644 blob bbb 5\ty\n')).toEqual({ arquivos: 2, bytes: 5 })
+})
+
+test('porMutante e resumoCusto: médias só dos aplicados; testes só quando todos têm o número', () => {
+  const a = { ...res(1, 'livre', 'MORTO', 'x'), segundos: 2, testes: 10 }
+  const b = { ...res(2, 'livre', 'SOBREVIVENTE'), segundos: 4, testes: 20 }
+  const na = { ...res(3, 'livre', 'NÃO APLICADO', 'y'), segundos: 99, testes: 999 }
+  expect(porMutante([a, b, na])).toEqual({ n: 2, segundos: 3, testes: 15 })
+  expect(porMutante([a, { ...b, testes: undefined }]).testes).toBeUndefined()
+  expect(porMutante([na])).toEqual({ n: 0, segundos: 0 })
+  const e = exec([a, b, na], { linhaDeBase: { passou: true, segundos: 1.25 }, custo: { repo: { arquivos: 40, bytes: 3 * 1024 * 1024 }, diff: { arquivos: 2, linhas: 80 }, testesNaBase: 46 } })
+  expect(resumoCusto(e)).toBe('base 1.3 s, 46 testes; por mutante 3.0 s, 15 testes (n=2); repositório 40 arquivos, 3.0 MB; diff 80 linhas em 2 arquivos')
+  expect(resumoCusto(exec([a]))).toContain('repositório ?; diff ?')
+  // 1 MB exato já se escreve em MB; abaixo, em KB.
+  const repo = (bytes: number) => resumoCusto(exec([a], { custo: { repo: { arquivos: 1, bytes }, diff: { arquivos: 1, linhas: 1 } } }))
+  expect(repo(1024 * 1024)).toContain('1 arquivos, 1.0 MB')
+  expect(repo(1024 * 1024 - 1)).toContain('1 arquivos, 1024 KB')
+  // Um comando sem resumo deixa a soma desconhecida: zero seria mentira.
+  expect(somarTestes(3, 4)).toBe(7)
+  expect(somarTestes(3, undefined)).toBeUndefined()
+  expect(somarTestes(undefined, 4)).toBeUndefined()
+  expect(relatorio(e, 'd')).toContain('Custo:      base 1.3 s, 46 testes; por mutante')
 })
