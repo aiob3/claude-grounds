@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-label="85 real test gaps found in 24 rounds" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-<title>85 real test gaps found in 24 rounds</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-label="81 real test gaps found in 23 rounds" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>81 real test gaps found in 23 rounds</title>
 <style>
   .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
   .t1 { fill: #0b0b0b; } .t2 { fill: #52514e; } .t3 { fill: #8a887f; }
@@ -17,129 +17,124 @@
   @keyframes cresce { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 </style>
 <rect width="1200" height="400" rx="16" class="sup"/>
-  <text x="56" y="62" font-size="44" font-weight="800" class="t1">85</text>
+  <text x="56" y="62" font-size="44" font-weight="800" class="t1">81</text>
   <text x="130" y="62" font-size="20" font-weight="700" class="t1">real test gaps found</text>
   <text x="56" y="92" font-size="15" class="t2">Real surviving mutants per EXP-001 round on the mods themselves. Every test passed before the round.</text>
   <line x1="76" y1="330" x2="1146" y2="330" class="borda" stroke-width="1.5"/>
   
   <g class="barra"><title>Round 1: 4 real survivors</title>
-    <path d="M105.5,330 L105.5,239.0 Q105.5,235.0 109.5,235.0 L125.8,235.0 Q129.8,235.0 129.8,239.0 L129.8,330 Z" class="ac"/>
+    <path d="M105.9,330 L105.9,239.0 Q105.9,235.0 109.9,235.0 L127.3,235.0 Q131.3,235.0 131.3,239.0 L131.3,330 Z" class="ac"/>
   </g>
-  <text x="117.7" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="117.7" y="356" font-size="14" class="t2" text-anchor="middle">R1</text>
+  <text x="118.6" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="118.6" y="356" font-size="14" class="t2" text-anchor="middle">R1</text>
   <g class="barra"><title>Round 2: 4 real survivors</title>
-    <path d="M148.9,330 L148.9,239.0 Q148.9,235.0 152.9,235.0 L169.1,235.0 Q173.1,235.0 173.1,239.0 L173.1,330 Z" class="ac"/>
+    <path d="M151.2,330 L151.2,239.0 Q151.2,235.0 155.2,235.0 L172.5,235.0 Q176.5,235.0 176.5,239.0 L176.5,330 Z" class="ac"/>
   </g>
-  <text x="161.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="161.0" y="356" font-size="14" class="t2" text-anchor="middle">R2</text>
+  <text x="163.8" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="163.8" y="356" font-size="14" class="t2" text-anchor="middle">R2</text>
   <g class="barra"><title>Round 3: 4 real survivors</title>
-    <path d="M192.2,330 L192.2,239.0 Q192.2,235.0 196.2,235.0 L212.5,235.0 Q216.5,235.0 216.5,239.0 L216.5,330 Z" class="ac"/>
+    <path d="M196.4,330 L196.4,239.0 Q196.4,235.0 200.4,235.0 L217.7,235.0 Q221.7,235.0 221.7,239.0 L221.7,330 Z" class="ac"/>
   </g>
-  <text x="204.3" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="204.3" y="356" font-size="14" class="t2" text-anchor="middle">R3</text>
+  <text x="209.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="209.0" y="356" font-size="14" class="t2" text-anchor="middle">R3</text>
   <g class="barra"><title>Round 4: 5 real survivors</title>
-    <path d="M235.5,330 L235.5,215.2 Q235.5,211.2 239.5,211.2 L255.8,211.2 Q259.8,211.2 259.8,215.2 L259.8,330 Z" class="ac"/>
+    <path d="M241.6,330 L241.6,215.2 Q241.6,211.2 245.6,211.2 L262.9,211.2 Q266.9,211.2 266.9,215.2 L266.9,330 Z" class="ac"/>
   </g>
-  <text x="247.7" y="201.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
-  <text x="247.7" y="356" font-size="14" class="t2" text-anchor="middle">R4</text>
+  <text x="254.3" y="201.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
+  <text x="254.3" y="356" font-size="14" class="t2" text-anchor="middle">R4</text>
   <g class="barra"><title>Round 5: 2 real survivors</title>
-    <path d="M278.9,330 L278.9,286.5 Q278.9,282.5 282.9,282.5 L299.1,282.5 Q303.1,282.5 303.1,286.5 L303.1,330 Z" class="ac"/>
+    <path d="M286.8,330 L286.8,286.5 Q286.8,282.5 290.8,282.5 L308.1,282.5 Q312.1,282.5 312.1,286.5 L312.1,330 Z" class="ac"/>
   </g>
-  <text x="291.0" y="272.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="291.0" y="356" font-size="14" class="t2" text-anchor="middle">R5</text>
+  <text x="299.5" y="272.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="299.5" y="356" font-size="14" class="t2" text-anchor="middle">R5</text>
   <g class="barra"><title>Round 6: 4 real survivors</title>
-    <path d="M322.2,330 L322.2,239.0 Q322.2,235.0 326.2,235.0 L342.5,235.0 Q346.5,235.0 346.5,239.0 L346.5,330 Z" class="ac"/>
+    <path d="M332.0,330 L332.0,239.0 Q332.0,235.0 336.0,235.0 L353.4,235.0 Q357.4,235.0 357.4,239.0 L357.4,330 Z" class="ac"/>
   </g>
-  <text x="334.3" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="334.3" y="356" font-size="14" class="t2" text-anchor="middle">R6</text>
+  <text x="344.7" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="344.7" y="356" font-size="14" class="t2" text-anchor="middle">R6</text>
   <g class="barra"><title>Round 7: 6 real survivors</title>
-    <path d="M365.5,330 L365.5,191.5 Q365.5,187.5 369.5,187.5 L385.8,187.5 Q389.8,187.5 389.8,191.5 L389.8,330 Z" class="ac"/>
+    <path d="M377.3,330 L377.3,191.5 Q377.3,187.5 381.3,187.5 L398.6,187.5 Q402.6,187.5 402.6,191.5 L402.6,330 Z" class="ac"/>
   </g>
-  <text x="377.7" y="177.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
-  <text x="377.7" y="356" font-size="14" class="t2" text-anchor="middle">R7</text>
+  <text x="389.9" y="177.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
+  <text x="389.9" y="356" font-size="14" class="t2" text-anchor="middle">R7</text>
   <g class="barra"><title>Round 8: 6 real survivors</title>
-    <path d="M408.9,330 L408.9,191.5 Q408.9,187.5 412.9,187.5 L429.1,187.5 Q433.1,187.5 433.1,191.5 L433.1,330 Z" class="ac"/>
+    <path d="M422.5,330 L422.5,191.5 Q422.5,187.5 426.5,187.5 L443.8,187.5 Q447.8,187.5 447.8,191.5 L447.8,330 Z" class="ac"/>
   </g>
-  <text x="421.0" y="177.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
-  <text x="421.0" y="356" font-size="14" class="t2" text-anchor="middle">R8</text>
+  <text x="435.1" y="177.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
+  <text x="435.1" y="356" font-size="14" class="t2" text-anchor="middle">R8</text>
   <g class="barra"><title>Round 9: 8 real survivors</title>
-    <path d="M452.2,330 L452.2,144.0 Q452.2,140.0 456.2,140.0 L472.5,140.0 Q476.5,140.0 476.5,144.0 L476.5,330 Z" class="ac"/>
+    <path d="M467.7,330 L467.7,144.0 Q467.7,140.0 471.7,140.0 L489.0,140.0 Q493.0,140.0 493.0,144.0 L493.0,330 Z" class="ac"/>
   </g>
-  <text x="464.3" y="130.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">8</text>
-  <text x="464.3" y="356" font-size="14" class="t2" text-anchor="middle">R9</text>
+  <text x="480.3" y="130.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">8</text>
+  <text x="480.3" y="356" font-size="14" class="t2" text-anchor="middle">R9</text>
   <g class="barra"><title>Round 10: 2 real survivors</title>
-    <path d="M495.5,330 L495.5,286.5 Q495.5,282.5 499.5,282.5 L515.8,282.5 Q519.8,282.5 519.8,286.5 L519.8,330 Z" class="ac"/>
+    <path d="M512.9,330 L512.9,286.5 Q512.9,282.5 516.9,282.5 L534.2,282.5 Q538.2,282.5 538.2,286.5 L538.2,330 Z" class="ac"/>
   </g>
-  <text x="507.7" y="272.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="507.7" y="356" font-size="14" class="t2" text-anchor="middle">R10</text>
+  <text x="525.6" y="272.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="525.6" y="356" font-size="14" class="t2" text-anchor="middle">R10</text>
   <g class="barra"><title>Round 11: 4 real survivors</title>
-    <path d="M538.9,330 L538.9,239.0 Q538.9,235.0 542.9,235.0 L559.1,235.0 Q563.1,235.0 563.1,239.0 L563.1,330 Z" class="ac"/>
+    <path d="M558.1,330 L558.1,239.0 Q558.1,235.0 562.1,235.0 L579.4,235.0 Q583.4,235.0 583.4,239.0 L583.4,330 Z" class="ac"/>
   </g>
-  <text x="551.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="551.0" y="356" font-size="14" class="t2" text-anchor="middle">R11</text>
+  <text x="570.8" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="570.8" y="356" font-size="14" class="t2" text-anchor="middle">R11</text>
   <g class="barra"><title>Round 12: 4 real survivors</title>
-    <path d="M582.2,330 L582.2,239.0 Q582.2,235.0 586.2,235.0 L602.5,235.0 Q606.5,235.0 606.5,239.0 L606.5,330 Z" class="ac"/>
+    <path d="M603.3,330 L603.3,239.0 Q603.3,235.0 607.3,235.0 L624.7,235.0 Q628.7,235.0 628.7,239.0 L628.7,330 Z" class="ac"/>
   </g>
-  <text x="594.3" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="594.3" y="356" font-size="14" class="t2" text-anchor="middle">R12</text>
+  <text x="616.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="616.0" y="356" font-size="14" class="t2" text-anchor="middle">R12</text>
   <g class="barra"><title>Round 13: 3 real survivors</title>
-    <path d="M625.5,330 L625.5,262.8 Q625.5,258.8 629.5,258.8 L645.8,258.8 Q649.8,258.8 649.8,262.8 L649.8,330 Z" class="ac"/>
+    <path d="M648.6,330 L648.6,262.8 Q648.6,258.8 652.6,258.8 L669.9,258.8 Q673.9,258.8 673.9,262.8 L673.9,330 Z" class="ac"/>
   </g>
-  <text x="637.7" y="248.8" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="637.7" y="356" font-size="14" class="t2" text-anchor="middle">R13</text>
+  <text x="661.2" y="248.8" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="661.2" y="356" font-size="14" class="t2" text-anchor="middle">R13</text>
   <g class="barra"><title>Round 14: 6 real survivors</title>
-    <path d="M668.9,330 L668.9,191.5 Q668.9,187.5 672.9,187.5 L689.1,187.5 Q693.1,187.5 693.1,191.5 L693.1,330 Z" class="ac"/>
+    <path d="M693.8,330 L693.8,191.5 Q693.8,187.5 697.8,187.5 L715.1,187.5 Q719.1,187.5 719.1,191.5 L719.1,330 Z" class="ac"/>
   </g>
-  <text x="681.0" y="177.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
-  <text x="681.0" y="356" font-size="14" class="t2" text-anchor="middle">R14</text>
+  <text x="706.4" y="177.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
+  <text x="706.4" y="356" font-size="14" class="t2" text-anchor="middle">R14</text>
   <g class="barra"><title>Round 15: 1 real survivors</title>
-    <path d="M712.2,330 L712.2,310.2 Q712.2,306.2 716.2,306.2 L732.5,306.2 Q736.5,306.2 736.5,310.2 L736.5,330 Z" class="ac"/>
+    <path d="M739.0,330 L739.0,310.2 Q739.0,306.2 743.0,306.2 L760.3,306.2 Q764.3,306.2 764.3,310.2 L764.3,330 Z" class="ac"/>
   </g>
-  <text x="724.3" y="296.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="724.3" y="356" font-size="14" class="t2" text-anchor="middle">R15</text>
+  <text x="751.7" y="296.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="751.7" y="356" font-size="14" class="t2" text-anchor="middle">R15</text>
   <g class="barra"><title>Round 16: 1 real survivors</title>
-    <path d="M755.5,330 L755.5,310.2 Q755.5,306.2 759.5,306.2 L775.8,306.2 Q779.8,306.2 779.8,310.2 L779.8,330 Z" class="ac"/>
+    <path d="M784.2,330 L784.2,310.2 Q784.2,306.2 788.2,306.2 L805.5,306.2 Q809.5,306.2 809.5,310.2 L809.5,330 Z" class="ac"/>
   </g>
-  <text x="767.7" y="296.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="767.7" y="356" font-size="14" class="t2" text-anchor="middle">R16</text>
-  <g class="barra"><title>Round 17: 4 real survivors</title>
-    <path d="M798.9,330 L798.9,239.0 Q798.9,235.0 802.9,235.0 L819.1,235.0 Q823.1,235.0 823.1,239.0 L823.1,330 Z" class="ac"/>
+  <text x="796.9" y="296.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="796.9" y="356" font-size="14" class="t2" text-anchor="middle">R16</text>
+  <g class="barra"><title>Round 17: 2 real survivors</title>
+    <path d="M829.4,330 L829.4,286.5 Q829.4,282.5 833.4,282.5 L850.7,282.5 Q854.7,282.5 854.7,286.5 L854.7,330 Z" class="ac"/>
   </g>
-  <text x="811.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="811.0" y="356" font-size="14" class="t2" text-anchor="middle">R17</text>
-  <g class="barra"><title>Round 18: 2 real survivors</title>
-    <path d="M842.2,330 L842.2,286.5 Q842.2,282.5 846.2,282.5 L862.5,282.5 Q866.5,282.5 866.5,286.5 L866.5,330 Z" class="ac"/>
+  <text x="842.1" y="272.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="842.1" y="356" font-size="14" class="t2" text-anchor="middle">R17</text>
+  <g class="barra"><title>Round 18: 3 real survivors</title>
+    <path d="M874.6,330 L874.6,262.8 Q874.6,258.8 878.6,258.8 L896.0,258.8 Q900.0,258.8 900.0,262.8 L900.0,330 Z" class="ac"/>
   </g>
-  <text x="854.3" y="272.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="854.3" y="356" font-size="14" class="t2" text-anchor="middle">R18</text>
+  <text x="887.3" y="248.8" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="887.3" y="356" font-size="14" class="t2" text-anchor="middle">R18</text>
   <g class="barra"><title>Round 19: 3 real survivors</title>
-    <path d="M885.5,330 L885.5,262.8 Q885.5,258.8 889.5,258.8 L905.8,258.8 Q909.8,258.8 909.8,262.8 L909.8,330 Z" class="ac"/>
+    <path d="M919.9,330 L919.9,262.8 Q919.9,258.8 923.9,258.8 L941.2,258.8 Q945.2,258.8 945.2,262.8 L945.2,330 Z" class="ac"/>
   </g>
-  <text x="897.7" y="248.8" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="897.7" y="356" font-size="14" class="t2" text-anchor="middle">R19</text>
-  <g class="barra"><title>Round 20: 3 real survivors</title>
-    <path d="M928.9,330 L928.9,262.8 Q928.9,258.8 932.9,258.8 L949.1,258.8 Q953.1,258.8 953.1,262.8 L953.1,330 Z" class="ac"/>
+  <text x="932.5" y="248.8" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="932.5" y="356" font-size="14" class="t2" text-anchor="middle">R19</text>
+  <g class="barra"><title>Round 20: 1 real survivors</title>
+    <path d="M965.1,330 L965.1,310.2 Q965.1,306.2 969.1,306.2 L986.4,306.2 Q990.4,306.2 990.4,310.2 L990.4,330 Z" class="ac"/>
   </g>
-  <text x="941.0" y="248.8" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="941.0" y="356" font-size="14" class="t2" text-anchor="middle">R20</text>
+  <text x="977.7" y="296.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="977.7" y="356" font-size="14" class="t2" text-anchor="middle">R20</text>
   <g class="barra"><title>Round 21: 1 real survivors</title>
-    <path d="M972.2,330 L972.2,310.2 Q972.2,306.2 976.2,306.2 L992.5,306.2 Q996.5,306.2 996.5,310.2 L996.5,330 Z" class="ac"/>
+    <path d="M1010.3,330 L1010.3,310.2 Q1010.3,306.2 1014.3,306.2 L1031.6,306.2 Q1035.6,306.2 1035.6,310.2 L1035.6,330 Z" class="ac"/>
   </g>
-  <text x="984.3" y="296.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="984.3" y="356" font-size="14" class="t2" text-anchor="middle">R21</text>
-  <g class="barra"><title>Round 22: 1 real survivors</title>
-    <path d="M1015.5,330 L1015.5,310.2 Q1015.5,306.2 1019.5,306.2 L1035.8,306.2 Q1039.8,306.2 1039.8,310.2 L1039.8,330 Z" class="ac"/>
+  <text x="1023.0" y="296.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="1023.0" y="356" font-size="14" class="t2" text-anchor="middle">R21</text>
+  <g class="barra"><title>Round 22: 5 real survivors</title>
+    <path d="M1055.5,330 L1055.5,215.2 Q1055.5,211.2 1059.5,211.2 L1076.8,211.2 Q1080.8,211.2 1080.8,215.2 L1080.8,330 Z" class="ac"/>
   </g>
-  <text x="1027.7" y="296.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="1027.7" y="356" font-size="14" class="t2" text-anchor="middle">R22</text>
-  <g class="barra"><title>Round 23: 5 real survivors</title>
-    <path d="M1058.9,330 L1058.9,215.2 Q1058.9,211.2 1062.9,211.2 L1079.1,211.2 Q1083.1,211.2 1083.1,215.2 L1083.1,330 Z" class="ac"/>
+  <text x="1068.2" y="201.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
+  <text x="1068.2" y="356" font-size="14" class="t2" text-anchor="middle">R22</text>
+  <g class="barra"><title>Round 23: 2 real survivors</title>
+    <path d="M1100.7,330 L1100.7,286.5 Q1100.7,282.5 1104.7,282.5 L1122.1,282.5 Q1126.1,282.5 1126.1,286.5 L1126.1,330 Z" class="ac"/>
   </g>
-  <text x="1071.0" y="201.2" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
-  <text x="1071.0" y="356" font-size="14" class="t2" text-anchor="middle">R23</text>
-  <g class="barra"><title>Round 24: 2 real survivors</title>
-    <path d="M1102.2,330 L1102.2,286.5 Q1102.2,282.5 1106.2,282.5 L1122.5,282.5 Q1126.5,282.5 1126.5,286.5 L1126.5,330 Z" class="ac"/>
-  </g>
-  <text x="1114.3" y="272.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="1114.3" y="356" font-size="14" class="t2" text-anchor="middle">R24</text>
+  <text x="1113.4" y="272.5" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="1113.4" y="356" font-size="14" class="t2" text-anchor="middle">R23</text>
 </svg>

@@ -21,9 +21,9 @@ muda entre `executar` e `registrar`, ou quando o agente informa um defeito.
 
 | Variável | Valor | Estado atual, calculado do log público |
 |---|---|---|
-| Duração | 10 rodadas de medição | 23 medições (mínimo atingido); 26 calibrações registradas |
+| Duração | 10 rodadas de medição | 22 medições (mínimo atingido); 27 calibrações registradas |
 | Instrumento estável | 3 medições seguidas na mesma versão | não, 2 de 3 medições seguidas em mod 0.8.4 |
-| Promover se | sobreviventes reais em pelo menos 3 medições, tempo médio das medições abaixo de 2 min e instrumento estável | medições com sobreviventes reais: 17; tempo médio das medições: 112 s |
+| Promover se | sobreviventes reais em pelo menos 3 medições, tempo médio das medições abaixo de 2 min e instrumento estável | medições com sobreviventes reais: 16; tempo médio das medições: 115 s |
 | Descartar ou ajustar se | tempo médio das medições acima de 5 min, ou nenhum achado em 5 medições seguidas | n/a |
 
 Quem decide é o operador. Até lá, o EXP-001 roda em paralelo e não bloqueia nenhuma entrega.
