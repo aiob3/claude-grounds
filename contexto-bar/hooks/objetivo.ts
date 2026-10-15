@@ -25,7 +25,7 @@ export function proxima(g: Goal): GoalItem | undefined {
 export const etiqueta = (i: GoalItem) => (nivelDe(i) === 'requisito' ? '' : `[${nivelDe(i)}] `)
 
 export type Acao = {
-  acao: 'definir' | 'adicionar' | 'concluir' | 'reabrir' | 'priorizar' | 'encerrar' | 'ver'
+  acao: 'definir' | 'adicionar' | 'concluir' | 'reabrir' | 'priorizar' | 'encerrar' | 'ver' | 'retirar'
   titulo?: string
   conclusao?: string
   itens?: { texto: string; dono?: Owner; tamanho?: Size; nivel?: Nivel }[]
@@ -114,6 +114,11 @@ export function aplicar(
   if (a.acao === 'priorizar') {
     if (!ehNivel(a.nivel)) return { goal: atual, erro: `priorizar precisa de nivel (${NIVEIS.join(' | ')}).` }
     g.itens = g.itens.map(i => (ids.has(i.id) ? { ...i, nivel: a.nivel } : i))
+    return { goal: g }
+  }
+  // retirar: a pendência sai do objetivo (o roadmap a guarda antes, pela acao "adiar"); não é concluir.
+  if (a.acao === 'retirar') {
+    g.itens = g.itens.filter(i => !ids.has(i.id))
     return { goal: g }
   }
   if (a.acao === 'reabrir') {

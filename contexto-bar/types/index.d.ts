@@ -81,6 +81,16 @@ export type EventoNota = { v: number; ev: 'nota'; id: string; em: string; autor:
 export type EventoTriagem = { v: number; ev: 'triagem'; id: string; em: string; autor: 'claude'; decisao: Decisao; motivo: string; /** Para onde foi: `#12`, `roadmap`... */ destino?: string; /** O melhor argumento contra a própria decisão. */ contraponto?: string }
 export type Nota = EventoNota & { triagem?: EventoTriagem }
 
+/** Roadmap (contrato em hooks/roadmap.ts): o plano além do objetivo em curso, por horizonte. */
+export type Horizonte = 'agora' | 'proximo' | 'depois'
+export type EventoRoadmap =
+  | { v: number; ev: 'item'; id: string; em: string; autor: Owner; texto: string; horizonte: Horizonte; frente?: string; /** De onde veio: `#7` (pendência adiada), `n-...` (nota do caderno). */ de?: string }
+  | { v: number; ev: 'mover'; id: string; em: string; horizonte: Horizonte }
+  | { v: number; ev: 'promover'; id: string; em: string; pendencia: number }
+  | { v: number; ev: 'descartar'; id: string; em: string; motivo: string }
+/** Um item com o estado depois de todos os eventos; `n` é a ordem de entrada no arquivo (R1, R2...). */
+export type ItemRoadmap = { n: number; id: string; texto: string; horizonte: Horizonte; frente?: string; de?: string; estado: 'aberto' | 'promovido' | 'descartado'; pendencia?: number; motivo?: string }
+
 /** Quem executa: o modelo e o effort da conversa principal e os subagentes vivos. */
 export type Subagente = { id: string; tipo: string; descricao: string; modelo: string; effort?: string; desde: number }
 export type Executores = { principal?: { modelo: string; effort?: string }; subagentes: Subagente[] }
@@ -114,6 +124,9 @@ declare module 'claude-code' {
       /** Passos (ferramentas da conversa principal) desta sessão, e o passo da última entrega de cada nota. */
       passos: number
       ultimaEntrega: Record<string, number>
+      roadmap: ItemRoadmap[]
+      /** Próximo e depois abertos no painel (agora aparece sempre). */
+      verRoadmap: boolean
     }
   }
 }

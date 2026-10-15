@@ -94,7 +94,7 @@ claude plugin install prova-de-teste@claude-grounds
 
 | Mod | Version | Role |
 |---|---|---|
-| [`contexto-bar`](contexto-bar/) | 0.14.1 | context band, goal per project, panel and window projection |
+| [`contexto-bar`](contexto-bar/) | 0.15.0 | context band, goal per project, panel and window projection |
 | [`prova-de-teste`](prova-de-teste/) | 0.12.1 | blind mutant round in an isolated copy, report and log |
 
 The `prova-de-teste` log goes to `PROVA_DE_TESTE_LOG` or, without that variable, to

@@ -1,13 +1,14 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { Atividade, Decisao, Executores, Goal, GoalItem, GroupKey, Indicador, Nota, Segment, Snapshot, TipoNota } from '../types'
+import type { Atividade, Decisao, EventoRoadmap, Executores, Goal, GoalItem, GroupKey, Horizonte, Indicador, ItemRoadmap, Nivel, Nota, Owner, Segment, Size, Snapshot, TipoNota } from '../types'
 import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
 import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
 import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
 import type { SegundoPlano } from './segundo-plano'
 import { DECISOES, entrega, GLIFO_DECISAO, idade, lembrete, paraLembrar, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
+import { abertos, destinoRoadmap, doHorizonte, ehHorizonte, HORIZONTES, lembreteRoadmap, lerRoadmap, linha as linhaRoadmap, novoItem, resumoRoadmap, VERSAO_ROADMAP } from './roadmap'
 import { centralizar, centroIndicador, COR_INDICADOR, encurtar, ESTADOS, nomeModelo, textoAtividade, validarIndicadores } from './painel'
 import { estiloDoTerminal, gauge, LARGURA_GAUGE, LINHAS_GAUGE, pedacos } from './gauge'
 import type { EstiloGauge } from './gauge'
@@ -30,6 +31,8 @@ const executores = atom({ plugin: 'contexto-bar', key: 'executores' } as const, 
 const rascunho = atom({ plugin: 'contexto-bar', key: 'rascunho' } as const, '')
 const passos = atom({ plugin: 'contexto-bar', key: 'passos' } as const, 0)
 const ultimaEntrega = atom({ plugin: 'contexto-bar', key: 'ultimaEntrega' } as const, {})
+const roadmap = atom({ plugin: 'contexto-bar', key: 'roadmap' } as const, [])
+const verRoadmap = atom({ plugin: 'contexto-bar', key: 'verRoadmap' } as const, false)
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
@@ -72,6 +75,47 @@ const TOOL_SPEC = {
       motivo: { type: 'string', description: 'Para triar: o porquê, em uma frase.' },
       destino: { type: 'string', description: 'Para triar: para onde a nota foi (#id da pendência, roadmap).' },
       contraponto: { type: 'string', description: 'Para triar: o melhor argumento contra a sua decisão, em uma frase.' },
+    },
+    required: ['acao'],
+  },
+} as const
+
+export const ROADMAP_TOOL_NAME = 'roadmap'
+export const ROADMAP_TOOL = `mcp__contexto-bar__${ROADMAP_TOOL_NAME}`
+
+const ROADMAP_SPEC = {
+  name: ROADMAP_TOOL_NAME,
+  description:
+    'Roadmap do projeto: o plano aprovado além do objetivo em curso, que sobrevive ao encerrar. Horizonte agora (entra ' +
+    'no próximo objetivo), proximo ou depois; frente agrupa um assunto (herdr, painel). Ações: ver; adicionar (itens com ' +
+    'texto, horizonte, frente); mover (ids R, horizonte); promover (ids R: viram pendências do objetivo ativo, com nivel e ' +
+    'tamanho); adiar (pendencias: ids do objetivo que saem dele e voltam ao roadmap); descartar (ids R, motivo). Plano que ' +
+    'o operador aprovou vem para cá, não fica só na conversa. Encerrar o objetivo devolve as pendências abertas para agora.',
+  isDeferred: false,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      acao: { type: 'string', enum: ['ver', 'adicionar', 'mover', 'promover', 'adiar', 'descartar'] },
+      itens: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            texto: { type: 'string' },
+            horizonte: { type: 'string', enum: ['agora', 'proximo', 'depois'] },
+            frente: { type: 'string', description: 'Assunto que agrupa itens (herdr, painel, prova).' },
+          },
+          required: ['texto'],
+        },
+      },
+      ids: { type: 'array', items: { type: 'integer' }, description: 'Números R dos itens do roadmap.' },
+      pendencias: { type: 'array', items: { type: 'integer' }, description: 'Para adiar: ids das pendências do objetivo.' },
+      horizonte: { type: 'string', enum: ['agora', 'proximo', 'depois'], description: 'Para mover e adiar (padrão agora).' },
+      frente: { type: 'string', description: 'Para adiar: a frente dos itens que entram.' },
+      nivel: { type: 'string', enum: ['bloqueante', 'requisito', 'melhoria'], description: 'Para promover (padrão requisito).' },
+      tamanho: { type: 'string', enum: ['P', 'M', 'G'], description: 'Para promover (padrão M).' },
+      dono: { type: 'string', enum: ['claude', 'operador'], description: 'Para promover (padrão claude).' },
+      motivo: { type: 'string', description: 'Para descartar: o porquê, em uma frase.' },
     },
     required: ['acao'],
   },
@@ -205,9 +249,112 @@ async function lerDoCaderno($: EngineInterface): Promise<void> {
 async function acrescentar($: EngineInterface, texto: string): Promise<boolean> {
   const arquivo = await arquivoCaderno($)
   if (!arquivo) return false
-  const r = await $.process.run(['sh', '-c', 'mkdir -p "$(dirname "$1")" && cat >> "$1"', '_', arquivo], { stdin: texto }).catch(() => null)
+  const ok = await acrescentarEm($, arquivo, texto)
   await lerDoCaderno($).catch(() => undefined)
+  return ok
+}
+
+async function acrescentarEm($: EngineInterface, arquivo: string, texto: string): Promise<boolean> {
+  const r = await $.process.run(['sh', '-c', 'mkdir -p "$(dirname "$1")" && cat >> "$1"', '_', arquivo], { stdin: texto }).catch(() => null)
   return r?.exitCode === 0
+}
+
+// O roadmap: ver hooks/roadmap.ts (propósito e contrato). Um arquivo por projeto, só acréscimo, como o caderno.
+async function arquivoRoadmap($: EngineInterface): Promise<string | undefined> {
+  const home = await $.env.get('HOME').catch(() => undefined)
+  if (!home) return undefined
+  await carregarObjetivo($)
+  return `${home}/.claude/roadmap/${encodeURIComponent(raizCarregada ?? '')}.jsonl`
+}
+
+async function lerDoRoadmap($: EngineInterface): Promise<ItemRoadmap[]> {
+  const arquivo = await arquivoRoadmap($)
+  const lidos = arquivo && (await $.fs.exists(arquivo).catch(() => false)) ? lerRoadmap(await $.fs.read(arquivo).catch(() => '')) : []
+  if (JSON.stringify(await read($, roadmap)) !== JSON.stringify(lidos)) await update($, roadmap, () => lidos)
+  return lidos
+}
+
+const instante = async ($: EngineInterface) => new Date(await $.clock.now().catch(() => Date.now())).toISOString()
+const sufixo = () => Math.random().toString(36).slice(2, 6)
+
+/** Grava os eventos de uma vez (um cat >> só) e relê. */
+async function gravarRoadmap($: EngineInterface, eventos: (EventoRoadmap | null)[]): Promise<boolean> {
+  const validos = eventos.filter((x): x is EventoRoadmap => !!x)
+  if (!validos.length) return true
+  const arquivo = await arquivoRoadmap($)
+  const ok = !!arquivo && (await acrescentarEm($, arquivo, validos.map(linhaRoadmap).join('')))
+  await lerDoRoadmap($).catch(() => undefined)
+  return ok
+}
+
+type AcaoRoadmap = {
+  acao?: string
+  itens?: { texto?: string; horizonte?: string; frente?: string }[]
+  ids?: number[]
+  pendencias?: number[]
+  horizonte?: string
+  frente?: string
+  nivel?: string
+  tamanho?: string
+  dono?: string
+  motivo?: string
+}
+
+async function mudarRoadmap($: EngineInterface, a: AcaoRoadmap, autor: Owner): Promise<string> {
+  const itens = await lerDoRoadmap($)
+  const em = await instante($)
+  const fim = async (msg?: string) => `${msg ? `${msg}\n` : ''}${resumoRoadmap(await read($, roadmap))}`
+  if (a.acao === 'ver') return fim()
+  if (a.acao === 'adicionar') {
+    const evs = (a.itens ?? []).map(i => novoItem(i.texto ?? '', ehHorizonte(i.horizonte) ? i.horizonte : 'proximo', em, sufixo(), autor, i.frente))
+    if (!evs.some(Boolean)) return fim('Erro: adicionar precisa de itens com texto.')
+    if (!(await gravarRoadmap($, evs))) return fim('Erro: não consegui gravar no roadmap.')
+    return fim()
+  }
+  if (a.acao === 'adiar') {
+    const g = await read($, objetivo)
+    const ids = new Set(a.pendencias ?? [])
+    const saem = (g?.itens ?? []).filter(i => ids.has(i.id) && !i.feito)
+    if (!g || !ids.size) return fim('Erro: adiar precisa de pendencias (ids do objetivo ativo).')
+    const fora = [...ids].filter(id => !saem.some(i => i.id === id))
+    if (fora.length) return fim(`Erro: pendências inexistentes ou já feitas: ${fora.join(', ')}.`)
+    const h = ehHorizonte(a.horizonte) ? a.horizonte : 'agora'
+    if (!(await gravarRoadmap($, saem.map(i => novoItem(i.texto, h, em, sufixo(), autor, a.frente, `#${i.id}`))))) return fim('Erro: não consegui gravar no roadmap; o objetivo ficou como estava.')
+    await mudarObjetivo($, { acao: 'retirar', ids: saem.map(i => i.id) } as Acao, autor)
+    return fim(`${saem.map(i => `#${i.id}`).join(', ')} saíram do objetivo e foram para ${HORIZONTES.find(x => x.h === h)!.rotulo}.`)
+  }
+  const pedidos = new Set(a.ids ?? [])
+  if (!pedidos.size) return fim(`Erro: ${a.acao ?? 'a ação'} precisa de ids (números R).`)
+  const alvos = abertos(itens).filter(i => pedidos.has(i.n))
+  const fora = [...pedidos].filter(n => !alvos.some(i => i.n === n))
+  if (fora.length) return fim(`Erro: R${fora.join(', R')} não estão abertos no roadmap.`)
+  if (a.acao === 'mover') {
+    if (!ehHorizonte(a.horizonte)) return fim('Erro: mover precisa de horizonte (agora | proximo | depois).')
+    const h = a.horizonte
+    if (!(await gravarRoadmap($, alvos.map(i => ({ v: VERSAO_ROADMAP, ev: 'mover', id: i.id, em, horizonte: h }) as EventoRoadmap)))) return fim('Erro: não consegui gravar no roadmap.')
+    return fim()
+  }
+  if (a.acao === 'descartar') {
+    if (!a.motivo?.trim()) return fim('Erro: descartar precisa do motivo, em uma frase.')
+    const motivo = a.motivo.trim()
+    if (!(await gravarRoadmap($, alvos.map(i => ({ v: VERSAO_ROADMAP, ev: 'descartar', id: i.id, em, motivo }) as EventoRoadmap)))) return fim('Erro: não consegui gravar no roadmap.')
+    return fim()
+  }
+  if (a.acao === 'promover') {
+    await carregarObjetivo($)
+    await doArquivoAgora($).catch(() => undefined)
+    const g = await read($, objetivo)
+    if (!g) return fim('Erro: promover precisa de um objetivo ativo; defina-o antes com a ferramenta objetivo.')
+    const base = g.itens.reduce((m, i) => Math.max(m, i.id), 0)
+    const nivel = (['bloqueante', 'requisito', 'melhoria'] as const).includes(a.nivel as Nivel) ? (a.nivel as Nivel) : 'requisito'
+    const tamanho = (['P', 'M', 'G'] as const).includes(a.tamanho as Size) ? (a.tamanho as Size) : 'M'
+    const dono: Owner = a.dono === 'operador' ? 'operador' : 'claude'
+    const r = await mudarObjetivo($, { acao: 'adicionar', itens: alvos.map(i => ({ texto: `${i.frente ? `${i.frente}: ` : ''}${i.texto}`, dono, tamanho, nivel })) }, autor)
+    if (r.erro) return fim(`Erro ao promover: ${r.texto}`)
+    await gravarRoadmap($, alvos.map((i, k) => ({ v: VERSAO_ROADMAP, ev: 'promover', id: i.id, em, pendencia: base + k + 1 }) as EventoRoadmap))
+    return fim(`${alvos.map((i, k) => `R${i.n} → #${base + k + 1}`).join(', ')} no objetivo "${g.titulo}".`)
+  }
+  return fim(`Erro: acao é uma de ver, adicionar, mover, promover, adiar, descartar.`)
 }
 
 async function escreverNota($: EngineInterface, texto: string): Promise<void> {
@@ -232,7 +379,15 @@ async function triar($: EngineInterface, a: { nota?: string; decisao?: string; m
   const em = new Date(await $.clock.now().catch(() => Date.now())).toISOString()
   if (!(await acrescentar($, linhaCaderno(triagem(n.id, a.decisao as Decisao, a.motivo, em, a.destino, a.contraponto))))) return 'Erro: não consegui gravar no caderno.'
   const resta = semResposta(await read($, caderno)).length
-  return `Triagem gravada: ${n.id} ${a.decisao}${a.destino ? ` → ${a.destino}` : ''}. ${resta ? `Ainda sem resposta: ${resta}.` : 'Nenhuma nota sem resposta.'}`
+  // Aceita (ou mudou o plano) com destino roadmap: a nota vira item de verdade, e não só uma palavra na triagem.
+  const h = a.decisao === 'aceita' || a.decisao === 'muda-plano' ? destinoRoadmap(a.destino) : null
+  let noRoadmap = ''
+  if (h && !(await read($, roadmap)).some(i => i.de === n.id)) {
+    const antes = (await lerDoRoadmap($)).length
+    const ok = await gravarRoadmap($, [novoItem(n.texto, h, em, sufixo(), 'operador', undefined, n.id)])
+    noRoadmap = ok ? ` Entrou no roadmap como R${antes + 1} (${HORIZONTES.find(x => x.h === h)!.rotulo}).` : ' Não consegui gravar no roadmap.'
+  }
+  return `Triagem gravada: ${n.id} ${a.decisao}${a.destino ? ` → ${a.destino}` : ''}.${noRoadmap} ${resta ? `Ainda sem resposta: ${resta}.` : 'Nenhuma nota sem resposta.'}`
 }
 
 /**
@@ -513,7 +668,18 @@ async function mudarObjetivo($: EngineInterface, a: Acao, origem: 'claude' | 'op
   const n = await read($, turno)
   const r = aplicar(atual, a, origem, usado(snap), n)
   if (r.erro) return { texto: `Erro: ${r.erro}\n${resumo(atual, snap)}`, erro: true }
+  // Encerrar não perde o plano: as pendências abertas voltam ao roadmap, em agora, antes do objetivo sair.
+  const abertas = a.acao === 'encerrar' ? (atual?.itens ?? []).filter(i => !i.feito) : []
+  let devolvidas = ''
+  if (abertas.length) {
+    await lerDoRoadmap($).catch(() => [])
+    const em = await instante($)
+    const ok = await gravarRoadmap($, abertas.map(i => novoItem(i.texto, 'agora', em, sufixo(), origem, undefined, `#${i.id}`)))
+    if (!ok) return { texto: `Erro: não consegui devolver as ${abertas.length} pendências abertas ao roadmap; o objetivo segue ativo.\n${resumo(atual, snap)}`, erro: true }
+    devolvidas = `\n${abertas.length === 1 ? 'A pendência aberta voltou' : `As ${abertas.length} pendências abertas voltaram`} ao roadmap, em agora.`
+  }
   await gravarObjetivo($, () => r.goal)
+  if (devolvidas) return { texto: resumo(r.goal, snap) + devolvidas, erro: false }
   const checagem = r.goal && (a.acao === 'definir' || a.acao === 'adicionar') ? `\n${alinhamento(r.goal)}` : ''
   return { texto: resumo(r.goal, snap) + checagem, erro: false }
 }
@@ -533,6 +699,7 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     await $.tool.register(TOOL_SPEC)
+    await $.tool.register(ROADMAP_SPEC)
     await $.command.register({
       name: 'objetivo',
       description: 'Objetivo em curso: sem argumento abre o painel; <texto> [:: passo que conclui] define; feito <ids>; bloqueante|requisito|melhoria <ids>; meu <texto>; nota [ideia|agora|depois|referencia] [#id] <texto>; auto on|off; encerrar',
@@ -541,6 +708,7 @@ export const register: Register = on => {
     const result = await next(e)
     await refresh($, hookTexts)
     await carregarObjetivo($)
+    await lerDoRoadmap($).catch(() => undefined)
     await semearCache($)
     return result
   })
@@ -553,6 +721,10 @@ export const register: Register = on => {
     }
     const r = await mudarObjetivo($, e as unknown as Acao, 'claude')
     return { result: r.texto } as never
+  })
+
+  on('tool.call', { tool: ROADMAP_TOOL as never }, async ($, e) => {
+    return { result: await mudarRoadmap($, e as unknown as AcaoRoadmap, 'claude') } as never
   })
 
   // Cada prompt leva ao modelo uma linha com o objetivo e as pendências (o operador não a vê).
@@ -572,7 +744,8 @@ export const register: Register = on => {
     const chave = atual ? `${raizCarregada}\n${atual.titulo}\n${atual.conclusao}` : undefined
     const completa = chave !== undefined && chave !== conclusaoEnviada
     if (chave !== undefined) conclusaoEnviada = chave
-    const linhas = [linhaContexto(atual, await read($, snapshot), TOOL, completa) + (await avisoSegundoPlano($).catch(() => '')) + pendenciaDoCaderno(await read($, caderno))]
+    const doPlano = lembreteRoadmap(await lerDoRoadmap($).catch(() => []), !atual || !proxima(atual))
+    const linhas = [linhaContexto(atual, await read($, snapshot), TOOL, completa) + doPlano + (await avisoSegundoPlano($).catch(() => '')) + pendenciaDoCaderno(await read($, caderno))]
     const doCaderno = await notasParaEntregar($).catch(() => '')
     if (doCaderno) linhas.push(doCaderno)
     const aviso = await checarAviso($)
@@ -666,9 +839,10 @@ export const register: Register = on => {
     if (!e.agentId) await update($, passos, n => n + 1).catch(() => undefined)
     const result = await next(e)
     if (!e.agentId) await marcar($, { estado: 'trabalhando' })
-    if (e.agentId || (e.tool as string) === TOOL) return result
+    if (e.agentId || (e.tool as string) === TOOL || (e.tool as string) === ROADMAP_TOOL) return result
     await refreshSoon($, hookTexts)
     await doArquivoAgora($).catch(() => undefined)
+    await lerDoRoadmap($).catch(() => undefined)
     if (result.deny !== undefined || result.isError) return result
     await observarChamada($, e as never, result).catch(() => undefined)
     // No meio do turno: se a projeção piorou, o aviso chega junto do resultado da ferramenta.
@@ -969,6 +1143,50 @@ export const register: Register = on => {
       </Box>
     )
 
+    // O roadmap: o plano além do objetivo (contrato em roadmap.ts). Agora aparece sempre; próximo e depois atrás do botão.
+    const plano = await read($, roadmap)
+    const abertoPlano = await read($, verRoadmap)
+    const contagem = HORIZONTES.map(x => `${x.rotulo} ${doHorizonte(plano, x.h).length}`).join(' · ')
+    const linhaPlano = (i: ItemRoadmap) => {
+      const prefixo = `R${i.n} ${i.frente ? `${i.frente}: ` : ''}`
+      const { curto, resto } = encurtar(i.texto, largura - prefixo.length - 2 - (goal ? BOTAO_PROMOVER : 0))
+      return (
+        <Box key={`r-${i.id}`} flexDirection="column">
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text dimColor={i.horizonte === 'depois'}>
+              <Text color="claude">R{i.n}</Text> {i.frente ? <Text dimColor>{i.frente}: </Text> : null}
+              {curto}
+            </Text>
+            {goal ? <Button key={`promover-${i.n}`} label="Promover" onPress={() => void mudarRoadmap($, { acao: 'promover', ids: [i.n] }, 'operador')} /> : null}
+          </Box>
+          {resto ? (
+            <Box display="none" hover={{ display: 'flex' }} paddingLeft={prefixo.length}>
+              <Text dimColor wrap="wrap">
+                …{resto}
+              </Text>
+            </Box>
+          ) : null}
+        </Box>
+      )
+    }
+    const roadmapBloco = abertos(plano).length ? (
+      <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="row">
+          <Text weight="bold">ROADMAP </Text>
+          <Button key="ver-roadmap" plain label={`${contagem} ${abertoPlano ? '▾' : '▸'}`} onPress={() => void update($, verRoadmap, v => !v)} />
+        </Box>
+        {HORIZONTES.filter(x => x.h === 'agora' || abertoPlano).map(x => {
+          const doH = doHorizonte(plano, x.h)
+          return doH.length ? (
+            <Box key={`h-${x.h}`} flexDirection="column">
+              <Text dimColor>{x.rotulo}</Text>
+              {doH.map(linhaPlano)}
+            </Box>
+          ) : null
+        })}
+      </Box>
+    ) : null
+
     const rodape = (
       <Box flexDirection="column" marginTop={1}>
         <Box flexDirection="row">
@@ -999,6 +1217,7 @@ export const register: Register = on => {
             <Text dimColor>/objetivo texto :: passo que conclui</Text>
           </Box>
           {cadernoBloco}
+          {roadmapBloco}
           {rodape}
         </Box>
       )
@@ -1051,6 +1270,7 @@ export const register: Register = on => {
             {fila.map(i => linhaItem(i, i.nivel === 'melhoria' ? '·' : '●', COR_NIVEL[i.nivel ?? 'requisito'], 0))}
           </Box>
         ) : null}
+        {roadmapBloco}
         {feitas.length ? (
           <Box flexDirection="column" marginTop={1}>
             <Button key="feitas" plain label={`✔ ${feitas.length} ${feitas.length === 1 ? 'feita' : 'feitas'} ${feitasAbertas ? '▾' : '▸'}`} onPress={() => void update($, verFeitas, v => !v)} />
@@ -1072,6 +1292,7 @@ const NOTAS_NO_PAINEL = 4
 
 // Colunas do botão "[ Feito ]" ao lado das pendências do operador.
 const BOTAO = 10
+const BOTAO_PROMOVER = 14
 const CURTO = { cabe: 'cabe', apertado: 'apertado', 'nao-cabe': 'não cabe', 'sem-dados': 'sem dados' } as const
 const COR_NIVEL = { bloqueante: 'error', requisito: 'text', melhoria: 'subtle' } as const
 

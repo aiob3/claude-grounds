@@ -860,7 +860,7 @@ test('caderno: a triagem do Claude grava, some da contagem e aparece no painel c
   expect(await triar({ nota: nota.id, decisao: 'aceita', motivo: '  ' })).toContain('diga o motivo')
   expect(c.texto().trim().split('\n').length).toBe(1)
   const ok = await triar({ nota: nota.id, decisao: 'aceita', motivo: 'entra na fase 1 do herdr', destino: 'roadmap', contraponto: 'pode pesar no painel' })
-  expect(ok).toContain(`Triagem gravada: ${nota.id} aceita → roadmap. Nenhuma nota sem resposta.`)
+  expect(ok).toContain(`Triagem gravada: ${nota.id} aceita → roadmap. Entrou no roadmap como R1 (depois). Nenhuma nota sem resposta.`)
   expect(JSON.parse(c.texto().trim().split('\n')[1]!)).toMatchObject({ v: 1, ev: 'triagem', id: nota.id, autor: 'claude', decisao: 'aceita', motivo: 'entra na fase 1 do herdr', destino: 'roadmap', contraponto: 'pode pesar no painel' })
   expect(await contextoDe($, 'segue')).not.toContain('caderno:')
   const pane = await painel($)
@@ -1223,4 +1223,163 @@ test('painel: checar a pasta do projeto que dá erro não derruba a leitura dos 
   const pane = await painel($)
   expect(pane).toContain('global')
   expect(pane).not.toContain('desta raiz')
+})
+
+// Roadmap: o arquivo do projeto num mapa por caminho, gravado por acréscimo como o caderno.
+const comRoadmap = (on: Parameters<TestBody>[1], o: { gravacaoFalha?: boolean } = {}) => {
+  const arqs: Record<string, string> = {}
+  mock.env(on, { HOME: '/h' })
+  on('session.root', () => ({ value: '/proj/r' }) as never)
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path in arqs }) as never)
+  on('fs.read', (_$, e) => {
+    const p = (e as { path: string }).path
+    if (p in arqs) return { value: arqs[p] } as never
+    throw new Error('ENOENT')
+  })
+  on('process.run', (_$, e) => {
+    const r = e as { argv: readonly string[]; init?: { stdin?: string } }
+    const alvo = r.argv[4]!
+    if (o.gravacaoFalha && alvo.includes('/roadmap/')) return { value: { exitCode: 1, stdout: '', stderr: 'disco cheio', isStdoutTruncated: false, isStderrTruncated: false } } as never
+    arqs[alvo] = (arqs[alvo] ?? '') + (r.init?.stdin ?? '')
+    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } } as never
+  })
+  const ARQ = '/h/.claude/roadmap/%2Fproj%2Fr.jsonl'
+  return { linhas: () => (arqs[ARQ] ?? '').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)), ARQ, arquivo: (p: string) => arqs[p] ?? '' }
+}
+const RM = 'mcp__contexto-bar__roadmap'
+const rm = async ($: Engine, a: object) => (JSON.parse(JSON.stringify(await $.tool.call({ tool: RM, ...a } as never))) as { result: string }).result
+const objetivoAgora = async ($: Engine) => JSON.parse(JSON.stringify(await $.tool.call({ tool: TOOL, acao: 'ver' } as never))).result as string
+
+test('roadmap: adicionar, mover e descartar gravam por acréscimo no arquivo do projeto; erros explicam e não gravam', async ($, on) => {
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  const r = comRoadmap(on)
+  expect(await rm($, { acao: 'ver' })).toBe('Roadmap vazio.')
+  expect(await rm($, { acao: 'adicionar', itens: [{ texto: '  ' }] })).toContain('adicionar precisa de itens com texto')
+  const ok = await rm($, { acao: 'adicionar', itens: [{ texto: 'mod do herdr só leitura', horizonte: 'agora', frente: 'herdr' }, { texto: 'delegação com agente dono' }, { texto: 'adversário de outro fornecedor', horizonte: 'depois', frente: 'herdr' }] })
+  expect(ok).toBe('Roadmap · 3 abertos\nagora:\n  R1 [herdr] mod do herdr só leitura\npróximo:\n  R2 delegação com agente dono\ndepois:\n  R3 [herdr] adversário de outro fornecedor')
+  expect(r.linhas().map(l => [l.ev, l.autor, l.horizonte])).toEqual([['item', 'claude', 'agora'], ['item', 'claude', 'proximo'], ['item', 'claude', 'depois']])
+  expect(await rm($, { acao: 'mover', ids: [2] })).toContain('mover precisa de horizonte')
+  expect(await rm($, { acao: 'mover', horizonte: 'agora' })).toContain('precisa de ids')
+  expect(await rm($, { acao: 'mover', ids: [2, 9], horizonte: 'agora' })).toContain('R9 não estão abertos')
+  expect(r.linhas().length).toBe(3)
+  expect(await rm($, { acao: 'mover', ids: [2], horizonte: 'agora' })).toContain('agora:\n  R1 [herdr] mod do herdr só leitura\n  R2 delegação com agente dono')
+  expect(await rm($, { acao: 'descartar', ids: [3], motivo: ' ' })).toContain('descartar precisa do motivo')
+  expect(await rm($, { acao: 'descartar', ids: [3], motivo: 'o operador decidiu outro caminho' })).toContain('descartados: R3')
+  expect(r.linhas().at(-1)).toMatchObject({ ev: 'descartar', motivo: 'o operador decidiu outro caminho' })
+  expect(await rm($, { acao: 'descartar', ids: [3], motivo: 'de novo' })).toContain('R3 não estão abertos')
+  expect(await rm($, { acao: 'apagar', ids: [1] })).toContain('acao é uma de ver, adicionar')
+  // Sem objetivo, o pedido lembra o que está em agora.
+  const ctx = await contextoDe($, 'e agora?')
+  expect(ctx).toContain(' · roadmap em agora: R1, R2 (promova com a ferramenta roadmap, acao \\"promover\\")')
+})
+
+test('roadmap: promover vira pendência do objetivo com a frente no texto; adiar tira do objetivo e guarda a origem', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  const r = comRoadmap(on)
+  await rm($, { acao: 'adicionar', itens: [{ texto: 'estados dos outros workspaces no painel', horizonte: 'agora', frente: 'herdr' }] })
+  expect(await rm($, { acao: 'promover', ids: [1] })).toContain('promover precisa de um objetivo ativo')
+  await comObjetivo($)
+  // Com pendência a fazer, o pedido não cobra o roadmap.
+  expect(await contextoDe($, 'segue')).not.toContain('roadmap em agora')
+  const p = await rm($, { acao: 'promover', ids: [1], nivel: 'bloqueante', tamanho: 'G' })
+  expect(p).toContain('R1 → #4 no objetivo "Painel novo".')
+  expect(p).toContain('promovidos: R1→#4')
+  expect(await objetivoAgora($)).toContain('[ ] #4 (claude, G) [bloqueante] herdr: estados dos outros workspaces no painel')
+  expect(await rm($, { acao: 'promover', ids: [1] })).toContain('R1 não estão abertos')
+  // Adiar: #2 sai do objetivo e entra em agora, com a origem; pendência feita ou inexistente não sai.
+  expect(await rm($, { acao: 'adiar', pendencias: [2, 40] })).toContain('pendências inexistentes ou já feitas: 40')
+  expect(await rm($, { acao: 'adiar' })).toContain('adiar precisa de pendencias')
+  const a = await rm($, { acao: 'adiar', pendencias: [2], horizonte: 'proximo', frente: 'painel' })
+  expect(a).toContain('#2 saíram do objetivo e foram para próximo.')
+  expect(a).toContain('próximo:\n  R2 [painel] desenhar os medidores')
+  expect(a).toContain('(de #2)')
+  const obj = await objetivoAgora($)
+  expect(obj).not.toContain('#2 ')
+  expect(obj).toContain('#3 ')
+  expect(r.linhas().at(-1)).toMatchObject({ ev: 'item', de: '#2', horizonte: 'proximo', frente: 'painel' })
+  await $.tool.call({ tool: TOOL, acao: 'concluir', ids: [3] } as never)
+  expect(await rm($, { acao: 'adiar', pendencias: [3] })).toContain('já feitas: 3')
+  // Promovido sem nível nem tamanho: requisito, M, do Claude.
+  await rm($, { acao: 'adicionar', itens: [{ texto: 'sem frente', horizonte: 'agora' }] })
+  await rm($, { acao: 'promover', ids: [3], dono: 'operador' })
+  expect(await objetivoAgora($)).toContain('[ ] #5 (operador, M) sem frente')
+})
+
+test('roadmap: encerrar devolve as pendências abertas para agora; sem gravar, o objetivo não sai', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  const r = comRoadmap(on)
+  await comObjetivo($)
+  await $.tool.call({ tool: TOOL, acao: 'concluir', ids: [2] } as never)
+  const fim = JSON.stringify(await $.tool.call({ tool: TOOL, acao: 'encerrar' } as never))
+  expect(fim).toContain('Nenhum objetivo ativo.')
+  expect(fim).toContain('As 2 pendências abertas voltaram ao roadmap, em agora.')
+  expect(r.linhas().map(l => [l.de, l.horizonte, l.texto])).toEqual([
+    ['#1', 'agora', 'conferir a faixa'],
+    ['#3', 'agora', 'escrever os testes'],
+  ])
+  // Uma aberta só: o singular. E encerrar sem abertas não grava nada.
+  await $.command.run({ command: 'objetivo', args: 'Outro :: x' } as never)
+  await $.command.run({ command: 'objetivo', args: 'add única' } as never)
+  expect(JSON.stringify(await $.command.run({ command: 'objetivo', args: 'encerrar' } as never))).toContain('A pendência aberta voltou ao roadmap, em agora.')
+  expect(r.linhas().at(-1)).toMatchObject({ de: '#1', texto: 'única', autor: 'operador' })
+  await $.command.run({ command: 'objetivo', args: 'Vazio :: y' } as never)
+  const n = r.linhas().length
+  expect(JSON.stringify(await $.tool.call({ tool: TOOL, acao: 'encerrar' } as never))).not.toContain('voltaram')
+  expect(r.linhas().length).toBe(n)
+})
+
+test('roadmap: se a gravação falha, encerrar não apaga o objetivo e adiar não tira a pendência', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  comRoadmap(on, { gravacaoFalha: true })
+  await comObjetivo($)
+  const fim = JSON.stringify(await $.tool.call({ tool: TOOL, acao: 'encerrar' } as never))
+  expect(fim).toContain('não consegui devolver as 3 pendências abertas ao roadmap; o objetivo segue ativo')
+  expect(await objetivoAgora($)).toContain('Objetivo: Painel novo')
+  expect(await rm($, { acao: 'adiar', pendencias: [2] })).toContain('não consegui gravar no roadmap; o objetivo ficou como estava')
+  expect(await objetivoAgora($)).toContain('#2 ')
+  expect(await rm($, { acao: 'adicionar', itens: [{ texto: 'x' }] })).toContain('Erro: não consegui gravar no roadmap.')
+})
+
+test('roadmap: a nota aceita com destino roadmap vira item com a origem; recusada ou para outro destino, não; não duplica', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  const r = comRoadmap(on)
+  await comObjetivo($)
+  await $.command.run({ command: 'objetivo', args: 'nota depois personagem com os estados do herdr' } as never)
+  await $.command.run({ command: 'objetivo', args: 'nota nada a ver' } as never)
+  const cad = '/h/.claude/caderno/%2Fproj%2Fr.jsonl'
+  const notas = r.arquivo(cad).split('\n').filter(Boolean).map((l: string) => JSON.parse(l))
+  const triar = async (a: object) => (JSON.parse(JSON.stringify(await $.tool.call({ tool: TOOL, acao: 'triar', ...a } as never))) as { result: string }).result
+  expect(await triar({ nota: notas[1].id, decisao: 'recusada', motivo: 'fora', destino: 'roadmap' })).not.toContain('Entrou no roadmap')
+  expect(await triar({ nota: notas[1].id, decisao: 'aceita', motivo: 'ok', destino: '#3' })).not.toContain('Entrou no roadmap')
+  expect(r.linhas()).toEqual([])
+  expect(await triar({ nota: notas[0].id, decisao: 'muda-plano', motivo: 'é a V3', destino: 'roadmap:proximo' })).toContain('Entrou no roadmap como R1 (próximo).')
+  expect(r.linhas()[0]).toMatchObject({ ev: 'item', autor: 'operador', texto: 'personagem com os estados do herdr', horizonte: 'proximo', de: notas[0].id })
+  // Triar de novo a mesma nota não cria outro item.
+  expect(await triar({ nota: notas[0].id, decisao: 'aceita', motivo: 'confirmo', destino: 'roadmap' })).not.toContain('Entrou no roadmap')
+  expect(r.linhas().length).toBe(1)
+})
+
+test('roadmap no painel: agora sempre, próximo e depois pelo botão; Promover só com objetivo; sem nada aberto, sem seção', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  comRoadmap(on)
+  expect(await painel($)).not.toContain('ROADMAP')
+  await rm($, { acao: 'adicionar', itens: [{ texto: 'abas nativas', horizonte: 'agora', frente: 'painel' }, { texto: 'mod do herdr', horizonte: 'proximo' }, { texto: 'adversário', horizonte: 'depois' }] })
+  // Sem objetivo: a seção aparece, sem o botão Promover.
+  let pane = await painel($)
+  expect(pane).toContain('ROADMAP ')
+  expect(pane).toContain('agora 1 · próximo 1 · depois 1 ▸')
+  expect(pane).toContain('abas nativas')
+  expect(pane).not.toContain('mod do herdr')
+  expect(pane).not.toContain('Promover')
+  await comObjetivo($)
+  const ui = await montar($)
+  await ui.press({ key: 'ver-roadmap' } as never)
+  expect(await ui.find({ type: 'Text', text: /mod do herdr/ } as never)).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /adversário/ } as never)).toBeDefined()
+  await ui.press({ key: 'promover-1' } as never)
+  await ui.unmount()
+  expect(await objetivoAgora($)).toContain('#4 (claude, M) painel: abas nativas')
+  pane = await painel($)
+  expect(pane).toContain('agora 0 · próximo 1 · depois 1 ▾')
 })
