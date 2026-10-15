@@ -179,7 +179,13 @@ Diário de um experimento operacional: usar mods (plugins locais do Claude Code)
 - **Por que:** uma rodada de 15/10 (fechamento lê sitemap e hreflang, 16/16) ficou fora do log público porque o gancho do harness não disparou. Com dois repositórios e dois ganchos, uma falha passava sem ninguém ver.
 - **Como foi provado:** as 74 linhas foram copiadas sem mudança; a geração numa cópia saiu idêntica ao que estava no ar (73 linhas públicas; a que falta é a rodada excluída pela regra de 14/10); numa cópia do repositório, o commit do `registrar` levou só o log, com outra mudança no índice que ficou de fora; os 72 testes do prova-de-teste passam.
 
+### Fechamento do objetivo "A mensagem se prova como o código" (2026-10-15, tarde)
+- **Resultado:** 21 de 27 pendências feitas. Duas das três condições da conclusão foram provadas: o leitor frio entende o README e o fio (antes e depois no log do EXP-002), e o texto público passa nas checagens mecânicas a cada sincronização.
+- **Descartado por decisão do operador:** a terceira condição, sinais de gente de fora, e com ela a medição dos sinais a cada sessão, a abertura de canais conforme os sinais e a decisão sobre o leitor frio virar ferramenta. Nas palavras do operador: "O nosso foco não é ficar monitorando o repositório no GitHub, a princípio". O fio está pronto em `publico/FIO.md` e sai quando o operador quiser.
+- **Fora daqui:** a prova dos três mínimos no uso real (publicar só pelo `promover-camada`, com progresso visível) fica com o operador, no próximo ciclo da sessão do motor.
+
 ## Próximas observações
+- [ ] prova-de-teste: o `repetir` roda só os sobreviventes da execução anterior e herda os mortos (o reforço cairia de ~50 s para ~5 s). Fazer quando a próxima rodada com testes pedir.
 - [x] Confirmar numa sessão nova que o objetivo de `~/Work` volta sozinho. **Validado pelo operador em 2026-10-14:** a sessão nova recebeu o objetivo da F1 inteiro (título, conclusão, 8 itens), sem restauração manual; ali o objetivo foi fechado em 8/8.
 - [ ] Ver se a média por unidade (hoje cerca de 11k tokens por P) se estabiliza entre sessões. Ela é gravada junto do objetivo e passa para o próximo objetivo definido por cima, mas se perde quando o objetivo é encerrado: o seguinte começa sem histórico.
 - [ ] Avaliar se o histórico de consumo deveria ser por projeto, independente do objetivo.
