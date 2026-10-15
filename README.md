@@ -143,28 +143,37 @@ inflado e equivalente sem justificativa. O agente trabalha livre, e o "pronto" s
 
 ## Quanto custa provar
 
-Um gate num hook não tem memória: a cada rodada ele revalida o código inteiro, e o custo cresce com o código. Aqui
-os mutantes saem só do diff, a prova das rodadas anteriores fica no log, e desde a versão 0.8 cada mutante roda só
-os arquivos de teste que alcançam, pelos imports, o arquivo mutado. Os outros ficam escondidos na cópia.
+Num projeto real, com 8881 testes, a rodada de mutation testing ficou 2,8 vezes mais rápida (de 407 s para 145 s)
+com exatamente os mesmos vereditos. Depois que o teste fraco foi reforçado, caiu para 107 s.
 
-A comparação rodou num projeto real do operador, com 3929 arquivos e 8881 testes no recorte verde da suíte (vitest),
-sobre uma mudança de 10 linhas. Os mesmos 10 mutantes, na mesma máquina:
+O ganho vem de test impact analysis, a mesma ideia do `vitest related` e do `jest --findRelatedTests`. Desde a
+versão 0.8, cada mutante roda só os arquivos de teste que chegam, pelo grafo de imports, ao arquivo mutado. Os
+outros ficam escondidos na cópia. Os mutantes já saíam só do diff, e a prova das rodadas anteriores fica no log, então
+nada do código antigo é revalidado à toa.
+
+A medição: 3929 arquivos e 8881 testes no recorte verde da suíte (vitest), uma mudança de 10 linhas, os mesmos 10
+mutantes, a mesma máquina.
 
 | | rodada | por mutante | testes por mutante | vereditos |
 |---|---|---|---|---|
-| suíte inteira em cada mutante | 407 s | 35,9 s | 8881 | 8 mortos, 2 sobreviventes |
-| incremental | 145 s | 10,0 s | 1906 | os mesmos |
+| suíte completa em cada mutante | 407 s | 35,9 s | 8881 | 8 mortos, 2 sobreviventes |
+| só os testes afetados | 145 s | 10,0 s | 1906 | os mesmos |
+| idem, com o teste reforçado | 107 s | 6,4 s | 1018 | 9 mortos, 1 equivalente |
 
-Cada mutante morto rodou 12 arquivos de teste, em cerca de 3 s.
+Um mutante morto passou de uns 36 s para uns 3 s: rodou 12 arquivos de teste em vez de 1007. Esse custo acompanha
+o tamanho do diff, não o do projeto.
 
-O mapa só afeta a velocidade. Uma morte só vale se um teste nomeado falhou, e todo sobrevivente é confirmado na
-suíte inteira. Nos próprios mods, três mutantes sobreviveram no modo incremental e morreram na suíte inteira, porque
-um teste chegava ao código pelo runtime do mod, sem import.
+Duas etapas continuam rodando a suíte completa, de propósito:
 
-A hipótese se confirmou em parte. O custo de cada mutante morto acompanha o diff. Dois custos continuam do tamanho
-da suíte: a linha de base, inteira de propósito para pegar regressão no código antigo, e a confirmação de cada
-sobrevivente. Quando a tarefa chega a PROVADO, sobra a linha de base. O relatório e o log trazem esses números a
-cada rodada (`custo: base, por mutante, repositório, diff`), e quem os mede é o próprio mod.
+- **A linha de base**, uma vez por rodada, para pegar regressão no código antigo.
+- **A confirmação de cada sobrevivente.** O grafo de imports só decide a velocidade, nunca o veredito: uma morte só
+  vale se um teste nomeado falhou, e um mutante só é dado como vivo depois de passar pela suíte inteira. Nos próprios
+  mods, essa confirmação pegou três mutantes que sobreviveram aos testes afetados e morreram na suíte completa,
+  porque um teste chegava ao código pelo runtime do mod, sem import.
+
+Por isso, quanto melhores os testes, mais rápida a rodada: com menos sobreviventes, sobra a linha de base mais uns
+3 s por mutante. O relatório e o log trazem esses números a cada rodada (`custo: base, por mutante, repositório,
+diff`), medidos pelo próprio mod.
 
 ## Instalar
 
@@ -219,7 +228,7 @@ abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
 - Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
-Em aberto: chegar a 10 medições com o instrumento parado (2 até agora) antes de decidir se o método
+Em aberto: chegar a 10 medições com o instrumento parado (4 até agora) antes de decidir se o método
 vira critério; medir o custo incremental em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 

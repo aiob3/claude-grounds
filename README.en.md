@@ -147,28 +147,37 @@ unjustified equivalents. The agent works freely, and an ungrounded "done" doesn'
 
 ## What proving costs
 
-A gate in a hook has no memory: every round it revalidates the whole codebase, and the cost grows with the code.
-Here the mutants come from the diff alone, earlier proofs stay in the log, and since version 0.8 each mutant runs only
-the test files that reach the mutated file through imports. The rest are hidden in the copy.
+On a real project with 8881 tests, a mutation testing round got 2.8x faster (407 s down to 145 s) with exactly the
+same verdicts. Once the weak test was strengthened, it dropped to 107 s.
 
-The comparison ran on a real project of the operator's, with 3929 files and 8881 tests in the green slice of the
-suite (vitest), over a 10-line change. Same 10 mutants, same machine:
+The speedup comes from test impact analysis, the same idea as `vitest related` or `jest --findRelatedTests`. Since
+version 0.8, each mutant runs only the test files that reach the mutated file through the import graph. The rest
+are hidden in the copy. Mutants already came from the diff alone, and earlier proofs stay in the log, so old code is
+never revalidated for nothing.
+
+The measurement: 3929 files and 8881 tests in the green slice of the suite (vitest), a 10-line change, the same 10
+mutants, the same machine.
 
 | | round | per mutant | tests per mutant | verdicts |
 |---|---|---|---|---|
-| whole suite for every mutant | 407 s | 35.9 s | 8881 | 8 killed, 2 survivors |
-| incremental | 145 s | 10.0 s | 1906 | the same |
+| full suite for every mutant | 407 s | 35.9 s | 8881 | 8 killed, 2 survivors |
+| affected tests only | 145 s | 10.0 s | 1906 | the same |
+| same, with the test strengthened | 107 s | 6.4 s | 1018 | 9 killed, 1 equivalent |
 
-Each killed mutant ran 12 test files, in about 3 s.
+A killed mutant went from about 36 s to about 3 s: it ran 12 test files instead of 1007. That cost tracks the size
+of the diff, not the size of the project.
 
-The map only affects speed. A kill only counts when a named test failed, and every survivor is confirmed against
-the whole suite. On the mods themselves, three mutants survived in incremental mode and died in the whole suite,
-because a test reached the code through the mod runtime, with no import.
+Two steps still run the full suite, on purpose:
 
-The hypothesis held in part. The cost of each killed mutant tracks the diff. Two costs still scale with the suite:
-the baseline, kept whole on purpose to catch regressions in old code, and confirming each survivor. Once a task
-reaches PROVADO (proven), the baseline is what's left. The report and the log carry these numbers every round
-(`custo`: baseline, per mutant, repository, diff), and the mod measures them itself.
+- **The baseline**, once per round, to catch regressions in old code.
+- **Confirming each survivor.** The import graph only decides speed, never the verdict: a kill only counts when a
+  named test failed, and a mutant is only called alive after it gets through the whole suite. On the mods
+  themselves, this check caught three mutants that survived the affected tests and died in the full suite, because a
+  test reached the code through the mod runtime, with no import.
+
+So the better the tests, the faster the round: with fewer survivors, what's left is the baseline plus about 3 s per
+mutant. The report and the log carry these numbers every round (`custo`: baseline, per mutant, repository, diff),
+measured by the mod itself.
 
 ## Install
 
@@ -226,7 +235,7 @@ session, open another one in the same folder and type `/objetivo`: the goal is s
 - The mods need Claude Code 2.1.287 or later (the version mods shipped in) and were tested on 2.1.300. They
   work in the terminal and in the Code tab of the Desktop app.
 
-Open: reach 10 measurements with a frozen instrument (2 so far) before deciding whether the method
+Open: reach 10 measurements with a frozen instrument (4 so far) before deciding whether the method
 becomes a criterion; measure the incremental cost on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
 average settles across sessions.
 
