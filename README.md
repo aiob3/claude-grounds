@@ -152,7 +152,7 @@ claude plugin install prova-de-teste@claude-grounds
 | Mod | Versão | Papel |
 |---|---|---|
 | [`contexto-bar`](contexto-bar/) | 0.8.0 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
-| [`prova-de-teste`](prova-de-teste/) | 0.8.0 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
+| [`prova-de-teste`](prova-de-teste/) | 0.8.1 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
 
 O log do `prova-de-teste` vai para `PROVA_DE_TESTE_LOG` ou, sem essa variável, para
 `~/.claude/prova-de-teste/EXP-001-log.md`. O agente usa as ferramentas `objetivo`, `executar` e `registrar`; você usa
@@ -191,7 +191,7 @@ abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
 - Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
-Em aberto: chegar a 10 medições com o instrumento parado (1 até agora) antes de decidir se o método
+Em aberto: chegar a 10 medições com o instrumento parado (2 até agora) antes de decidir se o método
 vira critério; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 

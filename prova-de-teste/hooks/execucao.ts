@@ -53,6 +53,9 @@ export function aplicarTrecho(fonte: string, linha: number, mutacao: string): Ap
   }
 }
 
+/** Tira as cores ANSI: o vitest colore o resumo mesmo sem terminal quando FORCE_COLOR está no ambiente (projeto real, 0.8.1). */
+export const semCor = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
+
 /**
  * O mutante quebrou o carregamento (sintaxe, tipos, import): é inválido, não conta como morto.
  * Só vale o erro na coluna 0, onde o carregador o escreve; o lançado dentro de um teste sai indentado
@@ -63,8 +66,8 @@ export function invalido(saida: string): boolean {
 }
 
 /** A primeira linha do erro de carga, para o relatório dizer por que o mutante não carregou. */
-export function erroDeCarga(saida: string): string | undefined {
-  const linhas = saida.split('\n')
+export function erroDeCarga(texto: string): string | undefined {
+  const linhas = semCor(texto).split('\n')
   // Na coluna 0, como o claude plugin test escreve; o mesmo texto citado no código de um teste que falhou não vale.
   const i = linhas.findIndex(l => /^\(fail\) the file did not load/.test(l))
   if (i >= 0) return linhas.slice(i + 1).find(l => l.trim())?.trim() ?? 'the file did not load'
@@ -72,10 +75,11 @@ export function erroDeCarga(saida: string): string | undefined {
 }
 
 /** O nome do teste que falhou, pelos formatos comuns; sem nenhum, o código de saída. */
-export function quemMatou(saida: string, codigo: number): string {
+export function quemMatou(texto: string, codigo: number): string {
+  const saida = semCor(texto)
   const padroes = [
     /^\s*\(fail\)\s+(.+?)(?:\s+\[[\d.]+m?s\])?\s*$/m, // claude plugin test, bun test
-    /^\s*[✕×]\s+(.+?)(?:\s+\(\d+\s*m?s\))?\s*$/m, // jest, vitest
+    /^\s*[✕×]\s+(.+?)(?:\s+\(\d+\s*m?s\)|\s+\d+(?:\.\d+)?m?s)?\s*$/m, // jest "(1 ms)", vitest "9ms"
     /^\s*✖\s+(?!failing tests:)(.+?)(?:\s+\([\d.]+m?s\))?\s*$/m, // node --test (spec)
     /^\s*not ok \d+ - (.+?)\s*(?:#.*)?$/m, // node --test (tap)
     /^FAILED\s+(\S+)/m, // pytest
@@ -92,7 +96,8 @@ export function quemMatou(saida: string, codigo: number): string {
  * Quantos testes a execução rodou, pelo resumo final dos formatos comuns; sem resumo, nada.
  * É o número que diz se a execução incremental rodou menos testes por mutante.
  */
-export function contarTestes(saida: string): number | undefined {
+export function contarTestes(texto: string): number | undefined {
+  const saida = semCor(texto)
   const num = (re: RegExp) => {
     const m = re.exec(saida)
     return m ? Number(m[1]) : undefined

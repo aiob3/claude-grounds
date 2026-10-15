@@ -6,7 +6,8 @@ import { aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTeste
 import type { Comando, Execucao, Resultado } from './execucao'
 import { avisoNovos, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
-import { cabeNoMapa, ehEntradaDeTeste, ehMapeavel, grafo, SUFIXO_FORA, testesQueAlcancam } from './alcance'
+import type { Alias } from './alcance'
+import { aliasesDe, cabeNoMapa, ehConfigDeAlias, ehEntradaDeTeste, ehMapeavel, grafo, SUFIXO_FORA, testesQueAlcancam } from './alcance'
 
 const avisadoTurno = atom({ plugin: 'prova-de-teste', key: 'avisadoTurno' } as const, -1)
 const ultima = atom({ plugin: 'prova-de-teste', key: 'ultima' } as const, null)
@@ -270,14 +271,22 @@ async function executar(
     const mapear = async () => {
       const ls = await git($, ['ls-files', '--cached', '--others', '--exclude-standard'], copia)
       if (ls.exitCode !== 0) return undefined
-      const arquivos = [...new Set(ls.stdout.split('\n').filter(ehMapeavel))]
+      const listados = [...new Set(ls.stdout.split('\n'))]
+      const arquivos = listados.filter(ehMapeavel)
       if (!cabeNoMapa(arquivos.length)) return undefined
+      const ler = async (f: string) => {
+        const t = await $.fs.read(`${copia}/${f}`).catch(() => undefined)
+        return typeof t === 'string' ? t : undefined
+      }
+      // Os aliases (`@/x`) dos tsconfig e vite.config: sem eles, os imports com alias não entram no mapa.
+      const aliases: Alias[] = []
+      for (const f of listados.filter(ehConfigDeAlias)) aliases.push(...aliasesDe(f, (await ler(f)) ?? ''))
       const fontes = new Map<string, string>()
       for (const f of arquivos) {
-        const t = await $.fs.read(`${copia}/${f}`).catch(() => undefined)
-        if (typeof t === 'string') fontes.set(f, t)
+        const t = await ler(f)
+        if (t !== undefined) fontes.set(f, t)
       }
-      return { g: grafo(fontes), testes: [...fontes.keys()].filter(ehEntradaDeTeste) }
+      return { g: grafo(fontes, aliases), testes: [...fontes.keys()].filter(ehEntradaDeTeste) }
     }
     const rodarUm = async (argv: string[]) =>
       $.process.run(argv, { cwd: copia, timeoutMs }).catch(err => ({

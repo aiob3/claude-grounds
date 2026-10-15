@@ -29,7 +29,7 @@ export function normalizar(p: string): string | undefined {
   return r.join('/')
 }
 
-/** Os especificadores relativos de um arquivo JS/TS: import, export from, require e import(). */
+/** Os especificadores de um arquivo JS/TS: import, export from, require e import(). Pacotes entram e não resolvem. */
 export function especificadoresJs(fonte: string): string[] {
   const r = new Set<string>()
   const padroes = [
@@ -37,12 +37,73 @@ export function especificadoresJs(fonte: string): string[] {
     /\bimport\s*['"]([^'"]+)['"]/g,
     /\b(?:require|import)\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
   ]
-  for (const p of padroes) for (const m of fonte.matchAll(p)) if (m[1]!.startsWith('.')) r.add(m[1]!)
+  for (const p of padroes) for (const m of fonte.matchAll(p)) r.add(m[1]!)
   return [...r]
 }
 
-/** O arquivo do repositório que um especificador relativo nomeia; `./x.js` também acha `x.ts` (ESM com TypeScript). */
-export function resolverJs(de: string, spec: string, arquivos: Set<string>): string | undefined {
+/**
+ * Um alias de import, válido para os arquivos sob `escopo` (a pasta do tsconfig ou do vite.config; '' = a raiz).
+ * Com `curinga` (`@/*`), `de` é prefixo e o resto do especificador vai depois de `para`; sem, só vale o nome exato.
+ */
+export type Alias = { escopo: string; de: string; para: string; curinga: boolean }
+
+/** Os aliases dos `paths` de um tsconfig, relativos ao baseUrl (ou à pasta dele). Lidos por regex: tsconfig aceita comentário. */
+export function aliasesDeTsconfig(caminho: string, texto: string): Alias[] {
+  const dir = pasta(caminho)
+  const bloco = /"paths"\s*:\s*\{([^}]*)\}/.exec(texto)?.[1]
+  if (!bloco) return []
+  const baseUrl = /"baseUrl"\s*:\s*"([^"]*)"/.exec(texto)?.[1] ?? '.'
+  const raiz = normalizar(dir + baseUrl)
+  if (raiz === undefined) return []
+  const r: Alias[] = []
+  for (const m of bloco.matchAll(/"([^"]+)"\s*:\s*\[\s*"([^"]+)"/g)) {
+    const [chave, alvo] = [m[1]!, m[2]!]
+    const curinga = chave.endsWith('*') && alvo.endsWith('*')
+    const prefixo = curinga ? alvo.slice(0, -1) : alvo
+    const para = normalizar(`${raiz}/${prefixo}`)
+    if (para === undefined) continue
+    // `src/*` e `*` substituem uma pasta (a barra volta depois de normalizar); `lib*` é prefixo de nome, sem barra.
+    const pasta_ = curinga && (prefixo === '' || prefixo.endsWith('/'))
+    r.push({ escopo: dir, de: curinga ? chave.slice(0, -1) : chave, para: pasta_ && para ? `${para}/` : para, curinga })
+  }
+  return r
+}
+
+/** Os aliases de um vite.config/vitest.config na forma `'@': path.resolve(__dirname, 'src')`. */
+export function aliasesDeVite(caminho: string, texto: string): Alias[] {
+  const dir = pasta(caminho)
+  const r: Alias[] = []
+  for (const m of texto.matchAll(/['"]([^'"]+)['"]\s*:\s*path\.resolve\(\s*__dirname\s*,\s*['"]([^'"]+)['"]\s*\)/g)) {
+    const para = normalizar(dir + m[2]!)
+    if (para === undefined) continue
+    // `@` vale como `@` exato e como prefixo `@/`.
+    r.push({ escopo: dir, de: m[1]!, para, curinga: false }, { escopo: dir, de: `${m[1]!}/`, para: para ? `${para}/` : '', curinga: true })
+  }
+  return r
+}
+
+export const ehConfigDeAlias = (caminho: string) => /(^|\/)(tsconfig[^/]*\.json|vite(st)?\.config\.[cm]?[jt]s)$/.test(caminho)
+
+/** Os aliases de um arquivo de configuração, pelo nome. */
+export const aliasesDe = (caminho: string, texto: string) => (caminho.endsWith('.json') ? aliasesDeTsconfig(caminho, texto) : aliasesDeVite(caminho, texto))
+
+/** Onde um especificador com alias aponta, pelos aliases que valem para `de`: o escopo mais fundo vence. */
+function porAlias(de: string, spec: string, aliases: Alias[]): string[] {
+  const valem = aliases.filter(a => de.startsWith(a.escopo) && (a.curinga ? spec.startsWith(a.de) : spec === a.de))
+  if (!valem.length) return []
+  const fundo = Math.max(...valem.map(a => a.escopo.length))
+  return valem.filter(a => a.escopo.length === fundo).map(a => a.para + spec.slice(a.de.length))
+}
+
+/** O arquivo do repositório que um especificador nomeia (relativo ou por alias); `./x.js` também acha `x.ts` (ESM com TypeScript). */
+export function resolverJs(de: string, spec: string, arquivos: Set<string>, aliases: Alias[] = []): string | undefined {
+  if (!spec.startsWith('.')) {
+    for (const alvo of porAlias(de, spec, aliases)) {
+      const achado = resolverJs('', `./${alvo}`, arquivos)
+      if (achado) return achado
+    }
+    return undefined
+  }
   const base = normalizar(pasta(de) + spec)
   if (base === undefined) return undefined
   const semJs = base.replace(/\.[cm]?jsx?$/, '')
@@ -95,11 +156,11 @@ export function importsPy(de: string, fonte: string, arquivos: Set<string>): str
 }
 
 /** O que cada arquivo importa, dentro do repositório. */
-export function grafo(fontes: Map<string, string>): Map<string, string[]> {
+export function grafo(fontes: Map<string, string>, aliases: Alias[] = []): Map<string, string[]> {
   const arquivos = new Set(fontes.keys())
   const g = new Map<string, string[]>()
   for (const [arq, fonte] of fontes) {
-    if (JS.test(arq)) g.set(arq, especificadoresJs(fonte).flatMap(s => resolverJs(arq, s, arquivos) ?? []))
+    if (JS.test(arq)) g.set(arq, especificadoresJs(fonte).flatMap(s => resolverJs(arq, s, arquivos, aliases) ?? []))
     else if (PY.test(arq)) g.set(arq, importsPy(arq, fonte, arquivos))
   }
   return g

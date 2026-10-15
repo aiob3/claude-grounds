@@ -156,7 +156,7 @@ claude plugin install prova-de-teste@claude-grounds
 | Mod | Version | Role |
 |---|---|---|
 | [`contexto-bar`](contexto-bar/) | 0.8.0 | context band, goal per project, panel and window projection |
-| [`prova-de-teste`](prova-de-teste/) | 0.8.0 | blind mutant round in an isolated copy, report and log |
+| [`prova-de-teste`](prova-de-teste/) | 0.8.1 | blind mutant round in an isolated copy, report and log |
 
 The `prova-de-teste` log goes to `PROVA_DE_TESTE_LOG` or, without that variable, to
 `~/.claude/prova-de-teste/EXP-001-log.md`. The agent uses the `objetivo` (goal), `executar` (run) and `registrar`
@@ -198,7 +198,7 @@ session, open another one in the same folder and type `/objetivo`: the goal is s
 - The mods need Claude Code 2.1.287 or later (the version mods shipped in) and were tested on 2.1.300. They
   work in the terminal and in the Code tab of the Desktop app.
 
-Open: reach 10 measurements with a frozen instrument (1 so far) before deciding whether the method
+Open: reach 10 measurements with a frozen instrument (2 so far) before deciding whether the method
 becomes a criterion; keep the consumption history per project, independent of the goal; see whether the per-unit
 average settles across sessions.
 

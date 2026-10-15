@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { cabeNoMapa, ehEntradaDeTeste, especificadoresJs, LIMITE_MAPA, grafo, importsPy, normalizar, resolverJs, testesQueAlcancam } from './alcance'
+import { aliasesDeTsconfig, aliasesDeVite, cabeNoMapa, ehConfigDeAlias, ehEntradaDeTeste, especificadoresJs, LIMITE_MAPA, grafo, importsPy, normalizar, resolverJs, testesQueAlcancam } from './alcance'
 import { planoIncremental } from './execucao'
 
 test('ehEntradaDeTeste: só o que o executor descobre pelo nome; helper e fixture da pasta de teste não', () => {
@@ -19,7 +19,7 @@ test('normalizar resolve . e ..; acima da raiz não existe', () => {
   expect(normalizar('./x')).toBe('x')
 })
 
-test('especificadoresJs: import, export from, efeito colateral, require e import(); pacote não entra', () => {
+test('especificadoresJs: import, export from, efeito colateral, require e import(); pacote entra e não resolve', () => {
   const fonte = [
     "import { a } from './a'",
     "import type { T } from '../tipos'",
@@ -30,7 +30,8 @@ test('especificadoresJs: import, export from, efeito colateral, require e import
     "import { expect } from 'claude-code/testing'",
     "import x from 'lodash'",
   ].join('\n')
-  expect(especificadoresJs(fonte).sort()).toEqual(['../tipos', './a', './b.js', './c', './d', './efeito'])
+  expect(especificadoresJs(fonte).sort()).toEqual(['../tipos', './a', './b.js', './c', './d', './efeito', 'claude-code/testing', 'lodash'])
+  expect(resolverJs('src/x.ts', 'lodash', new Set(['lodash.ts']))).toBeUndefined()
   // Import em várias linhas.
   expect(especificadoresJs("import {\n  a,\n  b,\n} from './varias'\n")).toEqual(['./varias'])
 })
@@ -119,4 +120,53 @@ test('cabeNoMapa: até o limite lê o repositório; acima, a suíte inteira', ()
   expect(cabeNoMapa(LIMITE_MAPA)).toBe(true)
   expect(cabeNoMapa(LIMITE_MAPA + 1)).toBe(false)
   expect(cabeNoMapa(0)).toBe(true)
+})
+
+test('aliases: paths do tsconfig por escopo e baseUrl, vite alias, o escopo mais fundo vence (projeto real, 0.8.1)', () => {
+  // src/tsconfig.json: "@/*": ["./*"] vale para src/; um tsconfig com comentário ainda é lido.
+  const src = aliasesDeTsconfig('src/tsconfig.json', '{ // app\n "compilerOptions": { "paths": {\n "@/*": ["./*"],\n "~cfg": ["../config/index.ts"] } } }')
+  expect(src).toEqual([
+    { escopo: 'src/', de: '@/', para: 'src/', curinga: true },
+    { escopo: 'src/', de: '~cfg', para: 'config/index.ts', curinga: false },
+  ])
+  expect(aliasesDeTsconfig('tsconfig.json', '{"compilerOptions":{"baseUrl":"lib","paths":{"#/*":["*"]}}}')).toEqual([{ escopo: '', de: '#/', para: 'lib/', curinga: true }])
+  expect(aliasesDeTsconfig('tsconfig.json', '{"compilerOptions":{}}')).toEqual([])
+  // Na raiz, sem baseUrl, `*` aponta para a própria raiz: prefixo vazio, sem barra solta (rodada 0.8.1, #1).
+  const raiz = aliasesDeTsconfig('tsconfig.json', '{"paths":{"~/*":["*"]}}')
+  expect(raiz).toEqual([{ escopo: '', de: '~/', para: '', curinga: true }])
+  expect(resolverJs('a/b.ts', '~/c/d', new Set(['c/d.ts']), raiz)).toBe('c/d.ts')
+  // `lib*` é prefixo de nome: `~xfoo` → `libfoo`, com curinga sem barra (#2).
+  const pre = aliasesDeTsconfig('tsconfig.json', '{"paths":{"~x*":["lib*"]}}')
+  expect(pre).toEqual([{ escopo: '', de: '~x', para: 'lib', curinga: true }])
+  expect(resolverJs('a.ts', '~xfoo', new Set(['libfoo.ts']), pre)).toBe('libfoo.ts')
+  // Alvo acima da raiz não vira alias (#6); curinga só na chave não é curinga (#11).
+  expect(aliasesDeTsconfig('tsconfig.json', '{"paths":{"@/*":["../fora/*"]}}')).toEqual([])
+  expect(aliasesDeTsconfig('tsconfig.json', '{"paths":{"@/*":["only.ts"]}}')).toEqual([{ escopo: '', de: '@/*', para: 'only.ts', curinga: false }])
+  expect(aliasesDeTsconfig('a/tsconfig.json', '{"compilerOptions":{"baseUrl":"../../x","paths":{"@/*":["*"]}}}')).toEqual([])
+  const vite = aliasesDeVite('vitest.config.ts', "alias: {\n  '@': path.resolve(__dirname, 'src'),\n}")
+  expect(vite).toEqual([
+    { escopo: '', de: '@', para: 'src', curinga: false },
+    { escopo: '', de: '@/', para: 'src/', curinga: true },
+  ])
+  const arqs = new Set(['src/utils/m.ts', 'src/lib/index.ts', 'config/index.ts', 'web/utils/m.ts'])
+  expect(resolverJs('src/__tests__/x.test.ts', '@/utils/m', arqs, src)).toBe('src/utils/m.ts')
+  expect(resolverJs('src/a.ts', '~cfg', arqs, src)).toBe('config/index.ts')
+  // Fora do escopo do tsconfig de src/, o alias dele não vale; o do vite (raiz) vale.
+  expect(resolverJs('electron/x.ts', '@/utils/m', arqs, src)).toBeUndefined()
+  expect(resolverJs('electron/x.ts', '@/lib', arqs, vite)).toBe('src/lib/index.ts')
+  expect(resolverJs('electron/x.ts', '@', new Set(['src/index.ts']), vite)).toBe('src/index.ts')
+  // Dois escopos casam: o mais fundo (web/) vence o da raiz.
+  // Na ordem que for: o do vite (raiz) vem antes e ainda perde (#4).
+  const web = [...vite, { escopo: 'web/', de: '@/', para: 'web/', curinga: true }]
+  expect(resolverJs('web/p.ts', '@/utils/m', new Set([...arqs, 'src/utils/m.ts']), web)).toBe('web/utils/m.ts')
+  // `@x` não é `@/x`: o curinga exige a barra; o alias exato não casa prefixo.
+  expect(resolverJs('src/a.ts', '@utils/m', arqs, src)).toBeUndefined()
+  expect(resolverJs('src/a.ts', '~cfg/x', arqs, src)).toBeUndefined()
+  expect(ehConfigDeAlias('src/tsconfig.json')).toBe(true)
+  expect(ehConfigDeAlias('vitest.config.mts')).toBe(true)
+  expect(ehConfigDeAlias('vite.config.ts')).toBe(true)
+  expect(ehConfigDeAlias('src/config.ts')).toBe(false)
+  // No grafo: o teste que importa por alias alcança o arquivo.
+  const g = grafo(new Map([['src/utils/m.ts', ''], ['src/__tests__/m.test.ts', "import { f } from '@/utils/m'\n"]]), src)
+  expect(testesQueAlcancam('src/utils/m.ts', g)).toEqual(['src/__tests__/m.test.ts'])
 })

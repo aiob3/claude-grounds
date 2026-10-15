@@ -197,7 +197,9 @@ test('sem HOME, /prova ~/pasta não inventa uma pasta', async ($, on) => {
 function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string } } = {}) {
   const fs = new Map<string, string>([
     ['/repo/src/a.ts', 'export const soma = (a, b) => a + b\n'],
-    ['/repo/src/a.test.ts', "import { soma } from './a'\nexpect(soma(1, 2)).toBe(3)\n"],
+    // Por alias do tsconfig: sem ler os aliases, nenhum teste alcançaria a.ts (rodada 0.8.1, #13).
+    ['/repo/src/a.test.ts', "import { soma } from '@/a'\nexpect(soma(1, 2)).toBe(3)\n"],
+    ['/repo/tsconfig.json', '{ "compilerOptions": { "paths": { "@/*": ["src/*"] } } }'],
     // Um módulo com o teste dele, que não alcança a.ts: a execução incremental o esconde nos mutantes de a.ts.
     ['/repo/src/b.ts', 'export const um = 1\n'],
     ['/repo/src/b.test.ts', "import { um } from './b.js'\nexpect(um).toBe(1)\n"],
@@ -217,7 +219,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       if (a === 'rev-parse --show-toplevel') return r('/repo\n')
       if (a === 'diff HEAD') return r(DIFF)
       if (a === 'status --porcelain') return r(' M src/a.ts\n')
-      if (a === 'ls-files --cached --others --exclude-standard') return r('src/a.ts\nsrc/a.test.ts\nsrc/b.ts\nsrc/b.test.ts\n')
+      if (a === 'ls-files --cached --others --exclude-standard') return r('src/a.ts\nsrc/a.test.ts\nsrc/b.ts\nsrc/b.test.ts\ntsconfig.json\n')
       if (a === 'ls-tree -r -l HEAD') return r('100644 blob aaa     30\tsrc/a.ts\n100644 blob bbb     2018\tsrc/a.test.ts\n')
       return r('')
     }

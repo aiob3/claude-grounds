@@ -257,6 +257,14 @@ test('contarTestes lê o resumo de cada executor; sem resumo, não inventa', () 
   expect(contarTestes('12 passed in 1.02s\n')).toBe(12)
   expect(contarTestes('1 error in 0.10s\n')).toBe(1)
   expect(contarTestes('  ✓ soma dá 3\n')).toBeUndefined()
+  // Com cor, como o vitest escreve com FORCE_COLOR (projeto real, 0.8.1).
+  expect(contarTestes('\x1b[2m      Tests \x1b[22m \x1b[1m\x1b[32m9 passed\x1b[39m\x1b[22m\x1b[90m (9)\x1b[39m\n')).toBe(9)
+  expect(quemMatou('\x1b[31m ✕ \x1b[39msoma dá 3\x1b[2m (1 ms)\x1b[22m\n', 1)).toBe('soma dá 3')
+  // vitest 4 escreve o tempo sem parênteses: fica fora do nome (projeto real, 0.8.1).
+  expect(quemMatou(' × shortenModel > maps ids 9ms\n', 1)).toBe('shortenModel > maps ids')
+  expect(quemMatou(' × soma 1.5s\n', 1)).toBe('soma')
+  expect(quemMatou(' × soma em 2 passos\n', 1)).toBe('soma em 2 passos')
+  expect(erroDeCarga('\x1b[31mSyntaxError: x\x1b[39m\n')).toBe('SyntaxError: x')
   expect(contarTestes('')).toBeUndefined()
 })
 
