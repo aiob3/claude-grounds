@@ -1,12 +1,13 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { Atividade, Goal, GoalItem, GroupKey, Indicador, Segment, Snapshot } from '../types'
+import type { Atividade, Decisao, Goal, GoalItem, GroupKey, Indicador, Nota, Segment, Snapshot, TipoNota } from '../types'
 import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
 import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
 import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
 import type { SegundoPlano } from './segundo-plano'
+import { DECISOES, entrega, GLIFO_DECISAO, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
 import { COR_INDICADOR, encurtar, ESTADOS, medidor, sufixoIndicador, textoAtividade, validarIndicadores } from './painel'
 
 const snapshot = atom({ plugin: 'contexto-bar', key: 'snapshot' } as const, null)
@@ -19,6 +20,10 @@ const atividade = atom({ plugin: 'contexto-bar', key: 'atividade' } as const, nu
 const verFeitas = atom({ plugin: 'contexto-bar', key: 'verFeitas' } as const, false)
 const indicadores = atom({ plugin: 'contexto-bar', key: 'indicadores' } as const, [])
 const autoEspelho = atom({ plugin: 'contexto-bar', key: 'painelAuto' } as const, null)
+const caderno = atom({ plugin: 'contexto-bar', key: 'caderno' } as const, [])
+const entregues = atom({ plugin: 'contexto-bar', key: 'entregues' } as const, [])
+const tipoNota = atom({ plugin: 'contexto-bar', key: 'tipoNota' } as const, 'nota')
+const envios = atom({ plugin: 'contexto-bar', key: 'envios' } as const, 0)
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
@@ -31,12 +36,14 @@ const TOOL_SPEC = {
     '(definir: titulo, conclusao = o passo que encerra, itens com dono claude|operador, tamanho P|M|G e nivel ' +
     'bloqueante|requisito|melhoria), ao concluir cada pendência (concluir: ids), para repriorizar (priorizar: ids + nivel), ' +
     'acrescentar (adicionar), reabrir, encerrar ou ver. Bloqueante trava outra pendência ou a entrega; requisito é preciso ' +
-    'para a entrega; melhoria pode esperar. A resposta traz a fila na ordem e a projeção de janela.',
+    'para a entrega; melhoria pode esperar. A resposta traz a fila na ordem e a projeção de janela. ' +
+    'Notas do caderno do operador chegam com o resultado de outras ferramentas: responda a cada uma com triar ' +
+    '(nota, decisao, motivo, destino, contraponto).',
   isDeferred: false,
   inputSchema: {
     type: 'object',
     properties: {
-      acao: { type: 'string', enum: ['definir', 'adicionar', 'concluir', 'reabrir', 'priorizar', 'encerrar', 'ver'] },
+      acao: { type: 'string', enum: ['definir', 'adicionar', 'concluir', 'reabrir', 'priorizar', 'encerrar', 'ver', 'triar'] },
       titulo: { type: 'string' },
       conclusao: { type: 'string', description: 'O passo que, feito, encerra o objetivo.' },
       itens: {
@@ -54,6 +61,11 @@ const TOOL_SPEC = {
       },
       ids: { type: 'array', items: { type: 'integer' } },
       nivel: { type: 'string', enum: ['bloqueante', 'requisito', 'melhoria'], description: 'Para priorizar.' },
+      nota: { type: 'string', description: 'Para triar: o id da nota do caderno (n-...).' },
+      decisao: { type: 'string', enum: ['aceita', 'recusada', 'muda-plano', 'registrada'], description: 'Para triar.' },
+      motivo: { type: 'string', description: 'Para triar: o porquê, em uma frase.' },
+      destino: { type: 'string', description: 'Para triar: para onde a nota foi (#id da pendência, roadmap).' },
+      contraponto: { type: 'string', description: 'Para triar: o melhor argumento contra a sua decisão, em uma frase.' },
     },
     required: ['acao'],
   },
@@ -128,6 +140,7 @@ export function fmtTokens(n: number): string {
 // Lê o detalhamento do /context (estimativa local, sem custo) e guarda para a barra.
 async function refresh($: EngineInterface, hookTexts: Set<string>) {
   await lerIndicadores($).catch(() => undefined)
+  await lerDoCaderno($).catch(() => undefined)
   try {
     const usage = await $.session.usage({ breakdown: 'summary' })
     // O tamanho do último pedido vem pronto: entrada sem cache, lida e gravada no cache, somadas.
@@ -161,6 +174,61 @@ async function lerIndicadores($: EngineInterface): Promise<void> {
   }
   const atual = await read($, indicadores)
   if (JSON.stringify(atual) !== JSON.stringify(lidos)) await update($, indicadores, () => lidos)
+}
+
+// O caderno: ver hooks/caderno.ts (propósito e contrato). Um arquivo por projeto, só acréscimo.
+async function arquivoCaderno($: EngineInterface): Promise<string | undefined> {
+  const home = await $.env.get('HOME').catch(() => undefined)
+  if (!home) return undefined
+  await carregarObjetivo($)
+  return `${home}/.claude/caderno/${encodeURIComponent(raizCarregada ?? '')}.jsonl`
+}
+
+async function lerDoCaderno($: EngineInterface): Promise<void> {
+  const arquivo = await arquivoCaderno($)
+  const lidas = arquivo && (await $.fs.exists(arquivo)) ? lerCaderno(await $.fs.read(arquivo)) : []
+  if (JSON.stringify(await read($, caderno)) !== JSON.stringify(lidas)) await update($, caderno, () => lidas)
+}
+
+/** Acrescenta uma linha ao fim do arquivo (O_APPEND do shell: duas sessões escrevendo não se apagam). */
+async function acrescentar($: EngineInterface, texto: string): Promise<boolean> {
+  const arquivo = await arquivoCaderno($)
+  if (!arquivo) return false
+  const r = await $.process.run(['sh', '-c', 'mkdir -p "$(dirname "$1")" && cat >> "$1"', '_', arquivo], { stdin: texto }).catch(() => null)
+  await lerDoCaderno($).catch(() => undefined)
+  return r?.exitCode === 0
+}
+
+async function escreverNota($: EngineInterface, texto: string): Promise<void> {
+  const em = new Date(await $.clock.now().catch(() => Date.now())).toISOString()
+  const g = await read($, objetivo)
+  const prox = g ? proxima(g) : undefined
+  const n = novaNota(texto, await read($, tipoNota), em, Math.random().toString(36).slice(2, 6), prox ? `#${prox.id}` : undefined)
+  if (!n) return
+  if (await acrescentar($, linhaCaderno(n))) await update($, envios, k => k + 1)
+}
+
+async function triar($: EngineInterface, a: { nota?: string; decisao?: string; motivo?: string; destino?: string; contraponto?: string }): Promise<string> {
+  await lerDoCaderno($)
+  const notas = await read($, caderno)
+  const n = notas.find(x => x.id === a.nota)
+  if (!n) return `Erro: nota ${a.nota ?? '(sem id)'} não está no caderno. Abertas: ${semResposta(notas).map(x => x.id).join(', ') || 'nenhuma'}.`
+  if (!DECISOES.includes(a.decisao as Decisao)) return `Erro: decisao é uma de ${DECISOES.join(', ')}.`
+  if (!a.motivo?.trim()) return 'Erro: diga o motivo em uma frase; ele aparece para o operador.'
+  const em = new Date(await $.clock.now().catch(() => Date.now())).toISOString()
+  if (!(await acrescentar($, linhaCaderno(triagem(n.id, a.decisao as Decisao, a.motivo, em, a.destino, a.contraponto))))) return 'Erro: não consegui gravar no caderno.'
+  const resta = semResposta(await read($, caderno)).length
+  return `Triagem gravada: ${n.id} ${a.decisao}${a.destino ? ` → ${a.destino}` : ''}. ${resta ? `Ainda sem resposta: ${resta}.` : 'Nenhuma nota sem resposta.'}`
+}
+
+/** As notas sem resposta que o Claude ainda não recebeu nesta sessão viram texto e passam a contar como entregues. */
+async function notasParaEntregar($: EngineInterface): Promise<string> {
+  await lerDoCaderno($).catch(() => undefined)
+  const ja = new Set(await read($, entregues))
+  const novas = semResposta(await read($, caderno)).filter(n => !ja.has(n.id))
+  if (!novas.length) return ''
+  await update($, entregues, l => [...l, ...novas.map(n => n.id)])
+  return entrega(novas, ja.size === 0, await $.clock.now().catch(() => Date.now()))
 }
 
 /** Estado do agente para o cartão Agora; nunca derruba o evento observado. */
@@ -396,7 +464,7 @@ export const register: Register = on => {
     await $.tool.register(TOOL_SPEC)
     await $.command.register({
       name: 'objetivo',
-      description: 'Objetivo em curso: sem argumento abre o painel; <texto> [:: passo que conclui] define; feito <ids>; bloqueante|requisito|melhoria <ids>; meu <texto>; auto on|off; encerrar',
+      description: 'Objetivo em curso: sem argumento abre o painel; <texto> [:: passo que conclui] define; feito <ids>; bloqueante|requisito|melhoria <ids>; meu <texto>; nota [ideia|agora|depois|referencia] [#id] <texto>; auto on|off; encerrar',
       argumentHint: '[texto :: conclui | feito 1 2 | bloqueante 3 | meu texto | encerrar]',
     })
     const result = await next(e)
@@ -408,6 +476,10 @@ export const register: Register = on => {
 
   // A ferramenta do objetivo: o modelo define e atualiza; a resposta é o estado com a projeção.
   on('tool.call', { tool: TOOL as never }, async ($, e) => {
+    if ((e as { acao?: string }).acao === 'triar') {
+      const r = await triar($, e as never)
+      return { result: r } as never
+    }
     const r = await mudarObjetivo($, e as unknown as Acao, 'claude')
     return { result: r.texto } as never
   })
@@ -428,13 +500,26 @@ export const register: Register = on => {
     const chave = atual ? `${raizCarregada}\n${atual.titulo}\n${atual.conclusao}` : undefined
     const completa = chave !== undefined && chave !== conclusaoEnviada
     if (chave !== undefined) conclusaoEnviada = chave
-    const linhas = [linhaContexto(atual, await read($, snapshot), TOOL, completa) + (await avisoSegundoPlano($).catch(() => ''))]
+    const linhas = [linhaContexto(atual, await read($, snapshot), TOOL, completa) + (await avisoSegundoPlano($).catch(() => '')) + pendenciaDoCaderno(await read($, caderno))]
+    const doCaderno = await notasParaEntregar($).catch(() => '')
+    if (doCaderno) linhas.push(doCaderno)
     const aviso = await checarAviso($)
     if (aviso) linhas.push(aviso)
     return next({ ...e, context: [...(e.context ?? []), ...linhas] })
   })
 
   on('command.run', { command: 'objetivo' }, async ($, e) => {
+    // /objetivo nota [ideia|agora|depois|referencia] [#id] texto: o caderno por comando (superfícies sem campo, atalho).
+    const mNota = /^nota\s+([\s\S]+)$/i.exec(e.args.trim())
+    if (mNota) {
+      const [primeira, ...resto] = mNota[1]!.trim().split(/\s+/)
+      const t = TIPOS.find(x => x.tipo === primeira || x.rotulo === primeira)
+      if (t) await update($, tipoNota, () => t.tipo)
+      const antes = (await read($, caderno)).length
+      await escreverNota($, t ? resto.join(' ') : mNota[1]!)
+      const gravou = (await read($, caderno)).length > antes
+      return { text: gravou ? 'Nota no caderno: o Claude recebe junto do resultado da próxima ferramenta e responde a ela.' : 'Nota vazia ou caderno indisponível: nada gravado.' }
+    }
     const c = comando(e.args)
     if (c === 'auto-on' || c === 'auto-off') {
       await mudarAuto($, c === 'auto-on')
@@ -496,7 +581,7 @@ export const register: Register = on => {
     if (result.deny !== undefined || result.isError) return result
     await observarChamada($, e as never, result).catch(() => undefined)
     // No meio do turno: se a projeção piorou, o aviso chega junto do resultado da ferramenta.
-    const notas = [await checarAviso($)]
+    const notas = [await checarAviso($), await notasParaEntregar($).catch(() => '')]
     // Publicar com a verificação aberta: a nota vem com o resultado (o mod não tem como falar antes da chamada).
     if ((e.tool as string) === 'Bash') notas.push(notaPublicacao(await read($, objetivo), String((e as { command?: unknown }).command ?? '')))
     const ctx = notas.filter((n): n is string => !!n)
@@ -565,7 +650,10 @@ export const register: Register = on => {
   // feitas recolhidas. O texto longo de cada pendência aparece inteiro com o ponteiro em cima (hover).
   // Acoplado ao lado da conversa no modo tela cheia; acima do prompt fora dele.
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const elementos = $.ui.resolve(e)
+    const { Box, Text, Button } = elementos
+    // O celular não tem campo de texto: lá a nota vai pelo /objetivo nota <texto>.
+    const Input = e.surface !== 'mobile' && 'Input' in elementos ? elementos.Input : undefined
     const largura = Math.max(30, (e.props as { bodyColumns?: number }).bodyColumns ?? 48)
     const goal = await read($, objetivo)
     const snap = await read($, snapshot)
@@ -681,6 +769,76 @@ export const register: Register = on => {
       </Box>
     )
 
+    // O caderno: a porta do operador durante a execução (propósito e contrato em caderno.ts).
+    const notas = await read($, caderno)
+    const tipo = await read($, tipoNota)
+    const regra = TIPOS.find(t => t.tipo === tipo) ?? TIPOS[0]!
+    const linhaNota = (n: Nota) => {
+      const d = GLIFO_DECISAO[n.triagem?.decisao ?? 'aguardando']
+      const prefixo = `${d.glifo} ${n.tipo} `
+      const { curto } = encurtar(n.texto, largura - prefixo.length)
+      return (
+        <Box key={`nota-${n.id}`} flexDirection="column">
+          <Text>
+            <Text color={d.cor}>{d.glifo}</Text>
+            <Text dimColor> {n.tipo} </Text>
+            {curto}
+          </Text>
+          <Box display="none" hover={{ display: 'flex' }} paddingLeft={2} flexDirection="column">
+            <Text dimColor wrap="wrap">
+              {n.texto}
+              {n.ref ? ` (sobre ${n.ref})` : ''}
+            </Text>
+            <Text color={d.cor} wrap="wrap">
+              {n.triagem ? `${d.rotulo}: ${n.triagem.motivo}${n.triagem.destino ? ` → ${n.triagem.destino}` : ''}` : 'aguardando a resposta do Claude'}
+            </Text>
+            {n.triagem?.contraponto ? (
+              <Text dimColor wrap="wrap">
+                contra: {n.triagem.contraponto}
+              </Text>
+            ) : null}
+          </Box>
+        </Box>
+      )
+    }
+    const abertasCaderno = semResposta(notas).length
+    const cadernoBloco = (
+      <Box flexDirection="column" marginTop={1}>
+        <Box key="caderno-titulo" flexDirection="column">
+          <Text>
+            <Text color="claude" weight="bold">
+              CADERNO
+            </Text>
+            <Text dimColor>{abertasCaderno ? ` · ${abertasCaderno} sem resposta` : ' · o que você pensar durante a execução'}</Text>
+          </Text>
+          <Box display="none" hover={{ display: 'flex' }}>
+            <Text dimColor wrap="wrap">
+              {PROPOSITO_OPERADOR}
+            </Text>
+          </Box>
+        </Box>
+        <Box flexDirection="row" gap={1}>
+          {TIPOS.map(t =>
+            t.tipo === tipo ? (
+              <Button key={`tipo-${t.tipo}`} variant="primary" label={t.rotulo} onPress={() => void update($, tipoNota, () => t.tipo)} />
+            ) : (
+              <Button key={`tipo-${t.tipo}`} plain label={t.rotulo} onPress={() => void update($, tipoNota, () => t.tipo)} />
+            ),
+          )}
+        </Box>
+        <Text dimColor wrap="wrap">{regra.regra}</Text>
+        {Input ? (
+          <Input key={`nota-${await read($, envios)}`} placeholder="#id (opcional) e a nota; Enter envia" submitLabel="enviar" onSubmit={(v: string) => void escreverNota($, v)} />
+        ) : (
+          <Text dimColor>/objetivo nota [#id] texto</Text>
+        )}
+        {notas
+          .slice(-NOTAS_NO_PAINEL)
+          .reverse()
+          .map(linhaNota)}
+      </Box>
+    )
+
     const rodape = (
       <Box flexDirection="column" marginTop={1}>
         <Box flexDirection="row">
@@ -710,6 +868,7 @@ export const register: Register = on => {
             <Text dimColor>Nenhum objetivo ativo.</Text>
             <Text dimColor>/objetivo texto :: passo que conclui</Text>
           </Box>
+          {cadernoBloco}
           {rodape}
         </Box>
       )
@@ -752,6 +911,7 @@ export const register: Register = on => {
             )}
           </Box>
         ) : null}
+        {cadernoBloco}
         {fila.length ? (
           <Box flexDirection="column" marginTop={1}>
             <Text>
@@ -772,6 +932,13 @@ export const register: Register = on => {
     )
   })
 }
+
+// O que o operador lê ao passar o ponteiro no título do caderno.
+const PROPOSITO_OPERADOR =
+  'Para o que você pensar durante a execução, sem interromper: ideias, decisões para agora ou para depois, ' +
+  'referências. Não é a fila do ciclo. Chega ao Claude junto do resultado da próxima ferramenta, e ele responde a ' +
+  'cada nota: aceita, recusa com motivo, muda o plano ou registra.'
+const NOTAS_NO_PAINEL = 4
 
 // Colunas do rótulo dos medidores e do botão "[ Feito ]" ao lado das pendências do operador.
 const ROTULO = 11

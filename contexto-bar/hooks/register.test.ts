@@ -1,6 +1,6 @@
 import { atom, read } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
-import type { Engine } from 'claude-code/testing'
+import type { Engine, TestBody } from 'claude-code/testing'
 
 import { buildSnapshot, cellsFor, chaveObjetivo, groupOf, TOOL } from './register'
 
@@ -457,8 +457,9 @@ test('cache: transcript grande demais não é lido nem quebra a barra; conta des
   on('fs.exists', () => ({ value: true }) as never)
   on('fs.stat', () => ({ value: { kind: 'file', size: 40 * 1024 * 1024, mtimeMs: 0, isLink: false } }) as never)
   let leituras = 0
-  on('fs.read', () => {
-    leituras++
+  // Só o transcript conta: o caderno e os indicadores também leem arquivos.
+  on('fs.read', (_$, e) => {
+    if ((e as { path: string }).path.includes('/.claude/projects/')) leituras++
     throw new Error('grande demais')
   })
   on('turn.start', (_$, e) => ({ turnId: (e as { turnId: string }).turnId }) as never)
@@ -821,4 +822,120 @@ test('painel: a fila do Claude vem na ordem da prioridade, melhoria por último 
   const pane = await painel($)
   const fila = pane.slice(pane.indexOf('FILA DO CLAUDE'))
   expect(fila.indexOf('revisar o contraste') < fila.indexOf('escrever os testes')).toBe(true)
+})
+
+// O caderno do operador: arquivo simulado, gravado pelo `cat >>` que o mod roda.
+type Montado = { input: (t: object) => Promise<unknown>; press: (t: object) => Promise<unknown>; find: (q: object) => Promise<unknown>; unmount: () => Promise<void> }
+const montar = async ($: Engine) => (await $.ui.mount({ plugin: 'contexto-bar', surface: 'terminal', ...PAINEL } as never)) as unknown as Montado
+const comCaderno = (on: Parameters<TestBody>[1]) => {
+  let arq = ''
+  const execs: { argv: readonly string[] }[] = []
+  mock.env(on, { HOME: '/h' })
+  on('session.root', () => ({ value: '/proj/c' }) as never)
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path.endsWith('.jsonl') && arq !== '' }) as never)
+  on('fs.read', (_$, e) => {
+    if ((e as { path: string }).path.endsWith('.jsonl')) return { value: arq } as never
+    throw new Error('ENOENT')
+  })
+  on('process.run', (_$, e) => {
+    const r = e as { argv: readonly string[]; init?: { stdin?: string } }
+    execs.push({ argv: r.argv })
+    arq += r.init?.stdin ?? ''
+    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } } as never
+  })
+  return { texto: () => arq, execs }
+}
+
+test('caderno: a nota escrita no painel chega ao Claude no resultado da próxima ferramenta, uma vez, com o propósito na primeira', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  const c = comCaderno(on)
+  await comObjetivo($)
+  const ui = await montar($)
+  await ui.input({ key: 'nota-0', text: 'e se o painel tiver abas nativas?' } as never)
+  // O campo volta vazio (chave nova) e a nota aparece aguardando.
+  expect(await ui.find({ key: 'nota-1' } as never)).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /e se o painel tiver abas nativas\?/ } as never)).toBeDefined()
+  await ui.unmount()
+  // Gravada por acréscimo no arquivo do projeto, ligada à próxima pendência.
+  expect(c.execs[0]!.argv).toEqual(['sh', '-c', 'mkdir -p "$(dirname "$1")" && cat >> "$1"', '_', '/h/.claude/caderno/%2Fproj%2Fc.jsonl'])
+  const gravada = JSON.parse(c.texto().trim())
+  expect(gravada).toMatchObject({ v: 1, ev: 'nota', autor: 'operador', tipo: 'nota', texto: 'e se o painel tiver abas nativas?', ref: '#1' })
+  const r = JSON.stringify(await $.tool.call({ tool: 'Bash', command: 'true' } as never))
+  expect(r).toContain(`[caderno] Nota nova do operador: ${gravada.id} (nota, sobre #1, agora há pouco)`)
+  expect(r).toContain('advisor e um adversário')
+  // Não volta na ferramenta seguinte; a linha do pedido conta a nota sem resposta.
+  expect(JSON.stringify(await $.tool.call({ tool: 'Bash', command: 'true' } as never))).not.toContain('[caderno]')
+  expect(await contextoDe($, 'segue')).toContain(' · caderno: 1 sem resposta')
+  // A segunda nota da sessão chega sem repetir o propósito (sobrevivente #4 da 0.12.0).
+  await $.command.run({ command: 'objetivo', args: 'nota agora trocar as barras por gauges' } as never)
+  const segunda = JSON.stringify(await $.tool.call({ tool: 'Bash', command: 'true' } as never))
+  expect(segunda).toContain('[caderno] Nota nova do operador')
+  expect(segunda).toContain('(agora, sobre #1, agora há pouco): trocar as barras por gauges')
+  expect(segunda).not.toContain('advisor e um adversário')
+})
+
+test('caderno: a triagem do Claude grava, some da contagem e aparece no painel com o motivo; erros explicam', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  const c = comCaderno(on)
+  await comObjetivo($)
+  await $.command.run({ command: 'objetivo', args: 'nota depois #3 levar o caderno para o herdr' } as never)
+  const nota = JSON.parse(c.texto().trim())
+  expect(nota).toMatchObject({ tipo: 'depois', ref: '#3', texto: 'levar o caderno para o herdr' })
+  // Nota vazia pelo comando: diz que nada foi gravado (sobrevivente #5 da 0.12.0).
+  expect(JSON.stringify(await $.command.run({ command: 'objetivo', args: 'nota agora    ' } as never))).toContain('nada gravado')
+  expect(c.texto().trim().split('\n').length).toBe(1)
+  const triar = async (a: object) => JSON.stringify(await $.tool.call({ tool: TOOL, acao: 'triar', ...a } as never))
+  expect(await triar({ nota: 'n-x', decisao: 'aceita', motivo: 'm' })).toContain(`Abertas: ${nota.id}`)
+  expect(await triar({ nota: nota.id, decisao: 'talvez', motivo: 'm' })).toContain('decisao é uma de aceita, recusada, muda-plano, registrada')
+  expect(await triar({ nota: nota.id, decisao: 'aceita', motivo: '  ' })).toContain('diga o motivo')
+  expect(c.texto().trim().split('\n').length).toBe(1)
+  const ok = await triar({ nota: nota.id, decisao: 'aceita', motivo: 'entra na fase 1 do herdr', destino: 'roadmap', contraponto: 'pode pesar no painel' })
+  expect(ok).toContain(`Triagem gravada: ${nota.id} aceita → roadmap. Nenhuma nota sem resposta.`)
+  expect(JSON.parse(c.texto().trim().split('\n')[1]!)).toMatchObject({ v: 1, ev: 'triagem', id: nota.id, autor: 'claude', decisao: 'aceita', motivo: 'entra na fase 1 do herdr', destino: 'roadmap', contraponto: 'pode pesar no painel' })
+  expect(await contextoDe($, 'segue')).not.toContain('caderno:')
+  const pane = await painel($)
+  expect(pane).toContain('"✔"]},{"type":"Text","props":{"dimColor":true},"children":[" ","depois"," "]}')
+  expect(pane).toContain('aceita: entra na fase 1 do herdr → roadmap')
+  expect(pane).toContain('"contra: ","pode pesar no painel"')
+})
+
+test('caderno: os tipos são botões, a regra do escolhido aparece, e a nota sai com ele; celular mostra o comando', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  const c = comCaderno(on)
+  const ui = await montar($)
+  expect(await ui.find({ type: 'Text', text: /sem mudar de rumo/ } as never)).toBeDefined()
+  await ui.press({ key: 'tipo-referencia' } as never)
+  expect(await ui.find({ type: 'Text', text: /link, busca ou imagem/ } as never)).toBeDefined()
+  await ui.input({ key: 'nota-0', text: 'https://ratatui.rs/examples/widgets/gauge/' } as never)
+  await ui.unmount()
+  expect(JSON.parse(c.texto().trim())).toMatchObject({ tipo: 'referencia' })
+  expect(JSON.parse(c.texto().trim())).not.toHaveProperty('ref')
+  // Nota vazia não grava nada.
+  const ui2 = await montar($)
+  await ui2.input({ key: 'nota-1', text: '   ' } as never)
+  await ui2.unmount()
+  expect(c.texto().trim().split('\n').length).toBe(1)
+  const cel = JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'mobile', props: { bodyColumns: 48 } } as never))
+  expect(cel).toContain('/objetivo nota [#id] texto')
+  expect(cel).not.toContain('"Input"')
+})
+
+test('caderno: sem ferramenta no meio, a nota chega no próximo pedido; o painel mostra a mais recente primeiro; rótulo com acento vale no comando (sobreviventes #8, #19 e #21 da 0.12.0)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  const c = comCaderno(on)
+  await comObjetivo($)
+  await $.command.run({ command: 'objetivo', args: 'nota primeira observação' } as never)
+  await $.command.run({ command: 'objetivo', args: 'nota referência https://ratatui.rs gauges' } as never)
+  const ultima = JSON.parse(c.texto().trim().split('\n')[1]!)
+  expect(ultima).toMatchObject({ tipo: 'referencia', texto: 'https://ratatui.rs gauges' })
+  const ctx = await contextoDe($, 'segue')
+  expect(ctx).toContain('[caderno] 2 notas novas do operador')
+  expect(ctx).toContain('primeira observação')
+  const pane = await painel($)
+  expect(pane.indexOf('https://ratatui.rs gauges') < pane.indexOf('primeira observação')).toBe(true)
 })

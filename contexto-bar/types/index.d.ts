@@ -72,6 +72,13 @@ export type Indicador = {
   detalhe?: string
 }
 
+/** Caderno do operador (contrato em hooks/caderno.ts): nota sem compromisso, agora (deste ciclo), depois (roadmap), referência. */
+export type TipoNota = 'nota' | 'agora' | 'depois' | 'referencia'
+export type Decisao = 'aceita' | 'recusada' | 'muda-plano' | 'registrada'
+export type EventoNota = { v: number; ev: 'nota'; id: string; em: string; autor: 'operador'; tipo: TipoNota; texto: string; /** `#12` ou a próxima pendência quando a nota foi escrita. */ ref?: string }
+export type EventoTriagem = { v: number; ev: 'triagem'; id: string; em: string; autor: 'claude'; decisao: Decisao; motivo: string; /** Para onde foi: `#12`, `roadmap`... */ destino?: string; /** O melhor argumento contra a própria decisão. */ contraponto?: string }
+export type Nota = EventoNota & { triagem?: EventoTriagem }
+
 declare module 'claude-code' {
   interface PluginState {
     'contexto-bar': {
@@ -89,6 +96,12 @@ declare module 'claude-code' {
       indicadores: Indicador[]
       /** Espelho do painel automático do store, para o botão redesenhar. */
       painelAuto: boolean | null
+      caderno: Nota[]
+      /** Ids das notas já levadas ao Claude nesta sessão. */
+      entregues: string[]
+      tipoNota: TipoNota
+      /** Conta os envios: muda a chave do campo, que volta vazio depois de cada nota. */
+      envios: number
     }
   }
 }
