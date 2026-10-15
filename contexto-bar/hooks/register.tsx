@@ -27,6 +27,7 @@ const entregues = atom({ plugin: 'contexto-bar', key: 'entregues' } as const, []
 const tipoNota = atom({ plugin: 'contexto-bar', key: 'tipoNota' } as const, 'nota')
 const envios = atom({ plugin: 'contexto-bar', key: 'envios' } as const, 0)
 const executores = atom({ plugin: 'contexto-bar', key: 'executores' } as const, { subagentes: [] })
+const rascunho = atom({ plugin: 'contexto-bar', key: 'rascunho' } as const, '')
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
@@ -208,7 +209,10 @@ async function escreverNota($: EngineInterface, texto: string): Promise<void> {
   const prox = g ? proxima(g) : undefined
   const n = novaNota(texto, await read($, tipoNota), em, Math.random().toString(36).slice(2, 6), prox ? `#${prox.id}` : undefined)
   if (!n) return
-  if (await acrescentar($, linhaCaderno(n))) await update($, envios, k => k + 1)
+  if (await acrescentar($, linhaCaderno(n))) {
+    await update($, envios, k => k + 1)
+    await update($, rascunho, () => '')
+  }
 }
 
 async function triar($: EngineInterface, a: { nota?: string; decisao?: string; motivo?: string; destino?: string; contraponto?: string }): Promise<string> {
@@ -339,7 +343,9 @@ async function lerSalvo($: EngineInterface, raiz: string): Promise<Goal | null> 
 
 async function escreverArquivo($: EngineInterface, arquivo: string, raiz: string, g: Goal | null): Promise<boolean> {
   try {
-    await $.fs.write(arquivo, `${JSON.stringify({ raiz, objetivo: g }, null, 2)}\n`)
+    const texto = `${JSON.stringify({ raiz, objetivo: g }, null, 2)}\n`
+    await $.fs.write(arquivo, texto)
+    textoVisto = texto
     return true
   } catch {
     return false
@@ -443,9 +449,31 @@ async function carregarObjetivo($: EngineInterface): Promise<void> {
   else await update($, objetivo, () => r.goal)
 }
 
+// Duas sessões na mesma pasta dividem o arquivo do objetivo. O arquivo é a fonte da verdade: antes de mudar,
+// a sessão relê o que outra gravou e aplica a mudança por cima; depois de cada ferramenta e a cada pedido, relê
+// para mostrar o que mudou lá. Sem isso, cada sessão regravava a sua cópia inteira e apagava a outra.
+let textoVisto: string | undefined
+async function doArquivoAgora($: EngineInterface): Promise<void> {
+  const raiz = raizCarregada
+  if (raiz === undefined) return
+  const arquivo = await caminhoDoObjetivo($, raiz)
+  if (!arquivo || !(await $.fs.exists(arquivo).catch(() => false))) return
+  const texto = await $.fs.read(arquivo).catch(() => undefined)
+  if (texto === undefined || texto === textoVisto) return
+  try {
+    const salvo = JSON.parse(texto) as { raiz?: string; objetivo?: Goal | null }
+    if (salvo.raiz !== raiz) return
+    textoVisto = texto
+    await update($, objetivo, () => salvo.objetivo ?? null)
+  } catch {
+    // Arquivo pela metade (outra sessão gravando): fica a cópia da sessão até a próxima leitura.
+  }
+}
+
 /** Muda o objetivo da sessão e grava o resultado na chave da pasta. */
 async function gravarObjetivo($: EngineInterface, fn: (g: Goal | null) => Goal | null): Promise<void> {
   await carregarObjetivo($)
+  await doArquivoAgora($).catch(() => undefined)
   await update($, objetivo, fn)
   const g = await read($, objetivo)
   const raiz = raizCarregada ?? ''
@@ -463,6 +491,7 @@ async function gravarObjetivo($: EngineInterface, fn: (g: Goal | null) => Goal |
 /** Aplica uma ação ao objetivo e devolve o resumo (ou o erro). */
 async function mudarObjetivo($: EngineInterface, a: Acao, origem: 'claude' | 'operador'): Promise<{ texto: string; erro: boolean }> {
   await carregarObjetivo($)
+  await doArquivoAgora($).catch(() => undefined)
   const snap = await read($, snapshot)
   const atual = await read($, objetivo)
   const n = await read($, turno)
@@ -519,6 +548,7 @@ export const register: Register = on => {
     if (nota) await mudarSegundoPlano($, sp => concluirTarefa(sp, nota.id))
     // Um /cd muda a pasta do projeto: a linha passa a ser a do objetivo dela.
     await carregarObjetivo($)
+    await doArquivoAgora($).catch(() => undefined)
     const atual = await read($, objetivo)
     // Pedido do operador: ver o objetivo desde o início da atividade, sem esperar o fim do ciclo.
     if (atual && (await painelAuto($))) await abrirPainel($).catch(() => undefined)
@@ -621,6 +651,7 @@ export const register: Register = on => {
     if (!e.agentId) await marcar($, { estado: 'trabalhando' })
     if (e.agentId || (e.tool as string) === TOOL) return result
     await refreshSoon($, hookTexts)
+    await doArquivoAgora($).catch(() => undefined)
     if (result.deny !== undefined || result.isError) return result
     await observarChamada($, e as never, result).catch(() => undefined)
     // No meio do turno: se a projeção piorou, o aviso chega junto do resultado da ferramenta.
@@ -854,6 +885,7 @@ export const register: Register = on => {
     }
     const abertasCaderno = semResposta(notas).length
     const ultimaNota = notas[notas.length - 1]
+    const rascunhoAtual = await read($, rascunho)
     const agoraMs = await $.clock.now().catch(() => Date.now())
     const cadernoBloco = (
       <Box flexDirection="column" marginTop={1}>
@@ -887,10 +919,23 @@ export const register: Register = on => {
             {regra.regra}
           </Text>
           {Input ? (
-            <Input key={`nota-${await read($, envios)}`} label="✎ " placeholder="escreva aqui; #id liga a uma pendência" submitLabel="enviar ao Claude" onSubmit={(v: string) => void escreverNota($, v)} />
+            <Input
+              key={`nota-${await read($, envios)}`}
+              placeholder="✎ escreva aqui; #id no começo liga a uma pendência"
+              submitLabel="enviar ao Claude"
+              onInput={(v: string) => void update($, rascunho, () => v)}
+              onSubmit={(v: string) => void escreverNota($, v)}
+            />
           ) : (
             <Text dimColor>/objetivo nota [tipo] [#id] texto</Text>
           )}
+          {/* O campo do motor é de uma linha: o texto longo (digitado ou colado) aparece inteiro aqui. Nota do operador, 15/10. */}
+          {rascunhoAtual.trim() ? (
+            <Box flexDirection="column" marginTop={1}>
+              <Text dimColor>prévia · {rascunhoAtual.length} caracteres</Text>
+              <Text wrap="wrap">{rascunhoAtual}</Text>
+            </Box>
+          ) : null}
           <Text dimColor wrap="wrap">
             {Input ? 'clique no campo (ou ctrl+x tab) · Enter envia · Esc volta ao prompt' : 'o celular não tem campo: use o comando acima'}
           </Text>

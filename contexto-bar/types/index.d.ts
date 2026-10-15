@@ -109,6 +109,8 @@ declare module 'claude-code' {
       /** Conta os envios: muda a chave do campo, que volta vazio depois de cada nota. */
       envios: number
       executores: Executores
+      /** O que o operador está escrevendo no caderno, para a prévia (o campo do motor é de uma linha). */
+      rascunho: string
     }
   }
 }

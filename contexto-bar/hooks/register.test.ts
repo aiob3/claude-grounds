@@ -997,10 +997,115 @@ test('caderno: tipos com atalho 1 a 4 e o escolhido marcado; a última nota most
   expect(pane).toContain('"key":"tipo-nota","label":"● nota","hotkey":"1","variant":"primary"')
   expect(pane).toContain('"key":"tipo-referencia","label":"referência","hotkey":"4","variant":"secondary"')
   expect(pane).toContain('clique no campo (ou ctrl+x tab) · Enter envia')
+  // O campo sem rótulo: o terminal desenhava "✎ :" antes do texto.
+  expect(pane).toContain('"placeholder":"✎ escreva aqui; #id no começo liga a uma pendência"')
+  expect(pane).not.toContain('"label":"✎')
   await $.command.run({ command: 'objetivo', args: 'nota olhar o contraste' } as never)
   pane = await painel($)
   expect(pane).toContain('◌ última nota enviada agora há pouco: chega ao Claude na próxima ferramenta')
   const id = JSON.parse(c.texto().trim()).id
   await $.tool.call({ tool: TOOL, acao: 'triar', nota: id, decisao: 'registrada', motivo: 'ok' } as never)
   expect(await painel($)).toContain('✔ última nota respondida: registrada')
+})
+
+test('duas sessões na mesma pasta: a mudança de uma aparece na outra e nenhuma apaga a outra; arquivo pela metade é ignorado', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  on('session.root', () => ({ value: '/proj/m' }) as never)
+  on('session.compact', () => ({ messages: [{ role: 'user', text: 'resumo', toolUses: [] }] }) as never)
+  mock.env(on, { HOME: '/home/u' })
+  const arquivo = '/home/u/.claude/objetivos/%2Fproj%2Fm.json'
+  const fs = new Map<string, string>()
+  on('fs.exists', (_$, e) => ({ value: fs.has((e as { path: string }).path) }) as never)
+  on('fs.read', (_$, e) => {
+    const t = fs.get((e as { path: string }).path)
+    if (t === undefined) throw new Error('ENOENT')
+    return { value: t } as never
+  })
+  on('fs.write', (_$, e) => {
+    const { path, text } = e as { path: string; text: string }
+    fs.set(path, text)
+    return { value: undefined } as never
+  })
+  const chamar = async (a: object) => JSON.stringify(await $.tool.call({ tool: TOOL, ...a } as never))
+  await chamar({ acao: 'definir', titulo: 'Juntos', conclusao: 'as duas sessões veem a mesma fila', itens: [{ texto: 'tarefa desta sessão' }] })
+  // A outra sessão acrescenta uma pendência direto no arquivo.
+  const outra = JSON.parse(fs.get(arquivo)!)
+  outra.objetivo.itens.push({ id: 2, texto: 'tarefa da outra sessão', dono: 'claude', tamanho: 'P', feito: false, nivel: 'requisito' })
+  fs.set(arquivo, JSON.stringify(outra))
+  // Depois de uma ferramenta qualquer, esta sessão já mostra a pendência da outra.
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect(await painel($)).toContain('tarefa da outra sessão')
+  // E concluir aqui não apaga o que a outra fez.
+  const r = await chamar({ acao: 'concluir', ids: [1] })
+  expect(r).toContain('[x] #1')
+  expect(r).toContain('[ ] #2 (claude, P) tarefa da outra sessão')
+  expect(JSON.parse(fs.get(arquivo)!).objetivo.itens.map((i: { texto: string }) => i.texto)).toEqual(['tarefa desta sessão', 'tarefa da outra sessão'])
+  // A outra sessão conclui a #2 pelo arquivo, e o próximo pedido daqui já vê.
+  const de2 = JSON.parse(fs.get(arquivo)!)
+  de2.objetivo.itens[1].feito = true
+  fs.set(arquivo, JSON.stringify(de2))
+  expect(await contextoDe($, 'segue')).toContain('2/2')
+  // A outra sessão grava e esta muda logo em seguida, sem ferramenta no meio: a mudança vai por cima da outra.
+  const de3 = JSON.parse(fs.get(arquivo)!)
+  de3.objetivo.itens.push({ id: 3, texto: 'mais uma da outra sessão', dono: 'claude', tamanho: 'P', feito: false, nivel: 'requisito' })
+  fs.set(arquivo, JSON.stringify(de3))
+  await chamar({ acao: 'adicionar', itens: [{ texto: 'mais uma desta sessão' }] })
+  expect(JSON.parse(fs.get(arquivo)!).objetivo.itens.map((i: { id: number }) => i.id)).toEqual([1, 2, 3, 4])
+  // O mesmo pelo /objetivo do operador.
+  const de4 = JSON.parse(fs.get(arquivo)!)
+  de4.objetivo.itens.push({ id: 5, texto: 'quinta, da outra', dono: 'claude', tamanho: 'P', feito: false, nivel: 'requisito' })
+  fs.set(arquivo, JSON.stringify(de4))
+  await $.command.run({ command: 'objetivo', args: 'feito 4' } as never)
+  const final = JSON.parse(fs.get(arquivo)!).objetivo.itens
+  expect(final.map((i: { id: number }) => i.id)).toEqual([1, 2, 3, 4, 5])
+  expect(final.find((i: { id: number }) => i.id === 4).feito).toBe(true)
+  // A compactação grava o marco do objetivo: também por cima do que a outra sessão acabou de gravar.
+  const de5 = JSON.parse(fs.get(arquivo)!)
+  de5.objetivo.itens.push({ id: 6, texto: 'sexta, da outra', dono: 'claude', tamanho: 'P', feito: false, nivel: 'requisito' })
+  de5.objetivo.marco = 999
+  de5.objetivo.aviso = 'apertado'
+  fs.set(arquivo, JSON.stringify(de5))
+  await $.session.compact({ trigger: 'manual', messages: [{ role: 'user', text: 'antes', toolUses: [] }] } as never)
+  const depois = JSON.parse(fs.get(arquivo)!).objetivo
+  expect(depois.itens.map((i: { id: number }) => i.id)).toEqual([1, 2, 3, 4, 5, 6])
+  // E a mudança desta sessão (o marco da compactação) não se perde ao juntar (manual #3 da 0.13.1).
+  expect(depois.marco).not.toBe(999)
+  expect(depois.aviso).toBeNull()
+  // Arquivo pela metade (a outra sessão no meio da escrita): fica a cópia desta sessão.
+  fs.set(arquivo, '{ "raiz": "/proj/m", "objetivo": { "tit')
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect(await painel($)).toContain('Juntos')
+  // Arquivo sem a raiz também não (sobrevivente #5 da 0.13.1).
+  fs.set(arquivo, JSON.stringify({ objetivo: { ...de2.objetivo, titulo: 'Sem raiz' } }))
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect(await painel($)).not.toContain('Sem raiz')
+  // Arquivo de outra pasta (raiz diferente) não é lido como o desta.
+  fs.set(arquivo, JSON.stringify({ raiz: '/outra', objetivo: { ...de2.objetivo, titulo: 'Intruso' } }))
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect(await painel($)).not.toContain('Intruso')
+  // A outra sessão encerra o objetivo: esta também fica sem (sobrevivente #1 da 0.13.1).
+  fs.set(arquivo, JSON.stringify({ raiz: '/proj/m', objetivo: null }))
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect(await painel($)).toContain('Nenhum objetivo ativo.')
+})
+
+test('caderno: o texto longo aparece inteiro numa prévia enquanto o operador digita ou cola; enviar limpa a prévia (nota do operador, 15/10)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  const c = comCaderno(on)
+  const longo = 'um texto colado bem mais longo do que cabe numa linha do campo, com detalhes que o operador precisa conferir antes de enviar'
+  const ui = await montar($)
+  expect(await ui.find({ type: 'Text', text: /prévia/ } as never)).toBeUndefined()
+  await ui.input({ key: 'nota-0', text: longo, kind: 'change' } as never)
+  expect(await ui.find({ type: "Text", text: new RegExp(`prévia · ${longo.length} caracteres`) } as never)).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: new RegExp(longo) } as never)).toBeDefined()
+  // Só espaços não abre prévia.
+  await ui.input({ key: 'nota-0', text: '   ', kind: 'change' } as never)
+  expect(await ui.find({ type: 'Text', text: /prévia/ } as never)).toBeUndefined()
+  await ui.input({ key: 'nota-0', text: longo, kind: 'change' } as never)
+  await ui.input({ key: 'nota-0', text: longo } as never)
+  expect(await ui.find({ type: 'Text', text: /prévia/ } as never)).toBeUndefined()
+  await ui.unmount()
+  expect(JSON.parse(c.texto().trim()).texto).toBe(longo)
 })
