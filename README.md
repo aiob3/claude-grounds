@@ -143,16 +143,18 @@ inflado e equivalente sem justificativa. O agente trabalha livre, e o "pronto" s
 
 ## Quanto custa provar
 
-Num projeto real, com 8881 testes, a rodada de mutation testing ficou 2,8 vezes mais rápida (de 407 s para 145 s)
-com exatamente os mesmos vereditos. Depois que o teste fraco foi reforçado, caiu para 107 s.
+**A dúvida.** Mutation testing tem fama de lento. Cada mutante é um bug plantado de propósito, e para saber se os
+testes o pegam é preciso rodar a suíte de novo: com 10 mutantes, a suíte roda 11 vezes. Na demo isso leva segundos.
+Num projeto grande leva minutos, e aí ninguém prova a cada tarefa do agente. A prova vai para o CI noturno, ou para
+um gate num hook que revalida tudo a cada vez, e o "testado" do agente volta a ficar sem conferência no dia a dia.
 
-O ganho vem de test impact analysis, a mesma ideia do `vitest related` e do `jest --findRelatedTests`. Desde a
-versão 0.8, cada mutante roda só os arquivos de teste que chegam, pelo grafo de imports, ao arquivo mutado. Os
-outros ficam escondidos na cópia. Os mutantes já saíam só do diff, e a prova das rodadas anteriores fica no log, então
-nada do código antigo é revalidado à toa.
+**O teste.** A mesma rodada, num projeto real grande, de dois jeitos. Primeiro com a suíte completa para cada
+mutante. Depois rodando, por mutante, só os testes afetados: os arquivos de teste que chegam ao arquivo mutado pelo
+grafo de imports. É test impact analysis, a mesma ideia do `vitest related` e do `jest --findRelatedTests`, e o
+`prova-de-teste` faz isso desde a versão 0.8. O projeto tem 3929 arquivos e 8881 testes no recorte verde da suíte
+(vitest). A mudança provada tem 10 linhas. Foram os mesmos 10 mutantes, na mesma máquina.
 
-A medição: 3929 arquivos e 8881 testes no recorte verde da suíte (vitest), uma mudança de 10 linhas, os mesmos 10
-mutantes, a mesma máquina.
+**O resultado.**
 
 | | rodada | por mutante | testes por mutante | vereditos |
 |---|---|---|---|---|
@@ -160,16 +162,23 @@ mutantes, a mesma máquina.
 | só os testes afetados | 145 s | 10,0 s | 1906 | os mesmos |
 | idem, com o teste reforçado | 107 s | 6,4 s | 1018 | 9 mortos, 1 equivalente |
 
-Um mutante morto passou de uns 36 s para uns 3 s: rodou 12 arquivos de teste em vez de 1007. Esse custo acompanha
-o tamanho do diff, não o do projeto.
+A rodada ficou 2,8 vezes mais rápida, de quase 7 minutos para 2 e meio, com exatamente os mesmos vereditos. Um
+mutante morto passou de uns 36 s para uns 3 s, porque rodou 12 arquivos de teste em vez de 1007.
 
-Duas etapas continuam rodando a suíte completa, de propósito:
+**O que isso prova.** Num projeto desse tamanho, conferir se os testes de uma mudança pegam bug cabe em cada tarefa
+do agente, sem esperar o CI. O custo de cada mutante morto passou a depender do tamanho da mudança, não do tamanho
+do projeto, e a economia não trocou nenhum veredito.
+
+**O que não prova.** Foi um projeto, um executor de testes e uma mudança pequena. Em projetos com outro desenho de
+imports o ganho pode ser maior ou menor. Medir mais casos está entre os pontos em aberto, no fim deste README.
+
+**Por que não fica ainda mais rápido.** Duas etapas continuam rodando a suíte completa, de propósito:
 
 - **A linha de base**, uma vez por rodada, para pegar regressão no código antigo.
 - **A confirmação de cada sobrevivente.** O grafo de imports só decide a velocidade, nunca o veredito: uma morte só
-  vale se um teste nomeado falhou, e um mutante só é dado como vivo depois de passar pela suíte inteira. Nos próprios
-  mods, essa confirmação pegou três mutantes que sobreviveram aos testes afetados e morreram na suíte completa,
-  porque um teste chegava ao código pelo runtime do mod, sem import.
+  vale se um teste nomeado falhou, e um mutante só é dado como vivo depois de passar pela suíte completa. Nos
+  próprios mods, essa confirmação pegou três mutantes que sobreviveram aos testes afetados e morreram na suíte
+  completa, porque um teste chegava ao código pelo runtime do mod, sem import.
 
 Por isso, quanto melhores os testes, mais rápida a rodada: com menos sobreviventes, sobra a linha de base mais uns
 3 s por mutante. O relatório e o log trazem esses números a cada rodada (`custo: base, por mutante, repositório,
@@ -219,17 +228,17 @@ abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
 
 - O `prova-de-teste` acha o comando de teste por convenção (`claude plugin test`, `npm test`, `pytest`). Para outro
   executor, passe `comando` ao `executar`.
-- A execução incremental segue imports estáticos: JS/TS (com os aliases do tsconfig e do vite) e Python. O que chega
+- A seleção dos testes afetados segue imports estáticos: JS/TS (com os aliases do tsconfig e do vite) e Python. O que chega
   ao código por outro caminho (runtime, leitura de arquivo, subprocesso) fica fora do mapa. Por isso todo
-  sobrevivente é confirmado na suíte inteira e a linha de base roda inteira. `incremental: false` desliga.
+  sobrevivente é confirmado na suíte completa e a linha de base roda completa. `incremental: false` desliga.
 - A equivalência de um sobrevivente continua sendo julgada pelo agente. O mod exige a justificativa e a grava no
   log, para auditoria, mas não a prova.
 - A projeção da janela é uma estimativa: a média das últimas 8 entregas por unidade de tamanho.
 - Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
-Em aberto: chegar a 10 medições com o instrumento parado (4 até agora) antes de decidir se o método
-vira critério; medir o custo incremental em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
+Em aberto: chegar a 10 medições com o instrumento parado (1 até agora) antes de decidir se o método
+vira critério; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 
 ## Avaliar

@@ -147,16 +147,19 @@ unjustified equivalents. The agent works freely, and an ungrounded "done" doesn'
 
 ## What proving costs
 
-On a real project with 8881 tests, a mutation testing round got 2.8x faster (407 s down to 145 s) with exactly the
-same verdicts. Once the weak test was strengthened, it dropped to 107 s.
+**The doubt.** Mutation testing has a reputation for being slow. Each mutant is a bug planted on purpose, and to
+know whether the tests catch it you have to run the suite again: with 10 mutants, the suite runs 11 times. On the
+demo that takes seconds. On a large project it takes minutes, and then nobody proves every agent task. Proving moves
+to the nightly CI, or to a hook gate that revalidates everything each time, and the agent's "tested" goes unchecked
+day to day again.
 
-The speedup comes from test impact analysis, the same idea as `vitest related` or `jest --findRelatedTests`. Since
-version 0.8, each mutant runs only the test files that reach the mutated file through the import graph. The rest
-are hidden in the copy. Mutants already came from the diff alone, and earlier proofs stay in the log, so old code is
-never revalidated for nothing.
+**The test.** The same round, on a large real project, two ways. First with the full suite for every mutant. Then
+running, per mutant, only the affected tests: the test files that reach the mutated file through the import graph.
+This is test impact analysis, the same idea as `vitest related` or `jest --findRelatedTests`, and `prova-de-teste`
+has done it since version 0.8. The project has 3929 files and 8881 tests in the green slice of the suite (vitest).
+The change being proven is 10 lines. Same 10 mutants, same machine.
 
-The measurement: 3929 files and 8881 tests in the green slice of the suite (vitest), a 10-line change, the same 10
-mutants, the same machine.
+**The result.**
 
 | | round | per mutant | tests per mutant | verdicts |
 |---|---|---|---|---|
@@ -164,14 +167,21 @@ mutants, the same machine.
 | affected tests only | 145 s | 10.0 s | 1906 | the same |
 | same, with the test strengthened | 107 s | 6.4 s | 1018 | 9 killed, 1 equivalent |
 
-A killed mutant went from about 36 s to about 3 s: it ran 12 test files instead of 1007. That cost tracks the size
-of the diff, not the size of the project.
+The round got 2.8x faster, from almost 7 minutes to two and a half, with exactly the same verdicts. A killed mutant
+went from about 36 s to about 3 s, because it ran 12 test files instead of 1007.
 
-Two steps still run the full suite, on purpose:
+**What it proves.** On a project this size, checking whether a change's tests catch bugs fits into every agent
+task, without waiting for CI. The cost of each killed mutant now depends on the size of the change, not the size of
+the project, and the savings didn't flip a single verdict.
+
+**What it doesn't prove.** It was one project, one test runner and one small change. Projects with a different
+import layout may gain more or less. Measuring more cases is among the open items at the end of this README.
+
+**Why it isn't even faster.** Two steps still run the full suite, on purpose:
 
 - **The baseline**, once per round, to catch regressions in old code.
 - **Confirming each survivor.** The import graph only decides speed, never the verdict: a kill only counts when a
-  named test failed, and a mutant is only called alive after it gets through the whole suite. On the mods
+  named test failed, and a mutant is only called alive after it gets through the full suite. On the mods
   themselves, this check caught three mutants that survived the affected tests and died in the full suite, because a
   test reached the code through the mod runtime, with no import.
 
@@ -226,17 +236,17 @@ session, open another one in the same folder and type `/objetivo`: the goal is s
 
 - `prova-de-teste` finds the test command by convention (`claude plugin test`, `npm test`, `pytest`). For another
   runner, pass `comando` (command) to `executar`.
-- Incremental runs follow static imports: JS/TS (with tsconfig and vite aliases) and Python. Code reached some other
+- Selecting the affected tests follows static imports: JS/TS (with tsconfig and vite aliases) and Python. Code reached some other
   way (runtime, file reads, subprocesses) is outside the map. That's why every survivor is confirmed against the
-  whole suite and the baseline runs whole. `incremental: false` turns it off.
+  full suite and the baseline runs in full. `incremental: false` turns it off.
 - Whether a survivor is equivalent is still judged by the agent. The mod requires the justification and saves it to
   the log for auditing, but does not prove it.
 - The window projection is an estimate: the average of the last 8 deliveries per size unit.
 - The mods need Claude Code 2.1.287 or later (the version mods shipped in) and were tested on 2.1.300. They
   work in the terminal and in the Code tab of the Desktop app.
 
-Open: reach 10 measurements with a frozen instrument (4 so far) before deciding whether the method
-becomes a criterion; measure the incremental cost on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
+Open: reach 10 measurements with a frozen instrument (1 so far) before deciding whether the method
+becomes a criterion; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
 average settles across sessions.
 
 ## Evaluate
