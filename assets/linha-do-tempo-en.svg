@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 942" width="1200" height="942" role="img" aria-label="Timeline of the instrument calibration rounds" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 888" width="1200" height="888" role="img" aria-label="Timeline of the instrument calibration rounds" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Timeline of the instrument calibration rounds</title>
 <style>
   .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
@@ -13,7 +13,7 @@
   }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 </style>
-<rect width="1200" height="942" rx="16" class="sup"/>
+<rect width="1200" height="888" rx="16" class="sup"/>
   <text x="56" y="50" font-size="24" font-weight="800" class="t1">Built with itself</text>
   <text x="56" y="74" font-size="15" class="t2">Every version went through its own method. In every round the instrument found a bug in itself or gained a new rule.</text>
   <line x1="74" y1="126" x2="74" y2="164" class="acs" stroke-width="2.5"/>
@@ -68,13 +68,9 @@
   <circle cx="74" cy="766" r="8" class="sup2 acs" stroke-width="2.5"/>
   <text x="100" y="771" font-size="16" font-weight="700" class="t1">demo</text>
   <text x="152" y="771" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.0</text>
-  <text x="100" y="792" font-size="14.5" class="t2">the logger accepted a better state than the run (FRACO) with no justification per survivor</text><line x1="74" y1="828" x2="74" y2="866" class="acs" stroke-width="2.5"/>
+  <text x="100" y="792" font-size="14.5" class="t2">the logger accepted a better state than the run (FRACO) with no justification per survivor</text>
   <circle cx="74" cy="820" r="8" class="sup2 acs" stroke-width="2.5"/>
   <text x="100" y="825" font-size="16" font-weight="700" class="t1">demo</text>
   <text x="152" y="825" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.1</text>
   <text x="100" y="846" font-size="14.5" class="t2">the logger accepted a better state than the run (FRACO) with no justification per survivor</text>
-  <circle cx="74" cy="874" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="879" font-size="16" font-weight="700" class="t1">demo</text>
-  <text x="152" y="879" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.1</text>
-  <text x="100" y="900" font-size="14.5" class="t2">the logger accepted a better state than the run (FRACO) with no justification per survivor</text>
 </svg>
