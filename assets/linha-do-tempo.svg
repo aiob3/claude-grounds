@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1644" width="1200" height="1644" role="img" aria-label="Linha do tempo das rodadas de calibração do instrumento" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1698" width="1200" height="1698" role="img" aria-label="Linha do tempo das rodadas de calibração do instrumento" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Linha do tempo das rodadas de calibração do instrumento</title>
 <style>
   .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
@@ -13,7 +13,7 @@
   }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 </style>
-<rect width="1200" height="1644" rx="16" class="sup"/>
+<rect width="1200" height="1698" rx="16" class="sup"/>
   <text x="56" y="50" font-size="24" font-weight="800" class="t1">Construído com ele mesmo</text>
   <text x="56" y="74" font-size="15" class="t2">Cada versão passou pelo próprio método. Em todas as rodadas o instrumento achou um defeito em si ou ganhou uma regra nova.</text>
   <line x1="74" y1="126" x2="74" y2="164" class="acs" stroke-width="2.5"/>
@@ -124,9 +124,13 @@
   <circle cx="74" cy="1522" r="8" class="sup2 acs" stroke-width="2.5"/>
   <text x="100" y="1527" font-size="16" font-weight="700" class="t1">R30</text>
   <text x="152" y="1527" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.0</text>
-  <text x="100" y="1548" font-size="14.5" class="t2">mutante com crases duplas no original e simples no mutado (``a`` → `b`, sem espaços por de…</text><text x="1150" y="1527" font-size="14" class="ac" text-anchor="end" font-weight="700">1 falha real nos testes</text>
+  <text x="100" y="1548" font-size="14.5" class="t2">mutante com crases duplas no original e simples no mutado (``a`` → `b`, sem espaços por de…</text><text x="1150" y="1527" font-size="14" class="ac" text-anchor="end" font-weight="700">1 falha real nos testes</text><line x1="74" y1="1584" x2="74" y2="1622" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="1576" r="8" class="sup2 acs" stroke-width="2.5"/>
   <text x="100" y="1581" font-size="16" font-weight="700" class="t1">R31</text>
   <text x="152" y="1581" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.0</text>
   <text x="100" y="1602" font-size="14.5" class="t2">nova versão: ``a`` → `b`</text><text x="1150" y="1581" font-size="14" class="ac" text-anchor="end" font-weight="700">3 falhas reais nos testes</text>
+  <circle cx="74" cy="1630" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="1635" font-size="16" font-weight="700" class="t1">R31</text>
+  <text x="152" y="1635" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.1</text>
+  <text x="100" y="1656" font-size="14.5" class="t2">nova versão: ordem das leituras com barra escapada</text><text x="1150" y="1635" font-size="14" class="ac" text-anchor="end" font-weight="700">3 falhas reais nos testes</text>
 </svg>
