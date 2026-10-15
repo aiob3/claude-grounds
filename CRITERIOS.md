@@ -21,8 +21,8 @@ muda entre `executar` e `registrar`, ou quando o agente informa um defeito.
 
 | Variável | Valor | Estado atual, calculado do log público |
 |---|---|---|
-| Duração | 10 rodadas de medição | 38 medições (mínimo atingido); 32 calibrações registradas |
-| Instrumento estável | 3 medições seguidas na mesma versão | sim, mod 0.9.1 com 5 medições seguidas |
+| Duração | 10 rodadas de medição | 38 medições (mínimo atingido); 33 calibrações registradas |
+| Instrumento estável | 3 medições seguidas na mesma versão | não, 0 de 3 medições seguidas |
 | Promover se | sobreviventes reais em pelo menos 3 medições, tempo médio das medições abaixo de 2 min e instrumento estável | medições com sobreviventes reais: 24; tempo médio das medições: 147 s |
 | Descartar ou ajustar se | tempo médio das medições acima de 5 min, ou nenhum achado em 5 medições seguidas | n/a |
 
