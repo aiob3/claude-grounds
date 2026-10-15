@@ -2,7 +2,7 @@
 
 <p align="center"><a href="README.en.md">English</a> · <b>Português</b></p>
 
-<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 85" src="https://img.shields.io/badge/falhas_reais_achadas-85-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
+<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 82" src="https://img.shields.io/badge/falhas_reais_achadas-82-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
 
 **Os testes que o agente escreve passam. Mas pegam bug?**
 
@@ -17,7 +17,7 @@ sessão para a outra. O objetivo pede a prova. A prova é feita por um modelo in
 planta bugs no código que o agente mudou, e a tarefa só fecha quando os testes pegam. O registro guarda cada rodada
 e recusa número inflado. Não há settings hook para configurar nem gate travando o agente.
 
-Construindo os próprios mods, a prova achou 85 falhas reais de teste. Em três projetos privados, sem relação com
+Construindo os próprios mods, a prova achou 82 falhas reais de teste. Em três projetos privados, sem relação com
 estes, achou mais 80. Num projeto com 8881 testes, provar uma mudança leva uns 2 minutos e meio,
 2,8 vezes menos que rodar a suíte completa para cada bug plantado, com os mesmos vereditos.
 
@@ -216,7 +216,7 @@ como morto, um caminho devolvido pelo modelo que fazia 18 mutantes não serem ap
 teste. A demo gravada acrescentou o último da lista: o `registrar` aceitava um estado melhor que o executado sem
 justificativa.
 
-<p align="center"><img src="assets/rodadas.svg" alt="85 falhas reais de teste encontradas" width="100%"></p>
+<p align="center"><img src="assets/rodadas.svg" alt="82 falhas reais de teste encontradas" width="100%"></p>
 
 As garantias de honestidade são mecânicas, não promessas:
 
@@ -314,7 +314,7 @@ diff`), medidos pelo próprio mod.
 - Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
-Em aberto: a duração mínima foi atingida (27 medições); falta o instrumento ficar estável, com 3 medições seguidas na mesma versão, para o operador decidir se o método vira critério; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
+Em aberto: os critérios de saída estão cumpridos (27 medições, instrumento estável); a decisão de promover é do operador; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 
 ## Avaliar
