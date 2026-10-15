@@ -103,6 +103,14 @@ export function erroDeCarga(texto: string): string | undefined {
   // Na coluna 0, como o claude plugin test escreve; o mesmo texto citado no código de um teste que falhou não vale.
   const i = linhas.findIndex(l => /^\(fail\) the file did not load/.test(l))
   if (i >= 0) return linhas.slice(i + 1).find(l => l.trim())?.trim() ?? 'the file did not load'
+  // pytest: o módulo de teste não importou (saída 2). Vale a última linha E do bloco "ERROR collecting", que é
+  // a exceção (as de cima são o trecho do código); E de um teste que falhou, antes do bloco, é morte.
+  const c = linhas.findIndex(l => /^_+ ERROR collecting .+ _+$/.test(l))
+  if (c >= 0) {
+    const fim = linhas.findIndex((l, j) => j > c && /^(?:_{3,}|={3,}) /.test(l))
+    const bloco = linhas.slice(c + 1, fim < 0 ? undefined : fim)
+    return bloco.findLast(l => /^E +\S/.test(l))?.replace(/^E +/, '') ?? 'ERROR collecting'
+  }
   return linhas.find(l => /^(?:SyntaxError|error TS\d{4}|Error: Cannot find module|ParseError)/.test(l))
 }
 

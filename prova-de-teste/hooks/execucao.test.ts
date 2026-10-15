@@ -7,8 +7,8 @@ import {
   pycachesDe,
   aplicarTrecho,
   conferirEstado,
-  erroDeCarga,
   invalido,
+  erroDeCarga,
   lerMutacoes,
   comandosPara,
   categoriasDescobertas,
@@ -212,6 +212,57 @@ test('mutante que não carrega é inválido, não morto', () => {
   expect(invalido('✖ lê o corpo (0.23ms)\n  SyntaxError [Error]: Unexpected token \'<\'\n')).toBe(false)
   // O node que não carrega o arquivo escreve o erro na coluna 0.
   expect(invalido('/c/b.test.js:1\nconst x = ;\n          ^\n\nSyntaxError: Unexpected token \';\'\n✖ b.test.js (34ms)\n')).toBe(true)
+})
+
+test('pytest que não coleta o módulo (saída 2) é inválido; a razão é a exceção, a última linha E do bloco', () => {
+  const coleta = [
+    '==================================== ERRORS ====================================',
+    '____________________ ERROR collecting tests/test_conta.py _____________________',
+    "tests/test_conta.py:1: in <module>",
+    '    from conta import soma',
+    'E     File "/c/conta.py", line 3',
+    'E       def soma(a, b:',
+    'E                    ^',
+    'E   SyntaxError: invalid syntax',
+    '=========================== short test summary info ============================',
+    'ERROR tests/test_conta.py',
+    '!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!',
+    'E   ValueError: depois do bloco não vale',
+  ].join('\n')
+  expect(invalido(coleta)).toBe(true)
+  expect(erroDeCarga(coleta)).toBe('SyntaxError: invalid syntax')
+  // Um teste que falhou antes do bloco tem as suas linhas E; elas não são a razão da carga.
+  const antes = [
+    '=================================== FAILURES ===================================',
+    '___________________________________ test_um ____________________________________',
+    'E   AssertionError: assert 2 == 3',
+    '____________________ ERROR collecting tests/test_dois.py ______________________',
+    'E   ModuleNotFoundError: No module named \'dois\'',
+  ].join('\n')
+  expect(erroDeCarga(antes)).toBe("ModuleNotFoundError: No module named 'dois'")
+  // E fora da coluna 0 é texto citado, não linha do pytest.
+  const citado = '____ ERROR collecting t.py ____\n    E   x = 1\nE   ImportError: cannot import name \'f\'\n'
+  expect(erroDeCarga(citado)).toBe("ImportError: cannot import name 'f'")
+  // Teste que falhou sem bloco de coleta é morte, mesmo com SyntaxError numa linha E.
+  expect(invalido('FAILED tests/test_x.py::test_a - SyntaxError\nE   SyntaxError: invalid syntax\n')).toBe(false)
+  expect(invalido('_______ ERROR at setup of test_a _______\nE   fixture quebrou\n')).toBe(false)
+  // Dois módulos sem coletar: a razão é a do primeiro bloco, que acaba no cabeçalho do segundo (sobrevivente #5 da 0.12.1).
+  const dois = [
+    '____ ERROR collecting tests/test_a.py ____',
+    "E   ModuleNotFoundError: No module named 'a'",
+    '____ ERROR collecting tests/test_b.py ____',
+    "E   ModuleNotFoundError: No module named 'b'",
+    '==== short test summary info ====',
+  ].join('\n')
+  expect(erroDeCarga(dois)).toBe("ModuleNotFoundError: No module named 'a'")
+  // Bloco sem linha E (import file mismatch) ainda é carga que falhou, com o cabeçalho por razão (#6 e #12).
+  const semE = '____ ERROR collecting tests/test_a.py ____\nimport file mismatch:\nimported module \'test_a\' has this __file__ attribute\n==== short test summary info ====\n'
+  expect(invalido(semE)).toBe(true)
+  expect(erroDeCarga(semE)).toBe('ERROR collecting')
+  // Linha na coluna 0 que começa com E sem ser linha E do pytest não é a razão (#7).
+  expect(erroDeCarga("____ ERROR collecting t.py ____\nE   ImportError: cannot import name 'f'\nErrors during collection\n")).toBe("ImportError: cannot import name 'f'")
+  // "ERROR collecting" citado na asserção de um teste que falhou não abre bloco de coleta (#8).
+  expect(invalido("FAILED tests/test_saida.py::test_le - assert\nE   assert '__ ERROR collecting x __' == ''\n")).toBe(false)
 })
 
 test('trecho original vazio nunca vira leitura: buscaria "" para sempre (sobrevivente #11 da 3ª execução da rodada 4)', () => {
