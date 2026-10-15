@@ -122,31 +122,31 @@
   <text x="152" y="1473" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.0</text>
   <text x="100" y="1494" font-size="14.5" class="t2">barra vertical escapada (\ / ) no trecho: 2 mutantes recusados como &quot;trecho não encontrado…</text><line x1="74" y1="1530" x2="74" y2="1568" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="1522" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="1527" font-size="16" font-weight="700" class="t1">R30</text>
+  <text x="100" y="1527" font-size="16" font-weight="700" class="t1">R28</text>
   <text x="152" y="1527" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.0</text>
   <text x="100" y="1548" font-size="14.5" class="t2">mutante com crases duplas no original e simples no mutado (``a`` → `b`, sem espaços por de…</text><text x="1150" y="1527" font-size="14" class="ac" text-anchor="end" font-weight="700">1 falha real nos testes</text><line x1="74" y1="1584" x2="74" y2="1622" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="1576" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="1581" font-size="16" font-weight="700" class="t1">R31</text>
+  <text x="100" y="1581" font-size="16" font-weight="700" class="t1">R29</text>
   <text x="152" y="1581" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.0</text>
   <text x="100" y="1602" font-size="14.5" class="t2">nova versão: ``a`` → `b`</text><text x="1150" y="1581" font-size="14" class="ac" text-anchor="end" font-weight="700">3 falhas reais nos testes</text><line x1="74" y1="1638" x2="74" y2="1676" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="1630" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="1635" font-size="16" font-weight="700" class="t1">R31</text>
+  <text x="100" y="1635" font-size="16" font-weight="700" class="t1">R29</text>
   <text x="152" y="1635" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.1</text>
   <text x="100" y="1656" font-size="14.5" class="t2">nova versão: ordem das leituras com barra escapada</text><text x="1150" y="1635" font-size="14" class="ac" text-anchor="end" font-weight="700">3 falhas reais nos testes</text><line x1="74" y1="1692" x2="74" y2="1730" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="1684" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="1689" font-size="16" font-weight="700" class="t1">R34</text>
+  <text x="100" y="1689" font-size="16" font-weight="700" class="t1">R31</text>
   <text x="152" y="1689" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.0</text>
-  <text x="100" y="1710" font-size="14.5" class="t2">nova versão: REGISTRO TARDIO: a execução das 18:3x não foi registrada na hora; números do…</text><text x="1150" y="1689" font-size="14" class="ac" text-anchor="end" font-weight="700">7 falhas reais nos testes</text><line x1="74" y1="1746" x2="74" y2="1784" class="acs" stroke-width="2.5"/>
+  <text x="100" y="1710" font-size="14.5" class="t2">nova versão: REGISTRO TARDIO: a execução das 18:3x não foi registrada na hora; números do…</text><text x="1150" y="1689" font-size="14" class="ac" text-anchor="end" font-weight="700">3 falhas reais nos testes</text><line x1="74" y1="1746" x2="74" y2="1784" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="1738" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="1743" font-size="16" font-weight="700" class="t1">R35</text>
+  <text x="100" y="1743" font-size="16" font-weight="700" class="t1">R32</text>
   <text x="152" y="1743" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.1</text>
   <text x="100" y="1764" font-size="14.5" class="t2">nova versão: 1ª passada e até provar</text><text x="1150" y="1743" font-size="14" class="ac" text-anchor="end" font-weight="700">3 falhas reais nos testes</text><line x1="74" y1="1800" x2="74" y2="1838" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="1792" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="1797" font-size="16" font-weight="700" class="t1">R35</text>
+  <text x="100" y="1797" font-size="16" font-weight="700" class="t1">R32</text>
   <text x="152" y="1797" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.9.1</text>
   <text x="100" y="1818" font-size="14.5" class="t2">o diff altera o próprio instrumento</text><text x="1150" y="1797" font-size="14" class="ac" text-anchor="end" font-weight="700">3 falhas reais nos testes</text>
   <circle cx="74" cy="1846" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="1851" font-size="16" font-weight="700" class="t1">R42</text>
+  <text x="100" y="1851" font-size="16" font-weight="700" class="t1">R37</text>
   <text x="152" y="1851" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.10.0</text>
   <text x="100" y="1872" font-size="14.5" class="t2">mutante que não compila (regex com parêntese sem par: o pytest sai com código 2 na coleta)…</text><text x="1150" y="1851" font-size="14" class="ac" text-anchor="end" font-weight="700">5 falhas reais nos testes</text>
 </svg>
