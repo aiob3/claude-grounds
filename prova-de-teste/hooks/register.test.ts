@@ -197,7 +197,7 @@ test('sem HOME, /prova ~/pasta não inventa uma pasta', async ($, on) => {
 })
 
 /** Um repositório em memória: git, cópia, comando de teste e sistema de arquivos. */
-function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean; nomeDoPlugin?: string; venvEditavel?: boolean; sobrescreverFalha?: boolean; cwdSessao?: string } = {}) {
+function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean; nomeDoPlugin?: string; venvEditavel?: boolean; sobrescreverFalha?: boolean; cwdSessao?: string; nucleos?: string; statusMuda?: boolean; vaza?: boolean; disputa?: boolean; lento?: boolean; cpFalhaEm?: string } = {}) {
   const fs = new Map<string, string>(o.python ? [
     ['/repo/pyproject.toml', '[tool.pytest.ini_options]\n'],
     ['/repo/src/calc.py', 'def dobro(x):\n    return x * 2\n'],
@@ -233,6 +233,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
   const ambientes: (Record<string, string> | undefined)[] = []
   const sobrescritos = new Map<string, string>()
   const modelo = { chamadas: 0 }
+  const conc = { agora: 0, max: 0, status: 0 }
   const TMP = '/tmp/prova-de-teste-abc'
   // Com a pasta da sessão em outro lugar, sem log fixo: o destino sai da raiz da execução (isolamento, 0.11.0).
   mock.env(on, o.cwdSessao ? { HOME: '/h' } : { PROVA_DE_TESTE_LOG: LOG_PATH })
@@ -245,15 +246,17 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       // O log padrão mora no mesmo repositório da rodada (/repo): isolamento por projeto (0.11.0).
       if (a === 'rev-parse --path-format=absolute --git-common-dir') return ['/repo', '/h/.claude/prova-de-teste'].includes(init?.cwd ?? '') ? r('/repo/.git\n') : r('', 128)
       if (a === 'diff HEAD') return r(o.python ? DIFF_PY : DIFF)
-      if (a === 'status --porcelain') return r(' M src/a.ts\n')
+      if (a === 'status --porcelain') return r(o.statusMuda && conc.status++ > 0 ? '' : ' M src/a.ts\n')
       if (a === 'ls-files --cached --others --exclude-standard' && o.python) return r('pyproject.toml\nsrc/calc.py\nsrc/test_calc.py\n')
       if (a === 'ls-files --cached --others --exclude-standard') return r('src/a.ts\nsrc/a.test.ts\nsrc/b.ts\nsrc/b.test.ts\ntsconfig.json\n')
       if (a === 'ls-tree -r -l HEAD') return r('100644 blob aaa     30\tsrc/a.ts\n100644 blob bbb     2018\tsrc/a.test.ts\n')
       return r('')
     }
     if (argv[0] === 'mktemp') return r(`${TMP}\n`)
+    if (argv[0] === 'nproc') return o.nucleos ? r(`${o.nucleos}\n`) : r('', 127)
     if (argv[0] === 'cp') {
-      for (const [k, v] of [...fs]) if (k.startsWith('/repo/')) fs.set(`${TMP}/repo/${k.slice(6)}`, v)
+      if (o.cpFalhaEm && argv.at(-1)!.endsWith(o.cpFalhaEm)) return { value: { exitCode: 1, stdout: '', stderr: 'cp: sem espaço' } } as never
+      for (const [k, v] of [...fs]) if (k.startsWith('/repo/')) fs.set(`${argv.at(-1)}/${k.slice(6)}`, v)
       return r('')
     }
     if (argv[0] === 'sh' && argv[2]!.includes('pyvenv.cfg')) {
@@ -304,17 +307,30 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
     if (argv[0] === 'npm' || argv[0] === 'claude') {
       rodadas.push([...argv, init?.cwd ?? ''])
       ambientes.push(init?.env)
-      // O teste falso só pega a troca de + por -.
-      const fonte = fs.get(`${TMP}/repo/src/a.ts`) ?? ''
+      // O teste falso só pega a troca de + por -; lê a cópia em que roda.
+      const dir = init?.cwd ?? `${TMP}/repo`
+      const fonte = fs.get(`${dir}/src/a.ts`) ?? ''
       if (o.baseFalha) return r('  ✕ soma dá 3 (1 ms)\n', 1)
       // Um teste que lê a árvore do repositório (o SaidaReal do publico): sem os testes escondidos, falha sem mutante nenhum.
       if (o.leRepo && [...fs.keys()].some(k => k.endsWith('.prova-fora'))) return r('  ✕ lê o repositório (1 ms)\nTests:  1 total\n', 1)
       if (fonte.includes('=> a +\n')) return r("(fail) the file did not load\n\nSyntaxError: Unexpected token '\\n'\n", 1)
       // Só os testes visíveis rodam; o de a.ts só pega a troca de + por -.
-      const visiveis = [...fs.keys()].filter(k => k.startsWith(`${TMP}/repo/`) && k.endsWith('.test.ts'))
+      const visiveis = [...fs.keys()].filter(k => k.startsWith(`${dir}/`) && k.endsWith('.test.ts'))
       const total = `Tests:  ${visiveis.length} total\n`
-      const pega = visiveis.includes(`${TMP}/repo/src/a.test.ts`) && fonte.includes('a - b')
-      return pega ? r(`  ✕ soma dá 3 (1 ms)\n${total}`, 1) : r(`  ✓ soma dá 3\n${total}`)
+      const pega = visiveis.includes(`${dir}/src/a.test.ts`) && fonte.includes('a - b')
+      const res = pega ? r(`  ✕ soma dá 3 (1 ms)\n${total}`, 1) : r(`  ✓ soma dá 3\n${total}`)
+      // Mais de uma suíte ao mesmo tempo: com disputa, a base falha; lento, o mutante b + a estoura o tempo sem nome.
+      return (async () => {
+        conc.agora++
+        conc.max = Math.max(conc.max, conc.agora)
+        let juntas = conc.agora > 1
+        await new Promise(ok => setTimeout(ok, 5))
+        juntas ||= conc.agora > 1
+        conc.agora--
+        if (o.disputa && juntas) return r('Error: listen EADDRINUSE: address already in use :::3000\n', 1)
+        if (o.lento && juntas && fonte.includes('b + a')) return r('', 124)
+        return res
+      })()
     }
     return r('', 127)
   })
@@ -333,6 +349,8 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
   on('fs.write', (_$, e) => {
     const { path, text } = e as { path: string; text: string }
     fs.set(path, text)
+    // Um defeito simulado: a escrita do mutante na cópia chega também ao original.
+    if (o.vaza && path.startsWith(`${TMP}/repo/src/`) && text.includes('a - b')) fs.set(path.replace(`${TMP}/repo/`, '/repo/'), text)
     return { value: undefined } as never
   })
   on('session.cwd', () => ({ value: o.cwdSessao ?? '/repo' }) as never)
@@ -358,7 +376,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       },
     }) as never,
   )
-  return { fs, apagadas, rodadas, ambientes, sobrescritos, TMP, modelo, sobrouEscondido }
+  return { fs, apagadas, rodadas, ambientes, sobrescritos, TMP, modelo, sobrouEscondido, conc }
 }
 
 test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver de verdade, restaura e não toca o original', async ($, on) => {
@@ -822,4 +840,74 @@ test('indicadores por projeto: sem raiz nem pasta da sessão, nada vai ao arquiv
   const m = isolado(on, { cwd: '', raiz: '' })
   await $.tool.call(registro as never)
   expect([...m.fs.keys()].filter(k => k.startsWith('/h/.claude/indicadores'))).toEqual([])
+})
+
+const executarJa = async ($: Parameters<TestBody>[0], extra: object = {}) => JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma', ...extra } as never))
+
+test('executar em paralelo: um quarto dos núcleos, cada mutante na sua cópia, mesmo veredito da fila e na ordem da lista (rodada de 1.441 s no motor, 15/10)', async ($, on) => {
+  const m = mundo(on, { nucleos: '32' })
+  const r = await executarJa($)
+  // 3 mutantes na lista: 3 cópias (32/4 = 8, limitado pelos mutantes).
+  expect(r).toContain('Paralelo:   3 cópias ao mesmo tempo (32 núcleos)')
+  expect(r).toContain('3 cópias em paralelo')
+  expect(m.conc.max).toBeGreaterThan(1)
+  expect(r).toContain('1 | src/a.ts:1 | condição invertida | `a + b` → `a - b` | MORTO por \\"soma dá 3\\"')
+  expect(r).toContain('2 | src/a.ts:1 | null/inválido')
+  expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes | 1 não aplicados')
+  expect(r).toContain('cmp na cópia: idêntico')
+  // Cada cópia rodou na própria pasta, e nenhuma deixou teste escondido.
+  const pastas = new Set(m.rodadas.map(x => x.at(-1)))
+  expect([...pastas].sort()).toEqual([`${m.TMP}/repo`, `${m.TMP}/repo-2`, `${m.TMP}/repo-3`])
+  expect(m.sobrouEscondido).toEqual([])
+  expect(m.apagadas).toEqual([m.TMP])
+})
+
+test('executar em paralelo: pedido vale até o número de mutantes; 1 é a fila sem linha a dizer; sem nproc, fila', async ($, on) => {
+  mundo(on, { nucleos: '32' })
+  expect(await executarJa($, { paralelo: 2 })).toContain('Paralelo:   2 cópias ao mesmo tempo')
+  const fila = await executarJa($, { paralelo: 1, repetir: true })
+  expect(fila).not.toContain('Paralelo:')
+  expect(fila).not.toContain('em paralelo')
+})
+
+test('executar em paralelo: a base que falha com as cópias juntas e passa sozinha manda a rodada para a fila, com o motivo', async ($, on) => {
+  const m = mundo(on, { nucleos: '32', disputa: true })
+  const r = await executarJa($)
+  expect(r).toContain('Paralelo:   em fila (32 núcleos): a linha de base falhou com 3 cópias ao mesmo tempo e passou sozinha')
+  expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes')
+  expect(r).toContain('linha de base passou')
+  expect(m.conc.max).toBeGreaterThan(1)
+})
+
+test('executar em paralelo: morte sem teste nomeado (tempo esgotado na disputa) é refeita sozinha e não vira morte falsa', async ($, on) => {
+  mundo(on, { nucleos: '32', lento: true })
+  // Na suíte inteira: no incremental, a falha sem nome já era refeita na suíte inteira.
+  const r = await executarJa($, { incremental: false })
+  expect(r).toContain('2 | src/a.ts:1 | null/inválido | `(a, b) => a + b` → `(a, b) => b + a` | SOBREVIVENTE')
+  expect(r).toContain('refeito sozinho (morte sem nome em paralelo)')
+  expect(r).toContain('1 morte(s) sem nome refeita(s) sozinha(s)')
+})
+
+test('executar: commit ou edição de outra sessão durante a rodada não invalida; mutante que chega ao original, sim', async ($, on) => {
+  const m = mundo(on, { statusMuda: true })
+  const r = await executarJa($)
+  expect(r).toContain('original ✔ intocado (nenhum mutante chegou a ele); o repositório mudou por fora durante a rodada')
+  expect(r).toContain('Estado:     FRACO')
+  expect(m.fs.get('/repo/src/a.ts')).toBe('export const soma = (a, b) => a + b\n')
+})
+
+test('executar: o texto mutado que aparece no arquivo original marca ALTERADO e a rodada não vale', async ($, on) => {
+  mundo(on, { vaza: true })
+  const r = await executarJa($)
+  expect(r).toContain('original ✘ ALTERADO: um mutante chegou ao arquivo original')
+  expect(r).not.toContain('mudou por fora')
+  expect(r).toContain('Estado:     NÃO VERIFICADO')
+})
+
+test('executar em paralelo: se uma das cópias não fica pronta, a rodada vai em fila e diz qual (sobrevivente #16 da 0.13.0)', async ($, on) => {
+  const m = mundo(on, { nucleos: '32', cpFalhaEm: '/repo-3' })
+  const r = await executarJa($)
+  expect(r).toContain('Paralelo:   em fila (32 núcleos): a cópia 3 não ficou pronta (a cópia falhou (cp: sem espaço))')
+  expect(new Set(m.rodadas.map(x => x.at(-1)))).toEqual(new Set([`${m.TMP}/repo`]))
+  expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes')
 })

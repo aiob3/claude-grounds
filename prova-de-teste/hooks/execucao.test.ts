@@ -8,6 +8,8 @@ import {
   aplicarTrecho,
   conferirEstado,
   invalido,
+  larguraDoParalelo,
+  MAX_COPIAS,
   erroDeCarga,
   lerMutacoes,
   comandosPara,
@@ -438,4 +440,19 @@ test('realocar troca a raiz pela cópia só onde ela é um caminho inteiro (venv
   expect(realocar('/repository/src\n/data/repo/src\n', '/repo', c)).toBe('/repository/src\n/data/repo/src\n')
   // Raiz com caracteres de regex.
   expect(realocar('/a+b (1)/src\n', '/a+b (1)', c)).toBe('/tmp/p/repo/src\n')
+})
+
+test('largura do paralelo: um quarto dos núcleos até 8, nunca mais que os mutantes; pedido e núcleos inválidos viram a fila (sobreviventes #2, #8 e #9 da 0.13.0)', () => {
+  expect(larguraDoParalelo(undefined, 64, 30)).toBe(MAX_COPIAS)
+  expect(larguraDoParalelo(undefined, 32, 30)).toBe(8)
+  expect(larguraDoParalelo(undefined, 12, 30)).toBe(3)
+  expect(larguraDoParalelo(undefined, 2, 30)).toBe(1)
+  expect(larguraDoParalelo(undefined, 32, 3)).toBe(3)
+  expect(larguraDoParalelo(undefined, undefined, 30)).toBe(1)
+  expect(larguraDoParalelo(undefined, Number.NaN, 30)).toBe(1)
+  expect(larguraDoParalelo(16, 4, 30)).toBe(16)
+  expect(larguraDoParalelo(16, 4, 5)).toBe(5)
+  expect(larguraDoParalelo(0, 32, 5)).toBe(1)
+  expect(larguraDoParalelo(2.7, 32, 5)).toBe(2)
+  expect(larguraDoParalelo(Number.NaN, 32, 30)).toBe(8)
 })

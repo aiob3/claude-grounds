@@ -180,6 +180,34 @@ export function tamanhoDoRepo(lsTree: string): { arquivos: number; bytes: number
 }
 
 /** O que a rodada custou e sobre o quê: os números da hipótese "o custo acompanha o diff, não o código". */
+export type Paralelo = { copias: number; nucleos?: number; motivo?: string; refeitos?: number }
+
+/** Teto do automático: além disso, a máquina do operador (32 núcleos) já ficaria disputada pelas próprias suítes. */
+export const MAX_COPIAS = 8
+
+/**
+ * Quantas cópias rodam mutantes ao mesmo tempo. Pedido explícito vale (até o número de mutantes); sem pedido, um
+ * quarto dos núcleos, até MAX_COPIAS: a suíte de um mutante também usa CPU. Sem saber os núcleos, uma (a fila).
+ * Na rodada de 25 mutantes de 15/10, em fila, a máquina ficou a 0,37 de 32 e a rodada levou 1.441 s.
+ */
+export function larguraDoParalelo(pedido: number | undefined, nucleos: number | undefined, mutantes: number): number {
+  const teto = Math.max(1, mutantes)
+  if (pedido !== undefined && Number.isFinite(pedido)) return Math.min(teto, Math.max(1, Math.floor(pedido)))
+  if (!nucleos || !Number.isFinite(nucleos)) return 1
+  return Math.min(teto, MAX_COPIAS, Math.max(1, Math.floor(nucleos / 4)))
+}
+
+/** Morte sem teste nomeado (tempo esgotado, saída sem nome) em paralelo pode ser a disputa por CPU: refaz sozinho. */
+export const refazerSozinho = (r: Pick<Resultado, 'situacao' | 'motivo'>) => r.situacao === 'MORTO' && /^código de saída/.test(r.motivo ?? '')
+
+/** A linha do relatório; nada quando a rodada foi em fila sem motivo a dizer. */
+export function linhaParalelo(p: Paralelo | undefined): string {
+  if (!p || (p.copias <= 1 && !p.motivo)) return ''
+  const nucleos = p.nucleos ? ` (${p.nucleos} núcleos)` : ''
+  if (p.copias <= 1) return `Paralelo:   em fila${nucleos}: ${p.motivo}`
+  return `Paralelo:   ${p.copias} cópias ao mesmo tempo${nucleos}${p.refeitos ? `; ${p.refeitos} morte(s) sem nome refeita(s) sozinha(s)` : ''}`
+}
+
 export type Custo = {
   repo?: { arquivos: number; bytes: number }
   diff: { arquivos: number; linhas: number }
@@ -209,7 +237,7 @@ const kb = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} M
 const um = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1))
 
 /** Uma linha só, igual no relatório e no log: base, por mutante, repositório e diff. */
-export function resumoCusto(e: Pick<Execucao, 'linhaDeBase' | 'resultados' | 'custo'>): string {
+export function resumoCusto(e: Pick<Execucao, 'linhaDeBase' | 'resultados' | 'custo' | 'paralelo'>): string {
   const pm = porMutante(e.resultados)
   const c = e.custo
   const testes = (n?: number) => (n === undefined ? '' : `, ${um(n)} testes`)
@@ -218,6 +246,7 @@ export function resumoCusto(e: Pick<Execucao, 'linhaDeBase' | 'resultados' | 'cu
     `por mutante ${pm.segundos.toFixed(1)} s${testes(pm.testes)} (n=${pm.n}${incrementais(e.resultados)})`,
     c?.repo ? `repositório ${c.repo.arquivos} arquivos, ${kb(c.repo.bytes)}` : 'repositório ?',
     c ? `diff ${c.diff.linhas} linhas em ${c.diff.arquivos} arquivos` : 'diff ?',
+    ...((e.paralelo?.copias ?? 1) > 1 ? [`${e.paralelo!.copias} cópias em paralelo`] : []),
   ].join('; ')
 }
 
@@ -341,9 +370,14 @@ export type Execucao = {
   linhaDeBase: { passou: boolean; segundos: number; saida?: string }
   resultados: Resultado[]
   restauracao: 'cmp na cópia: idêntico' | 'cmp na cópia: DIFERENTE'
+  /** Nenhum texto mutado chegou ao arquivo do original. */
   originalIntocado: boolean
+  /** O git status do original mudou durante a rodada (commit ou edição de outra sessão); não invalida. */
+  mudouPorFora?: boolean
   segundos: number
   custo?: Custo
+  /** Quantas cópias rodaram mutantes ao mesmo tempo; o motivo quando ficou em fila sem ter sido pedido. */
+  paralelo?: Paralelo
 }
 
 export type Contagem = { aplicados: number; mortos: number; sobreviventes: number }
@@ -440,7 +474,8 @@ export function relatorio(e: Execucao, data: string): string {
     `Categorias: ${CATEGORIAS.map(k => `${k} ${desc.includes(k) ? '✘' : e.naoAplicaveis.some(n => n.startsWith(`${k}:`)) ? 'n/a' : '✔'}`).join(' | ')}`,
     e.naoAplicaveis.length ? `n/a:        ${e.naoAplicaveis.join('; ')}` : '',
     `Concentração: ${conc.maior}/${conc.total}${conc.alerta ? ` ⚠ concentração em "${conc.teste}": aplique mais 1 mutante fora dessa área` : ''}`,
-    `Restauração: ${e.restauracao}; original ${marca(e.originalIntocado)} ${e.originalIntocado ? 'intocado (git status igual antes e depois)' : 'ALTERADO'}`,
+    `Restauração: ${e.restauracao}; original ${marca(e.originalIntocado)} ${e.originalIntocado ? 'intocado (nenhum mutante chegou a ele)' : 'ALTERADO: um mutante chegou ao arquivo original'}${e.mudouPorFora ? '; o repositório mudou por fora durante a rodada (commit ou edição de outra sessão): a cópia é de antes, a prova vale' : ''}`,
+    linhaParalelo(e.paralelo),
     `Tempo:      ${e.segundos.toFixed(1)} s`,
     `Custo:      ${resumoCusto(e)}`,
     `Estado:     ${est}${est === 'FRACO' ? ' (sobrevivente sem tratamento ou categoria descoberta: a tarefa não é Done)' : ''}`,

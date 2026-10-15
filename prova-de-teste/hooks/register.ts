@@ -1,9 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Escolha, ExecucaoFeita } from '../types'
-import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
-import type { Comando, Execucao, Resultado } from './execucao'
+import type { Escolha, ExecucaoFeita, Mutante } from '../types'
+import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, larguraDoParalelo, refazerSozinho, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
+import type { Comando, Execucao, Paralelo, Resultado } from './execucao'
 import { efetividade, indicadoresDeEfetividade } from './placar'
 import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, logDoProjeto, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
@@ -254,6 +254,11 @@ const SPEC_EXECUTAR = {
       comando: { type: 'array', items: { type: 'string' }, description: 'Comando de teste, rodado na raiz da cópia. Padrão: detectado (claude plugin test, npm test, pytest).' },
       timeoutSegundos: { type: 'number', description: 'Limite por execução dos testes (padrão 120, máximo 600).' },
       repetir: { type: 'boolean', description: 'Reaplica a última lista escolhida às cegas (para provar um reforço com os mesmos mutantes) em vez de pedir outra.' },
+      paralelo: {
+        type: 'integer',
+        description:
+          'Quantas cópias rodam mutantes ao mesmo tempo (padrão: um quarto dos núcleos, até 8; 1 = em fila). A linha de base roda antes em todas juntas; se falhar assim, a rodada vai em fila.',
+      },
       incremental: {
         type: 'boolean',
         description:
@@ -294,7 +299,7 @@ async function pluginsTocados($: EngineInterface, raiz: string, tocados: string[
 
 async function executar(
   $: EngineInterface,
-  a: { tarefa?: string; cwd?: string; base?: string; modelo?: string; novos?: boolean; comando?: string[]; timeoutSegundos?: number; repetir?: boolean; incremental?: boolean },
+  a: { tarefa?: string; cwd?: string; base?: string; modelo?: string; novos?: boolean; comando?: string[]; timeoutSegundos?: number; repetir?: boolean; incremental?: boolean; paralelo?: number },
 ): Promise<{ texto: string; erro: boolean }> {
   const inicio = Date.now()
   if (!a.tarefa?.trim()) return { texto: 'Erro: falta tarefa.', erro: true }
@@ -318,33 +323,41 @@ async function executar(
   if (!comandos.length) return { texto: `Erro: não achei o comando de teste em ${raiz}; passe "comando".\n\n${esc.texto}`, erro: true }
 
   const statusAntes = (await git($, ['status', '--porcelain'], raiz)).stdout
+  // O que vale é nenhum mutante ter chegado ao original. Outra sessão pode comitar ou editar o repositório durante a
+  // rodada (a cópia já foi feita): isso não invalida a prova, só é dito (rodadas perdidas no motor, 15/10).
+  const mutados = new Map<string, Set<string>>()
   const tmp = await $.process.run(['mktemp', '-d', '-t', `${PREFIXO_TMP}XXXXXX`])
   const pasta = tmp.stdout.trim()
   if (tmp.exitCode !== 0 || !pasta.includes(PREFIXO_TMP)) return { texto: `Erro: não criei a pasta temporária (${tmp.stderr.trim()}).`, erro: true }
   const copia = `${pasta}/repo`
   try {
-    const cp = await $.process.run(['cp', '-a', '--reflink=auto', `${raiz}/.`, copia], { timeoutMs: 600_000 })
-    if (cp.exitCode !== 0) return { texto: `Erro: a cópia falhou (${cp.stderr.trim()}).`, erro: true }
-    const naCopia = comandos.map(c => ({ ...c, argv: c.argv.map(x => x.replaceAll('{COPIA}', copia)) }))
-    // Os .pyc que vieram na cópia, ao lado do que pode ser mutado, saem antes da base (ver AMBIENTE_DE_TESTE).
-    const pycaches = pycachesDe(e.enviados).map(p => `${copia}/${p}`)
-    if (pycaches.length) {
-      const rm = await $.process.run(['rm', '-rf', '--', ...pycaches])
-      if (rm.exitCode !== 0) return { texto: `Erro: não apaguei o __pycache__ da cópia (${rm.stderr.trim()}).`, erro: true }
+    /** Uma cópia pronta para os testes: o repositório inteiro, sem o bytecode ao lado do que muda, com o venv apontando para ela. */
+    const preparar = async (destino: string, realocado: string): Promise<string | undefined> => {
+      const cp = await $.process.run(['cp', '-a', '--reflink=auto', `${raiz}/.`, destino], { timeoutMs: 600_000 })
+      if (cp.exitCode !== 0) return `a cópia falhou (${cp.stderr.trim()})`
+      // Os .pyc que vieram na cópia, ao lado do que pode ser mutado, saem antes da base (ver AMBIENTE_DE_TESTE).
+      const pycaches = pycachesDe(e.enviados).map(p => `${destino}/${p}`)
+      if (pycaches.length) {
+        const rm = await $.process.run(['rm', '-rf', '--', ...pycaches])
+        if (rm.exitCode !== 0) return `não apaguei o __pycache__ da cópia (${rm.stderr.trim()})`
+      }
+      // O venv copiado passa a apontar para a cópia (ver ACHAR_NO_VENV).
+      const doVenv = await $.process.run(['sh', '-c', ACHAR_NO_VENV, 'sh', raiz], { cwd: destino })
+      for (const f of doVenv.stdout.split('\n').filter(Boolean)) {
+        // Link fica de fora: escrever nele escreveria no alvo, que pode ser o venv do original.
+        const st = await $.fs.stat(`${destino}/${f}`).catch(() => undefined)
+        if (!st || st.isLink) continue
+        const t = await $.fs.read(`${destino}/${f}`)
+        const novo = realocar(t, raiz, destino)
+        if (novo === t) continue
+        await $.fs.write(realocado, novo)
+        const w = await $.process.run(['sh', '-c', SOBRESCREVER, 'sh', realocado, `${destino}/${f}`])
+        if (w.exitCode !== 0) return `não apontei o venv da cópia para a cópia (${f}: ${w.stderr.trim()})`
+      }
+      return undefined
     }
-    // O venv copiado passa a apontar para a cópia (ver ACHAR_NO_VENV).
-    const doVenv = await $.process.run(['sh', '-c', ACHAR_NO_VENV, 'sh', raiz], { cwd: copia })
-    for (const f of doVenv.stdout.split('\n').filter(Boolean)) {
-      // Link fica de fora: escrever nele escreveria no alvo, que pode ser o venv do original.
-      const st = await $.fs.stat(`${copia}/${f}`).catch(() => undefined)
-      if (!st || st.isLink) continue
-      const t = await $.fs.read(`${copia}/${f}`)
-      const novo = realocar(t, raiz, copia)
-      if (novo === t) continue
-      await $.fs.write(`${pasta}/realocado`, novo)
-      const w = await $.process.run(['sh', '-c', SOBRESCREVER, 'sh', `${pasta}/realocado`, `${copia}/${f}`])
-      if (w.exitCode !== 0) return { texto: `Erro: não apontei o venv da cópia para a cópia (${f}: ${w.stderr.trim()}).`, erro: true }
-    }
+    const erroDaCopia = await preparar(copia, `${pasta}/realocado`)
+    if (erroDaCopia) return { texto: `Erro: ${erroDaCopia}.`, erro: true }
     /** Os arquivos JS/TS/Python do repositório e quem importa quem; grande demais ou ilegível, nada. */
     const mapear = async () => {
       const ls = await git($, ['ls-files', '--cached', '--others', '--exclude-standard'], copia)
@@ -366,50 +379,62 @@ async function executar(
       }
       return { g: grafo(fontes, aliases), testes: [...fontes.keys()].filter(ehEntradaDeTeste) }
     }
-    const rodarUm = async (argv: string[]) =>
-      $.process.run(argv, { cwd: copia, timeoutMs, env: AMBIENTE_DE_TESTE }).catch(err => ({
-        exitCode: -1,
-        stdout: '',
-        stderr: `não rodou: ${err instanceof Error ? err.message : String(err)}`,
-      }))
-    /** Roda os comandos em ordem e para no primeiro que falhar; os testes somam os de cada comando que rodou. */
-    const rodar = async (cs: Comando[]) => {
-      const t = Date.now()
-      let ultimo = { exitCode: 0, stdout: '', stderr: '' }
-      let testes: number | undefined = 0
-      for (const c of cs) {
-        ultimo = await rodarUm(c.argv)
-        testes = somarTestes(testes, contarTestes(`${ultimo.stdout}\n${ultimo.stderr}`))
-        if (ultimo.exitCode !== 0) break
-      }
-      return { ...ultimo, testes, segundos: (Date.now() - t) / 1000 }
-    }
+    let mapa: Awaited<ReturnType<typeof mapear>>
 
-    const base = await rodar(naCopia)
+    /** Quem roda os testes numa cópia: os comandos dela, os testes que ela escondeu e como rodar. */
+    const trabalhador = (dir: string) => {
+      const comandosDaCopia = comandos.map(c => ({ ...c, argv: c.argv.map(x => x.replaceAll('{COPIA}', dir)) }))
+      const rodarUm = async (argv: string[]) =>
+        $.process.run(argv, { cwd: dir, timeoutMs, env: AMBIENTE_DE_TESTE }).catch(err => ({
+          exitCode: -1,
+          stdout: '',
+          stderr: `não rodou: ${err instanceof Error ? err.message : String(err)}`,
+        }))
+      /** Roda os comandos em ordem e para no primeiro que falhar; os testes somam os de cada comando que rodou. */
+      const rodar = async (cs: Comando[]) => {
+        const t = Date.now()
+        let ultimo = { exitCode: 0, stdout: '', stderr: '' }
+        let testes: number | undefined = 0
+        for (const c of cs) {
+          ultimo = await rodarUm(c.argv)
+          testes = somarTestes(testes, contarTestes(`${ultimo.stdout}\n${ultimo.stderr}`))
+          if (ultimo.exitCode !== 0) break
+        }
+        return { ...ultimo, testes, segundos: (Date.now() - t) / 1000 }
+      }
+      const escondidos = new Set<string>()
+      /** Esconde na cópia os arquivos de teste fora de `quero`, renomeando; mexe só no que mudou desde a última vez. */
+      const ajustar = async (quero: Set<string>) => {
+        const mv = async (fs: string[], de: string, para: string) => {
+          if (!fs.length) return
+          const r = await $.process.run(['sh', '-c', `for f; do mv -- "$f${de}" "$f${para}"; done`, 'sh', ...fs], { cwd: dir })
+          if (r.exitCode !== 0) throw new Error(`não consegui ${para ? 'esconder' : 'mostrar'} testes na cópia: ${r.stderr.trim()}`)
+        }
+        const esconder = (mapa?.testes ?? []).filter(t => !quero.has(t) && !escondidos.has(t))
+        const mostrar = [...escondidos].filter(t => quero.has(t))
+        await mv(esconder, '', SUFIXO_FORA)
+        esconder.forEach(t => escondidos.add(t))
+        await mv(mostrar, SUFIXO_FORA, '')
+        mostrar.forEach(t => escondidos.delete(t))
+      }
+      const todos = () => ajustar(new Set(mapa?.testes ?? []))
+      return { dir, comandos: comandosDaCopia, rodar, ajustar, todos }
+    }
+    type Trabalhador = ReturnType<typeof trabalhador>
+    const primeiro = trabalhador(copia)
+
+    const base = await primeiro.rodar(primeiro.comandos)
     const lsTree = await git($, ['ls-tree', '-r', '-l', 'HEAD'], raiz)
 
     // O mapa da execução incremental: lido da cópia uma vez; sem ele, cada mutante roda a suíte inteira.
-    const mapa = a.incremental === false || base.exitCode !== 0 ? undefined : await mapear()
-    const escondidos = new Set<string>()
-    /** Esconde na cópia os arquivos de teste fora de `quero`, renomeando; mexe só no que mudou desde a última vez. */
-    const ajustar = async (quero: Set<string>) => {
-      const mv = async (fs: string[], de: string, para: string) => {
-        if (!fs.length) return
-        const r = await $.process.run(['sh', '-c', `for f; do mv -- "$f${de}" "$f${para}"; done`, 'sh', ...fs], { cwd: copia })
-        if (r.exitCode !== 0) throw new Error(`não consegui ${para ? 'esconder' : 'mostrar'} testes na cópia: ${r.stderr.trim()}`)
-      }
-      const esconder = (mapa?.testes ?? []).filter(t => !quero.has(t) && !escondidos.has(t))
-      const mostrar = [...escondidos].filter(t => quero.has(t))
-      await mv(esconder, '', SUFIXO_FORA)
-      esconder.forEach(t => escondidos.add(t))
-      await mv(mostrar, SUFIXO_FORA, '')
-      mostrar.forEach(t => escondidos.delete(t))
-    }
-    const todos = () => ajustar(new Set(mapa?.testes ?? []))
+    mapa = a.incremental === false || base.exitCode !== 0 ? undefined : await mapear()
+    const nproc = await $.process.run(['nproc']).catch(() => undefined)
+    const nucleos = nproc?.exitCode === 0 ? Number.parseInt(nproc.stdout.trim(), 10) || undefined : undefined
+    const paralelo: Paralelo = { copias: 1, ...(nucleos ? { nucleos } : {}) }
     const exec: Execucao = {
       tarefa: a.tarefa.trim(),
       modelo: e.modelo,
-      comando: naCopia.map(c => c.argv.join(' ').replaceAll(copia, '<cópia>')),
+      comando: primeiro.comandos.map(c => c.argv.join(' ').replaceAll(copia, '<cópia>')),
       enviados: e.enviados,
       excluidos: e.excluidos,
       naoCodigo: e.naoCodigo,
@@ -426,66 +451,88 @@ async function executar(
         diff: { arquivos: e.enviados.length, linhas: e.linhasDoDiff ?? 0 },
         testesNaBase: base.testes,
       },
+      paralelo,
     }
+    const trabalhadores: Trabalhador[] = [primeiro]
     if (exec.linhaDeBase.passou) {
-      /** Por recorte: se ele passa sem mutante (ver chaveDoRecorte). */
-      const basesDoRecorte = new Map<string, boolean>()
-      let n = 0
-      for (const m of e.mutantes) {
-        n++
-        const r: Resultado = { ...m, n, situacao: 'NÃO APLICADO', segundos: 0 }
-        exec.resultados.push(r)
+      // As outras cópias. Antes de dividir os mutantes, a linha de base roda em todas ao mesmo tempo: se falha
+      // assim e passou sozinha, as suítes disputam algo (uma porta, um arquivo fora da cópia) e a rodada vai em fila.
+      const largura = larguraDoParalelo(a.paralelo, nucleos, e.mutantes.length)
+      for (let k = 2; k <= largura; k++) {
+        const erro = await preparar(`${pasta}/repo-${k}`, `${pasta}/realocado-${k}`)
+        if (erro) {
+          paralelo.motivo = `a cópia ${k} não ficou pronta (${erro})`
+          break
+        }
+        trabalhadores.push(trabalhador(`${pasta}/repo-${k}`))
+      }
+      if (paralelo.motivo) trabalhadores.splice(1)
+      if (trabalhadores.length > 1) {
+        const bases = await Promise.all(trabalhadores.map(t => t.rodar(t.comandos)))
+        if (bases.some(b => b.exitCode !== 0)) {
+          paralelo.motivo = `a linha de base falhou com ${trabalhadores.length} cópias ao mesmo tempo e passou sozinha (porta, arquivo ou outro recurso que as suítes disputam)`
+          trabalhadores.splice(1)
+        }
+      }
+      paralelo.copias = trabalhadores.length
+
+      /** Por recorte: se ele passa sem mutante (ver chaveDoRecorte); a chave não depende da cópia, e cada recorte roda uma vez. */
+      const basesDoRecorte = new Map<string, Promise<boolean>>()
+      const semCopia = (t: Trabalhador, cs: Comando[]) => cs.map(c => ({ ...c, argv: c.argv.map(x => x.replaceAll(t.dir, '{COPIA}')) }))
+      const processar = async (w: Trabalhador, m: Mutante, r: Resultado) => {
         const alvo = resolverArquivo(m.arquivo, e.enviados)
         if ('erro' in alvo) {
           r.motivo = alvo.erro
-          continue
+          return
         }
         r.arquivo = alvo.arquivo
         // Sem comando que cubra o arquivo, "sobreviver" não diria nada: nem roda.
-        const cobrem = comandosPara(alvo.arquivo, naCopia)
+        const cobrem = comandosPara(alvo.arquivo, w.comandos)
         if (!cobrem.length) {
           r.motivo = 'nenhum comando de teste cobre este arquivo'
-          continue
+          return
         }
-        const caminho = `${copia}/${alvo.arquivo}`
+        const caminho = `${w.dir}/${alvo.arquivo}`
         const original = await $.fs.read(caminho)
         const ap = aplicarTrecho(original, m.linha, m.mutacao)
         if ('erro' in ap) {
           r.motivo = ap.erro
-          continue
+          return
         }
         r.linhaReal = ap.linhaReal
         r.ocorrencias = ap.ocorrencias
+        mutados.set(alvo.arquivo, (mutados.get(alvo.arquivo) ?? new Set()).add(ap.texto))
         let plano = planoIncremental(alvo.arquivo, mapa, cobrem)
         if (plano.alcancam) {
           // Ainda sem o mutante: o recorte novo roda uma vez no código original; falhando, a suíte inteira decide.
-          const chave = chaveDoRecorte(plano.alcancam, plano.comandos)
+          const chave = chaveDoRecorte(plano.alcancam, semCopia(w, plano.comandos))
           if (!basesDoRecorte.has(chave)) {
-            await ajustar(new Set(plano.alcancam))
-            basesDoRecorte.set(chave, (await rodar(plano.comandos)).exitCode === 0)
+            const alcancam = new Set(plano.alcancam)
+            const comandosDoRecorte = plano.comandos
+            basesDoRecorte.set(chave, (async () => (await w.ajustar(alcancam), (await w.rodar(comandosDoRecorte)).exitCode === 0))())
           }
-          if (!basesDoRecorte.get(chave)) plano = { escopo: `suíte inteira (o recorte de ${plano.alcancam.length} arquivos de teste falha sem mutante)`, comandos: cobrem }
+          if (!(await basesDoRecorte.get(chave))) plano = { escopo: `suíte inteira (o recorte de ${plano.alcancam.length} arquivos de teste falha sem mutante)`, comandos: cobrem }
         }
         await $.fs.write(caminho, ap.texto)
         try {
           r.escopo = plano.escopo
-          let t: Awaited<ReturnType<typeof rodar>>
+          let t: Awaited<ReturnType<Trabalhador['rodar']>>
           if (plano.alcancam) {
-            await ajustar(new Set(plano.alcancam))
-            const inc = await rodar(plano.comandos)
+            await w.ajustar(new Set(plano.alcancam))
+            const inc = await w.rodar(plano.comandos)
             const saidaInc = inc.stdout + '\n' + inc.stderr
             // Morte só vale com um teste nomeado; sobrevivente, carga quebrada ou falha sem nome: a suíte inteira decide.
             const morteNomeada = inc.exitCode !== 0 && !invalido(saidaInc) && !/^código de saída/.test(quemMatou(saidaInc, inc.exitCode))
             if (morteNomeada) t = inc
             else {
-              await todos()
-              const cheia = await rodar(cobrem)
+              await w.todos()
+              const cheia = await w.rodar(cobrem)
               r.escopo = `${plano.escopo}, ${inc.exitCode === 0 ? 'sobrevivente confirmado' : 'falha sem nome refeita'} na suíte inteira`
               t = { ...cheia, segundos: inc.segundos + cheia.segundos, testes: somarTestes(inc.testes, cheia.testes) }
             }
           } else {
-            await todos()
-            t = await rodar(cobrem)
+            await w.todos()
+            t = await w.rodar(cobrem)
           }
           r.segundos = t.segundos
           const saida = t.stdout + '\n' + t.stderr
@@ -501,10 +548,43 @@ async function executar(
           if ((await $.fs.read(caminho)) !== original) exec.restauracao = 'cmp na cópia: DIFERENTE'
         }
       }
+
+      // Os mutantes saem de uma fila só, na ordem da lista; o número de cada um é o da lista, rode em que cópia rodar.
+      const fila = e.mutantes.map((m, i) => {
+        const r: Resultado = { ...m, n: i + 1, situacao: 'NÃO APLICADO', segundos: 0 }
+        exec.resultados.push(r)
+        return { m, r }
+      })
+      let proximo = 0
+      // allSettled: se uma cópia lança, as outras terminam antes de a pasta ser apagada; depois o erro sobe.
+      const feitos = await Promise.allSettled(
+        trabalhadores.map(async t => {
+          while (proximo < fila.length) {
+            const { m, r } = fila[proximo++]!
+            await processar(t, m, r)
+          }
+        }),
+      )
+      const falhou = feitos.find((x): x is PromiseRejectedResult => x.status === 'rejected')
+      if (falhou) throw falhou.reason
+      if (trabalhadores.length > 1) {
+        // Morte sem teste nomeado pode ser a disputa por CPU (tempo esgotado): refeita sozinha, na primeira cópia.
+        const refazer = fila.filter(({ r }) => refazerSozinho(r))
+        for (const { m, r } of refazer) {
+          Object.assign(r, { situacao: 'NÃO APLICADO', segundos: 0, testes: undefined, escopo: undefined, motivo: undefined })
+          await processar(primeiro, m, r)
+          r.escopo = `${r.escopo ?? 'suíte inteira'}, refeito sozinho (morte sem nome em paralelo)`
+        }
+        paralelo.refeitos = refazer.length
+      }
     }
     // Os testes escondidos voltam antes de conferir a cópia; se um mv falhar, ajustar lança e a rodada não sai.
-    await todos()
-    exec.originalIntocado = (await git($, ['status', '--porcelain'], raiz)).stdout === statusAntes
+    for (const t of trabalhadores) await t.todos()
+    for (const [arquivo, textos] of mutados) {
+      const agora = await $.fs.read(`${raiz}/${arquivo}`).catch(() => undefined)
+      if (agora !== undefined && textos.has(agora)) exec.originalIntocado = false
+    }
+    exec.mudouPorFora = (await git($, ['status', '--porcelain'], raiz)).stdout !== statusAntes
     exec.segundos = (Date.now() - inicio) / 1000
     const c = contar(exec.resultados)
     const feita: ExecucaoFeita = {
