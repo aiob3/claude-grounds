@@ -337,6 +337,26 @@ test('crase escapada dentro do trecho é a crase do código: os 4 "não encontra
   expect(lerMutacoes('`\\`x\\`` → `y`')).toEqual([{ de: '\\`x\\`', para: 'y' }, { de: '`x`', para: 'y' }])
 })
 
+test('crases duplas de um lado só (``a`` → `b`): o trecho é achado (recusado na rodada do caderno, 0.12.0)', () => {
+  const ok = (fonte: string, mutacao: string, esperado: string) => {
+    const r = aplicarTrecho(fonte, 1, mutacao)
+    expect('erro' in r ? r.erro : r.texto).toBe(esperado)
+  }
+  const fonte = 'const ref = m ? `#${m[1]}` : refPadrao\n'
+  ok(fonte, '``const ref = m ? `#${m[1]}` : refPadrao`` → `const ref = refPadrao`', 'const ref = refPadrao\n')
+  // O outro lado duplo também.
+  ok(fonte, '`const ref = m ? `#${m[1]}` : refPadrao` → ``const ref = refPadrao``', 'const ref = refPadrao\n')
+  // Código que começa e termina em crase de verdade continua achando a literal primeiro.
+  ok('const s = `x`\n', '``x`` → ``y``', 'const s = `y`\n')
+  expect(lerMutacoes('`a` → `b`')).toEqual([{ de: 'a', para: 'b' }])
+  // Espaços dentro das crases duplas saem junto (sobrevivente #10 da 0.9.1).
+  ok('const v = a\n', '`` a `` → `b`', 'const v = b\n')
+  // Com sobra no original, a literal vem primeiro: aqui ela e a sem sobra mudariam linhas diferentes (sobrevivente #4).
+  ok('x; const s = `x`\n', '``x`` → ``y``', 'x; const s = `y`\n')
+  // Duas crases sozinhas não viram trecho vazio (sobrevivente #1).
+  expect(lerMutacoes('```` → `b`')).not.toContainEqual({ de: '', para: 'b' })
+})
+
 test('barra vertical escapada no trecho é a do código: os 3 recusados da rodada da 0.9.0', () => {
   const ok = (fonte: string, mutacao: string, esperado: string) => {
     const r = aplicarTrecho(fonte, 1, mutacao)

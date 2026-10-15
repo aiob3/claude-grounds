@@ -21,9 +21,22 @@ export function lerMutacoes(mutacao: string): { de: string; para: string }[] {
   const leituras: { de: string; para: string }[] = []
   for (const corte of miolo.matchAll(/`\s*→\s*`/g)) {
     const de = miolo.slice(0, corte.index)
-    if (de) leituras.push({ de, para: miolo.slice(corte.index! + corte[0].length) })
+    if (de) leituras.push(...delimitadores(de, miolo.slice(corte.index! + corte[0].length)))
   }
   return comEscapes(leituras)
+}
+
+/**
+ * Crases duplas de um lado só (``a`` → `b`, sem espaços): sobra uma crase de delimitador no começo do original e no
+ * fim, ou no mutado. Com sobra no original, a leitura literal fica primeiro e a sem sobra vem para quando a literal
+ * não existe no arquivo; com sobra só no mutado, a sem sobra vem primeiro. Recusado como "trecho não encontrado" na rodada do caderno (contexto-bar 0.12.0).
+ */
+function delimitadores(de: string, para: string): { de: string; para: string }[] {
+  const tira = (s: string) => (s.length > 2 && s.startsWith('`') && s.endsWith('`') ? s.slice(1, -1).trim() : s)
+  const sem = { de: tira(de), para: tira(para) }
+  if (sem.de === de && sem.para === para) return [{ de, para }]
+  // Com o original intacto, as duas leituras acham o mesmo trecho e vale a primeira: a crase de sobra era do mutado.
+  return sem.de === de ? [sem, { de, para }] : [{ de, para }, sem]
 }
 
 /**
