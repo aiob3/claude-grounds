@@ -2,7 +2,7 @@
 
 <p align="center"><a href="README.en.md">English</a> · <b>Português</b></p>
 
-<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 137" src="https://img.shields.io/badge/falhas_reais_achadas-137-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
+<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 141" src="https://img.shields.io/badge/falhas_reais_achadas-141-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
 
 **Os testes que o agente escreve passam. Mas pegam bug?**
 
@@ -17,7 +17,7 @@ sessão para a outra. O objetivo pede a prova. A prova é feita por um modelo in
 planta bugs no código que o agente mudou, e a tarefa só fecha quando os testes pegam. O registro guarda cada rodada
 e recusa número inflado. Não há settings hook para configurar nem gate travando o agente.
 
-Construindo os próprios mods, a prova achou 137 falhas reais de teste. Em três projetos privados, sem relação com
+Construindo os próprios mods, a prova achou 141 falhas reais de teste. Em três projetos privados, sem relação com
 estes, achou mais 1. Num projeto com 8881 testes, provar uma mudança leva uns 2 minutos e meio,
 2,8 vezes menos que rodar a suíte completa para cada bug plantado, com os mesmos vereditos.
 
@@ -216,7 +216,7 @@ como morto, um caminho devolvido pelo modelo que fazia 18 mutantes não serem ap
 teste. A demo gravada acrescentou o último da lista: o `registrar` aceitava um estado melhor que o executado sem
 justificativa.
 
-<p align="center"><img src="assets/rodadas.svg" alt="137 falhas reais de teste encontradas" width="100%"></p>
+<p align="center"><img src="assets/rodadas.svg" alt="141 falhas reais de teste encontradas" width="100%"></p>
 
 As garantias de honestidade são mecânicas, não promessas:
 

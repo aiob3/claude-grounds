@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 2292" width="1200" height="2292" role="img" aria-label="Timeline of the instrument calibration rounds" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 2346" width="1200" height="2346" role="img" aria-label="Timeline of the instrument calibration rounds" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Timeline of the instrument calibration rounds</title>
 <style>
   .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
@@ -13,7 +13,7 @@
   }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 </style>
-<rect width="1200" height="2292" rx="16" class="sup"/>
+<rect width="1200" height="2346" rx="16" class="sup"/>
   <text x="56" y="50" font-size="24" font-weight="800" class="t1">Built with itself</text>
   <text x="56" y="74" font-size="15" class="t2">Every version went through its own method. In every round the instrument found a bug in itself or gained a new rule.</text>
   <line x1="74" y1="126" x2="74" y2="164" class="acs" stroke-width="2.5"/>
@@ -172,9 +172,13 @@
   <circle cx="74" cy="2170" r="8" class="sup2 acs" stroke-width="2.5"/>
   <text x="100" y="2175" font-size="16" font-weight="700" class="t1">R44</text>
   <text x="152" y="2175" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.12.1</text>
-  <text x="100" y="2196" font-size="14.5" class="t2">nova versão: refeito; a 0.11.1 não entrou no código</text><text x="1150" y="2175" font-size="14" class="ac" text-anchor="end" font-weight="700">5 real test gaps</text>
+  <text x="100" y="2196" font-size="14.5" class="t2">nova versão: refeito; a 0.11.1 não entrou no código</text><text x="1150" y="2175" font-size="14" class="ac" text-anchor="end" font-weight="700">5 real test gaps</text><line x1="74" y1="2232" x2="74" y2="2270" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="2224" r="8" class="sup2 acs" stroke-width="2.5"/>
   <text x="100" y="2229" font-size="16" font-weight="700" class="t1">R44</text>
   <text x="152" y="2229" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.12.1</text>
   <text x="100" y="2250" font-size="14.5" class="t2">nova versão: register.ts:493 sem o ramo de inválido</text><text x="1150" y="2229" font-size="14" class="ac" text-anchor="end" font-weight="700">5 real test gaps</text>
+  <circle cx="74" cy="2278" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="2283" font-size="16" font-weight="700" class="t1">R46</text>
+  <text x="152" y="2283" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.12.1</text>
+  <text x="100" y="2304" font-size="14.5" class="t2">nova versão: teto de 8 cópias, pedido NaN, núcleos NaN, cópia que falha ao preparar</text><text x="1150" y="2283" font-size="14" class="ac" text-anchor="end" font-weight="700">4 real test gaps</text>
 </svg>
