@@ -112,6 +112,27 @@ test('não-código não vai ao escolhedor: documentação, dotfiles e lockfiles 
   expect(r.naoCodigo).toEqual(['.gitignore', 'README.md', '.spec/f/design.md', 'package-lock.json', 'docs/x.txt'])
 })
 
+test('binário e bytecode não vão ao escolhedor: .pyc apagado do índice entrava como código (rodada no publico, 0.8.2)', () => {
+  const apagado = (f: string) => `diff --git a/${f} b/${f}\ndeleted file mode 100644\nindex 1a2b3c4..0000000\nBinary files a/${f} and /dev/null differ\n`
+  const diff = [
+    apagado('publico/__pycache__/gerar.cpython-315.pyc'),
+    // Binário com outro nome qualquer: vale o "Binary files" do git, não a extensão.
+    'diff --git a/lib/nativo.so b/lib/nativo.so\nnew file mode 100755\nindex 0000000..1a2b3c4\nBinary files /dev/null and b/lib/nativo.so differ\n',
+    'diff --git a/x.bin b/x.bin\nindex 1..2 100644\nGIT binary patch\nliteral 3\nKcmZ?l\n',
+    'diff --git a/publico/gerar.py b/publico/gerar.py\n--- a/publico/gerar.py\n+++ b/publico/gerar.py\n@@ -1 +1 @@\n+x = 1\n',
+  ].join('')
+  const r = separar(diff)
+  expect(r.fonte.map(b => b.arquivo)).toEqual(['publico/gerar.py'])
+  expect(r.naoCodigo).toEqual(['publico/__pycache__/gerar.cpython-315.pyc', 'lib/nativo.so', 'x.bin'])
+  // Pelo nome, mesmo quando o git mostra como texto: .pyo e o cache do numba dentro do __pycache__ (sobreviventes #8 e #17 da 0.8.3).
+  const texto = (f: string) => `diff --git a/${f} b/${f}\n--- a/${f}\n+++ b/${f}\n@@ -1 +1 @@\n+x\n`
+  expect(separar(texto('pkg/m.cpython-315.opt-1.pyo') + texto('pkg/__pycache__/f.nbi') + texto('pkg/m.py')).naoCodigo).toEqual(['pkg/m.cpython-315.opt-1.pyo', 'pkg/__pycache__/f.nbi'])
+  // O __pycache__ da raiz do repositório, sem pasta antes (sobrevivente #3 da 2ª lista da 0.8.3).
+  expect(separar(texto('__pycache__/f.nbi')).naoCodigo).toEqual(['__pycache__/f.nbi'])
+  // Texto que só cita a frase dentro de uma linha não é binário.
+  expect(separar('diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n+m = "Binary files a and b differ"\n').fonte.length).toBe(1)
+})
+
 test('avisa quando a maior parte do envio está fora do git (código pré-existente nunca commitado)', () => {
   expect(avisoNovos(['src/a.js', 'src/b.js', 'src/c.js'], ['src/a.js', 'src/b.js', 'src/c.js', 'outro.js'])).toContain('3 de 3 arquivos enviados estão fora do git')
   expect(avisoNovos(['src/a.js', 'src/b.js', 'src/c.js'], ['src/a.js', 'src/b.js'])).toContain('novos: false')

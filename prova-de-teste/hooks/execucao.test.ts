@@ -1,6 +1,9 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
+  AMBIENTE_DE_TESTE,
+  chaveDoRecorte,
+  pycachesDe,
   aplicarTrecho,
   conferirEstado,
   erroDeCarga,
@@ -25,6 +28,13 @@ import {
   resolverArquivo,
 } from './execucao'
 import type { Execucao, Resultado } from './execucao'
+
+test('o recorte é o conjunto de testes e os comandos: a ordem dos testes não muda a chave, outro comando muda (sobreviventes #4 e #18 da 0.8.3)', () => {
+  const npm = [{ argv: ['npm', 'test'] }]
+  expect(chaveDoRecorte(['b.test.ts', 'a.test.ts'], npm)).toBe(chaveDoRecorte(['a.test.ts', 'b.test.ts'], npm))
+  expect(chaveDoRecorte(['a.test.ts'], npm)).not.toBe(chaveDoRecorte(['a.test.ts'], [{ argv: ['npx', 'vitest', 'run'] }]))
+  expect(chaveDoRecorte(['a.test.ts'], npm)).not.toBe(chaveDoRecorte(['a.test.ts', 'b.test.ts'], npm))
+})
 
 test('lê a mutação com crase simples ou dupla, inclusive trecho com crase dentro', () => {
   expect(lerMutacao('`a + b` → `a - b`')).toEqual({ de: 'a + b', para: 'a - b' })
@@ -299,4 +309,10 @@ test('porMutante e resumoCusto: médias só dos aplicados; testes só quando tod
   expect(somarTestes(3, undefined)).toBeUndefined()
   expect(somarTestes(undefined, 4)).toBeUndefined()
   expect(relatorio(e, 'd')).toContain('Custo:      base 1.3 s, 46 testes; por mutante')
+})
+
+test('nenhum comando de teste grava .pyc, e saem só os __pycache__ ao lado dos .py mutáveis (bytecode velho, 15/10/2026)', () => {
+  expect(AMBIENTE_DE_TESTE.PYTHONDONTWRITEBYTECODE).toBe('1')
+  expect(pycachesDe(['src/calc.py', 'src/util.py', 'calc.py', 'gui/app.pyw', 'hooks/a.ts', 'src/py.ts'])).toEqual(['src/__pycache__', '__pycache__', 'gui/__pycache__'])
+  expect(pycachesDe(['hooks/a.ts', 'a.pyi'])).toEqual([])
 })

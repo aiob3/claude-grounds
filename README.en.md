@@ -2,16 +2,130 @@
 
 <p align="center"><b>English</b> · <a href="README.md">Português</a></p>
 
-<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="tests" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks to wire up: none" src="https://img.shields.io/badge/hooks_to_wire_up-none-0f7a3d?style=flat-square"> <img alt="real test gaps found: 49" src="https://img.shields.io/badge/real_test_gaps_found-49-0f7a3d?style=flat-square"> <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-52514e?style=flat-square"></p>
+<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="tests" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks to wire up: none" src="https://img.shields.io/badge/hooks_to_wire_up-none-0f7a3d?style=flat-square"> <img alt="real test gaps found: 78" src="https://img.shields.io/badge/real_test_gaps_found-78-0f7a3d?style=flat-square"> <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-52514e?style=flat-square"></p>
 
-When a Claude Code agent says "done, tested", how do you check? claude-grounds turns that sentence into a loop.
-Before starting, the agent declares what "done" means, with the proof inside it. On every prompt, the pending proof
-comes back in front of it. The proof runs blind, and the goal only closes when the record meets what was declared.
-The goal and the proof are saved, so the next session picks up with the evidence.
+**The tests your agent writes pass. But do they catch bugs?**
 
-It is two Claude Code mods (plugins whose code runs inside Claude Code, available since version 2.1.287) that work
-as a pair: `contexto-bar` keeps and shows the claim, `prova-de-teste` produces its grounds. Each installs on its own,
-and there are no hooks to wire up.
+Claude Code writes the code, writes the tests, and everything goes green. But a green test is not the same as a test
+that protects you, and you often find out it checked nothing only when the bug shows up. Long tasks add another
+problem: what was agreed gets lost when the session compacts or restarts.
+
+claude-grounds is for people who use Claude Code to write code with tests, on tasks that span sessions. It is two
+**Claude Code mods**, the feature that arrived in version 2.1.287 to run code inside Claude Code. Installed together,
+they form a chain. The band keeps the context load and the project goal in sight, and the goal carries over from one
+session to the next. The goal asks for proof. The proof comes from an independent model that sees only the diff: it
+plants bugs in the code the agent changed, and the task only closes when the tests catch them. The record keeps every
+round and refuses inflated numbers. There are no settings hooks to wire up and no gate blocking the agent.
+
+Building the mods themselves, the proof found 78 real test gaps. On three private projects, unrelated to these,
+it found 77 more. On a project with 8881 tests, proving a change takes about 2 and a half minutes,
+2.8x less than running the full suite for every planted bug, with the same verdicts.
+
+## What you get
+
+<p align="center"><img src="assets/ganhos-en.svg" alt="The band asks for proof, the proof goes to the record, and the record feeds the band in the next session" width="100%"></p>
+
+### The band: the project context in sight
+
+<p align="center"><img src="assets/demo/06.webp" alt="Real screen: the band above the prompt with the context load by source and the goal at 5/5, and the goal panel beside it" width="100%"></p>
+
+Above the prompt, `contexto-bar` shows how much of the context window is in use and why (system, memory, MCP,
+skills, hooks, conversation), and whether the remaining work fits before compaction. Below it sits the project goal,
+with the pending items by owner and the step bar. The agent gets this goal on every prompt, so the pending proof stays
+in front of it. The goal lives in one file per project: closing the session, rebooting the machine or opening another
+session in parallel erases nothing. When you come back, it is there.
+
+That also saves money. In the sessions where these mods were built, a long session reached requests of 338 thousand
+to 701 thousand tokens, with a 99% cache hit rate. A new session started at 42 thousand to 53 thousand tokens, with
+the goal back in the band and a 78% to 89% hit rate over the first five requests. Closing a heavy session and opening
+a new one makes each request 7 to 14 times smaller without losing the thread. The band shows the session's cache hit
+rate at the end of its row, and the panel shows the size of the last request.
+
+### The proof: a criterion that reapplies itself
+
+<p align="center"><img src="assets/demo/03.webp" alt="Real screen: contexto-bar closes a pending item and then prova-de-teste runs the mutant round" width="100%"></p>
+
+The goal is born with the proof inside it, and that is where `prova-de-teste` comes in (in the screen above, right
+after a pending item is closed). It copies the repository to a temporary folder, asks a model with no tools and no
+history for plausible bugs in the code that changed, runs the tests against each one and hands over the report. That
+model sees only the diff, never the tests, so the agent has no way to pick the easy bugs. A test that lets a bug
+through is a weak test, and the item does not close until it is strengthened.
+
+Until now, a criterion like this lived in an instructions file, with no guarantee that the agent would follow it or
+that it would survive the next session. Here it runs on its own, the same way on every task, and the agent knows in
+advance what it will be held to.
+
+### The record: nothing lost, nothing inflated
+
+Each round becomes a line in the log. `registrar` only accepts the numbers from the last run and refuses a state
+better than what ran without a written justification. The goal only closes once the proof is recorded, and the next
+session, another day or another project picks up from there.
+
+**What it does not do:** it does not block destructive actions (that is security, a different category) and it does
+not guarantee the code is right. It guarantees the tests catch the planted bugs.
+
+## From the agent's side
+
+I asked the agent that built and used the mods for an assessment of its own work, without polish. The numbers come
+from the log.
+
+- **It stopped deciding on its own when a test is good enough.** The rounds for versions 0.7.0 to 0.8.1 turned up 13
+  real gaps in the mods' own tests, and one more on the large project. Every test was green before, and without the
+  round they would have shipped as "tested".
+- **The criterion holds even when it forgets.** The rules live in `registrar`, not in the agent's memory. A state
+  better than what ran is refused.
+- **The thread survived a reboot.** The session went down with a machine restart and was later compacted. It came
+  back knowing the goal, what was done and who owned each item, because that was in the goal file, not only in the
+  conversation summary.
+- **The instrument caught its own mistakes.** Confirming against the full suite showed three "survivors" were false.
+- **Where it did not help:** the message. The same day's communication mistakes (text with no context for a
+  newcomer, a wrong term, a private name published) were caught by the operator, not by the mods. The proof is
+  mechanical for code and did not cover text. That is why [EXP-002](EXP-002.md) was born: the README now goes through
+  automatic checks and a cold reader, a model that sees only the page and has to say who it is for, what pain it
+  solves and what you get.
+
+## Install
+
+```sh
+claude plugin marketplace add aiob3/claude-grounds
+claude plugin install contexto-bar@claude-grounds
+claude plugin install prova-de-teste@claude-grounds
+```
+
+| Mod | Version | Role |
+|---|---|---|
+| [`contexto-bar`](contexto-bar/) | 0.9.0 | context band, goal per project, panel and window projection |
+| [`prova-de-teste`](prova-de-teste/) | 0.8.3 | blind mutant round in an isolated copy, report and log |
+
+The `prova-de-teste` log goes to `PROVA_DE_TESTE_LOG` or, without that variable, to
+`~/.claude/prova-de-teste/EXP-001-log.md`. The agent uses the `objetivo` (goal), `executar` (run) and `registrar`
+(record) tools; you use `/objetivo`:
+
+| You type | What happens |
+|---|---|
+| `/objetivo` | opens the panel |
+| `/objetivo Migrate the login :: tests green in production` | sets the goal and the step that closes it |
+| `/objetivo feito 2 3` | marks items 2 and 3 done |
+| `/objetivo bloqueante 4` | moves item 4 to the top of the queue (blocking) |
+| `/objetivo meu review the contract` | adds an item owned by you |
+| `/objetivo encerrar` | closes the project goal |
+
+The mods speak Portuguese today (tool names, reports and messages); the behavior is the same in any language you
+write your prompts in.
+
+## First five minutes
+
+```sh
+git clone https://github.com/aiob3/claude-grounds-demo && cd claude-grounds-demo
+claude
+```
+
+Paste this prompt: *"Bug: mediana([10, 9, 2]) returns 2, but it should be 9. Fix it in src/estatistica.js. Before
+touching anything, define the task goal. Write the test that catches the bug and show it failing before the fix (red
+first). After the fix, prove the test with the executar tool from prova-de-teste and record the round."*
+
+You should see the band with the goal, the failing test, the `executar` report and the panel at the end. Close the
+session, open another one in the same folder and type `/objetivo`: the goal is still there.
 
 ## The loop, in a real session
 
@@ -109,7 +223,7 @@ published, and the instrument found bugs in itself along the way. A mutant that 
 path returned by the model that left 18 mutants unapplied, a test helper mistaken for a test. The recorded demo added
 the last one: `registrar` accepted a better state than the run without justification.
 
-<p align="center"><img src="assets/rodadas-en.svg" alt="49 real test gaps found" width="100%"></p>
+<p align="center"><img src="assets/rodadas-en.svg" alt="78 real test gaps found" width="100%"></p>
 
 The honesty guarantees are mechanical, not promises:
 
@@ -189,49 +303,6 @@ So the better the tests, the faster the round: with fewer survivors, what's left
 mutant. The report and the log carry these numbers every round (`custo`: baseline, per mutant, repository, diff),
 measured by the mod itself.
 
-## Install
-
-```sh
-claude plugin marketplace add aiob3/claude-grounds
-claude plugin install contexto-bar@claude-grounds
-claude plugin install prova-de-teste@claude-grounds
-```
-
-| Mod | Version | Role |
-|---|---|---|
-| [`contexto-bar`](contexto-bar/) | 0.8.0 | context band, goal per project, panel and window projection |
-| [`prova-de-teste`](prova-de-teste/) | 0.8.1 | blind mutant round in an isolated copy, report and log |
-
-The `prova-de-teste` log goes to `PROVA_DE_TESTE_LOG` or, without that variable, to
-`~/.claude/prova-de-teste/EXP-001-log.md`. The agent uses the `objetivo` (goal), `executar` (run) and `registrar`
-(record) tools; you use `/objetivo`:
-
-| You type | What happens |
-|---|---|
-| `/objetivo` | opens the panel |
-| `/objetivo Migrate the login :: tests green in production` | sets the goal and the step that closes it |
-| `/objetivo feito 2 3` | marks items 2 and 3 done |
-| `/objetivo bloqueante 4` | moves item 4 to the top of the queue (blocking) |
-| `/objetivo meu review the contract` | adds an item owned by you |
-| `/objetivo encerrar` | closes the project goal |
-
-The mods speak Portuguese today (tool names, reports and messages); the behavior is the same in any language you
-write your prompts in.
-
-## First five minutes
-
-```sh
-git clone https://github.com/aiob3/claude-grounds-demo && cd claude-grounds-demo
-claude
-```
-
-Paste this prompt: *"Bug: mediana([10, 9, 2]) returns 2, but it should be 9. Fix it in src/estatistica.js. Before
-touching anything, define the task goal. Write the test that catches the bug and show it failing before the fix (red
-first). After the fix, prove the test with the executar tool from prova-de-teste and record the round."*
-
-You should see the band with the goal, the failing test, the `executar` report and the panel at the end. Close the
-session, open another one in the same folder and type `/objetivo`: the goal is still there.
-
 ## Limits and next steps
 
 - `prova-de-teste` finds the test command by convention (`claude plugin test`, `npm test`, `pytest`). For another
@@ -245,7 +316,7 @@ session, open another one in the same folder and type `/objetivo`: the goal is s
 - The mods need Claude Code 2.1.287 or later (the version mods shipped in) and were tested on 2.1.300. They
   work in the terminal and in the Code tab of the Desktop app.
 
-Open: the minimum duration is reached (16 measurements); the instrument still has to settle, with 3 measurements in a row on the same version, before the operator decides whether the method becomes a criterion; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
+Open: the minimum duration is reached (21 measurements); the instrument still has to settle, with 3 measurements in a row on the same version, before the operator decides whether the method becomes a criterion; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
 average settles across sessions.
 
 ## Evaluate

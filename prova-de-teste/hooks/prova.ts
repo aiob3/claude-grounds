@@ -35,8 +35,14 @@ const NAO_CODIGO = [
   /\.(md|mdx|markdown|txt|rst|adoc|lock|png|jpe?g|gif|webp|ico|svg|pdf)$/i,
   /(^|\/)\.(gitignore|gitattributes|editorconfig|npmrc|nvmrc|prettierrc|prettierignore|eslintignore|dockerignore)$/,
   /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|LICENSE|CHANGELOG)$/,
+  // Bytecode e cache do Python: os .pyc apagados do índice entravam no envio como código (rodada no publico, 0.8.2).
+  /(^|\/)__pycache__\//,
+  /\.py[co]$/,
 ]
 export const ehNaoCodigo = (caminho: string) => NAO_CODIGO.some(r => r.test(caminho))
+
+/** Bloco binário do git diff: não tem linha de texto que o escolhedor possa mutar. */
+const ehBinario = (texto: string) => /^(Binary files .* differ|GIT binary patch)$/m.test(texto)
 
 /** Aviso quando a maior parte do envio é de arquivos fora do git: pode ser código antigo nunca commitado, não a tarefa. */
 export function avisoNovos(enviados: string[], novos: string[]): string {
@@ -75,7 +81,7 @@ export function blocos(diff: string): BlocoDiff[] {
 export function separar(diff: string): { fonte: BlocoDiff[]; excluidos: string[]; naoCodigo: string[] } {
   const todos = blocos(diff)
   const testes = todos.filter(b => ehArquivoDeTeste(b.arquivo))
-  const naoCodigo = todos.filter(b => !ehArquivoDeTeste(b.arquivo) && ehNaoCodigo(b.arquivo))
+  const naoCodigo = todos.filter(b => !ehArquivoDeTeste(b.arquivo) && (ehNaoCodigo(b.arquivo) || ehBinario(b.texto)))
   return {
     fonte: todos.filter(b => !testes.includes(b) && !naoCodigo.includes(b)),
     excluidos: testes.map(b => b.arquivo),

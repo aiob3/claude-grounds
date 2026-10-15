@@ -58,7 +58,7 @@ const usageWith = (messages: number) =>
   }) as never
 
 const barText = async ($: Engine) =>
-  JSON.stringify(await $.ui.render({ component: 'AbovePrompt', surface: 'terminal', props: { hasSurvey: false } } as never))
+  JSON.stringify(await $.ui.render({ component: 'AbovePrompt', surface: 'terminal', props: { hasSurvey: false, bodyColumns: 100 } } as never))
 
 test('a barra relê o contexto depois de cada ferramenta, sem esperar o fim do turno', async ($, on) => {
   let reads = 0
@@ -100,9 +100,17 @@ test('a ferramenta define o objetivo, a banda mostra a segunda camada e o prompt
   const band = await barText($)
   expect(band).toContain('Barra permanente')
   expect(band).toContain('sua vez')
-  expect(band).toContain('próxima #')
+  // A próxima é a caixa dela na barra de passos, em destaque, sem o texto "próxima #" na banda.
+  expect(band).toContain('"children":["[",{"type":"Text","props":{"color":"claude","weight":"bold"},"children":["▣"]},"□","]"')
+  expect(band).not.toContain('próxima #')
+  // Recém-definido: a primeira linha leva a conclusão; as seguintes, só o título, o progresso e a próxima.
   const sent = (await $.prompt.submit({ text: 'segue' } as never)) as unknown as { context?: string[] }
-  expect(JSON.stringify(sent.context)).toContain('Pendências do operador: #2 rodar reload')
+  expect(JSON.stringify(sent.context)).toContain('próxima #1 instalar (claude)')
+  expect(JSON.stringify(sent.context)).toContain('reload mostra a instalada')
+  const depois = (await $.prompt.submit({ text: 'segue' } as never)) as unknown as { context?: string[] }
+  expect(JSON.stringify(depois.context)).toContain('Barra permanente · 0/2 · próxima #1')
+  expect(JSON.stringify(depois.context)).not.toContain('reload mostra a instalada')
+  expect(JSON.stringify(depois.context)).not.toContain('rodar reload')
 })
 
 test('o operador define e conclui pelo /objetivo, e o painel lista as pendências por dono', async ($, on) => {
@@ -344,4 +352,151 @@ test('definir e adicionar devolvem a checagem de alinhamento; concluir não', as
   expect(def.indexOf('Objetivo:')).toBeLessThan(def.indexOf('Alinhamento'))
   expect(await chamar({ acao: 'adicionar', itens: [{ texto: 'readme em inglês', tamanho: 'M' }] })).toContain('Alinhamento')
   expect(await chamar({ acao: 'concluir', ids: [1] })).not.toContain('Alinhamento')
+})
+
+const transcriptDe = (...linhas: object[]) => linhas.map(l => JSON.stringify(l)).join('\n') + '\n'
+const resp = (id: string, input: number, lidos: number, criados: number) => ({
+  type: 'assistant',
+  message: { id, usage: { input_tokens: input, cache_read_input_tokens: lidos, cache_creation_input_tokens: criados } },
+})
+// Um turno inteiro: quem não ouviu o início de um turno não ouve o fim.
+const umTurno = async ($: Engine, turnId: string, agentId?: string) => {
+  await $.turn.start({ text: '', turnId, ...(agentId ? { agentId } : {}) } as never)
+  await $.turn.complete({ turnId, reason: 'answer', answer: 'ok', ...(agentId ? { agentId } : {}) } as never)
+}
+const usoDoTurno = (input: number, lidos: number) =>
+  ({ text: 'ok', usage: { input_tokens: input, output_tokens: 1, cache_read_input_tokens: lidos, cache_creation_input_tokens: 0, model: 'm' } }) as never
+
+test('cache: o transcript semeia uma vez, cada turno da conversa principal soma, a barra mostra o acerto e o painel o detalhe', async ($, on) => {
+  on('session.usage', () => ({ value: { context: { tokens: 243000, window: 200000, breakdown: { categories } } } }) as never)
+  on('session.id', () => ({ value: 'sess' }) as never)
+  on('session.cwd', () => ({ value: '/home/u/Work' }) as never)
+  on('session.root', () => ({ value: '/home/u/Work' }) as never)
+  mock.env(on, { HOME: '/home/u' })
+  const arquivo = '/home/u/.claude/projects/-home-u-Work/sess.jsonl'
+  let leituras = 0
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path === arquivo }) as never)
+  on('fs.stat', () => ({ value: { kind: 'file', size: 1000, mtimeMs: 0, isLink: false } }) as never)
+  on('fs.read', (_$, e) => {
+    if ((e as { path: string }).path !== arquivo) throw new Error('ENOENT')
+    leituras++
+    return { value: transcriptDe(resp('m1', 0, 0, 40000), resp('m2', 0, 40000, 0), { ...resp('s', 0, 0, 90000), isSidechain: true }) } as never
+  })
+  on('turn.start', (_$, e) => ({ turnId: (e as { turnId: string }).turnId }) as never)
+  on('turn.complete', () => usoDoTurno(0, 80000))
+
+  // Primeiro fim de turno sem semente: semeia do transcript (40k lidos de 80k), sem somar o turno por cima.
+  await umTurno($, 't1')
+  expect(leituras).toBe(1)
+  expect(await barText($)).toContain(' · cache 50%')
+  // Turnos seguintes somam o uso sem reler o arquivo; turno de subagente não conta.
+  await umTurno($, 't2')
+  await umTurno($, 't3', 'sub')
+  expect(leituras).toBe(1)
+  expect(await barText($)).toContain(' · cache 75%')
+  const pane = JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'terminal', props: {} } as never))
+  expect(pane).toContain('cache 75% (120k de 160k lidos)')
+  expect(pane).toContain('último pedido 243k')
+  // Terminal estreito: o acerto sai da barra para não quebrar a linha.
+  const larg = async (bodyColumns: number) =>
+    JSON.stringify(await $.ui.render({ component: 'AbovePrompt', surface: 'terminal', props: { hasSurvey: false, bodyColumns } } as never))
+  expect(await larg(24)).not.toContain('cache')
+  // No limite: ' 25%' (4) + ' · cache 75%' (12) + 2 colchetes deixam exatamente 10 células com 28 colunas (sobrevivente #3).
+  expect(await larg(28)).toContain(' · cache 75%')
+  expect(await larg(27)).not.toContain('cache')
+})
+
+test('cache: hook acima que responde o turno sem o uso não apaga a conta; o uso vem do próprio evento (sobrevivente #12 da 3ª rodada)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('session.id', () => ({ value: 'sess' }) as never)
+  on('session.cwd', () => ({ value: '/home/u/Work' }) as never)
+  on('session.root', () => ({ value: '/home/u/Work' }) as never)
+  mock.env(on, { HOME: '/home/u' })
+  const arquivo = '/home/u/.claude/projects/-home-u-Work/sess.jsonl'
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path === arquivo }) as never)
+  on('fs.stat', () => ({ value: { kind: 'file', size: 1000, mtimeMs: 0, isLink: false } }) as never)
+  on('fs.read', () => ({ value: transcriptDe(resp('m1', 0, 0, 40000), resp('m2', 0, 40000, 0)) }) as never)
+  on('turn.start', (_$, e) => ({ turnId: (e as { turnId: string }).turnId }) as never)
+  // A hook acima responde com o texto dela e deixa o uso de fora, como o tipo permite.
+  on('turn.complete', () => ({ text: 'ok' }) as never)
+  await umTurno($, 't1')
+  expect(await barText($)).toContain(' · cache 50%')
+  await $.turn.start({ text: '', turnId: 't2' } as never)
+  await $.turn.complete({ turnId: 't2', reason: 'answer', answer: 'ok', usage: { input_tokens: 0, output_tokens: 1, cache_read_input_tokens: 80000, cache_creation_input_tokens: 0, model: 'm' } } as never)
+  expect(await barText($)).toContain(' · cache 75%')
+})
+
+test('cache: transcript de exatamente 4 MiB ainda é lido (o limite do $.fs.read é "acima de 4 MiB"); a pasta de trabalho vem antes da raiz (sobreviventes #4 e #7)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('session.id', () => ({ value: 'sess' }) as never)
+  on('session.cwd', () => ({ value: '/w/sub' }) as never)
+  on('session.root', () => ({ value: '/w' }) as never)
+  mock.env(on, { HOME: '/home/u' })
+  const daCwd = '/home/u/.claude/projects/-w-sub/sess.jsonl'
+  const daRaiz = '/home/u/.claude/projects/-w/sess.jsonl'
+  const lidos: string[] = []
+  on('fs.exists', (_$, e) => ({ value: [daCwd, daRaiz].includes((e as { path: string }).path) }) as never)
+  on('fs.stat', () => ({ value: { kind: 'file', size: 4 * 1024 * 1024, mtimeMs: 0, isLink: false } }) as never)
+  on('fs.read', (_$, e) => {
+    const p = (e as { path: string }).path
+    lidos.push(p)
+    return { value: transcriptDe(p === daCwd ? resp('a', 0, 30, 70) : resp('b', 0, 90, 10)) } as never
+  })
+  on('turn.start', (_$, e) => ({ turnId: (e as { turnId: string }).turnId }) as never)
+  on('turn.complete', () => usoDoTurno(10, 990))
+  await umTurno($, 't1')
+  expect(lidos).toEqual([daCwd])
+  expect(await barText($)).toContain(' · cache 30%')
+})
+
+test('cache: transcript grande demais não é lido nem quebra a barra; conta desde o carregamento e diz que é parcial', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('session.id', () => ({ value: 'sess' }) as never)
+  on('session.cwd', () => ({ value: '/w' }) as never)
+  mock.env(on, { HOME: '/home/u' })
+  on('fs.exists', () => ({ value: true }) as never)
+  on('fs.stat', () => ({ value: { kind: 'file', size: 40 * 1024 * 1024, mtimeMs: 0, isLink: false } }) as never)
+  let leituras = 0
+  on('fs.read', () => {
+    leituras++
+    throw new Error('grande demais')
+  })
+  on('turn.start', (_$, e) => ({ turnId: (e as { turnId: string }).turnId }) as never)
+  on('turn.complete', () => usoDoTurno(10, 990))
+  await umTurno($, 't1')
+  expect(leituras).toBe(0)
+  expect(await barText($)).not.toContain('cache')
+  await umTurno($, 't2')
+  expect(await barText($)).toContain(' · cache 99%')
+  const pane = JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'terminal', props: {} } as never))
+  expect(pane).toContain('desde o carregamento')
+})
+
+test('painel: sem cache medido ainda, o tamanho do último pedido aparece sozinho (sobrevivente #12 da 2ª rodada)', async ($, on) => {
+  on('session.usage', () => ({ value: { context: { tokens: 243000, window: 200000, breakdown: { categories } } } }) as never)
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
+  const pane = JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'terminal', props: {} } as never))
+  expect(pane).toContain('último pedido 243k')
+  expect(pane).not.toContain('cache')
+})
+
+test('a caixa da próxima tem a cor do caso: bloqueante error, do operador warning, do Claude claude (sobrevivente #22 da 2ª rodada)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('session.root', () => ({ value: '/proj/cor' }) as never)
+  mock.store(on)
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
+  const corDaProxima = async () => {
+    const m = (await barText($)).match(/\{"type":"Text","props":\{"color":"([^"]+)","weight":"bold"\},"children":\["▣"\]\}/)
+    return m?.[1]
+  }
+  await $.command.run({ command: 'objetivo', args: 'Cores :: fim' } as never)
+  await $.command.run({ command: 'objetivo', args: 'meu revisar' } as never)
+  await $.command.run({ command: 'objetivo', args: 'add codar' } as never)
+  expect(await corDaProxima()).toBe('warning')
+  await $.command.run({ command: 'objetivo', args: 'feito 1' } as never)
+  expect(await corDaProxima()).toBe('claude')
+  await $.command.run({ command: 'objetivo', args: 'bloqueante 2' } as never)
+  expect(await corDaProxima()).toBe('error')
 })

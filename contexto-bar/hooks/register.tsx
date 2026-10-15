@@ -4,10 +4,13 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Goal, GroupKey, Segment, Snapshot } from '../types'
 import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
+import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
 
 const snapshot = atom({ plugin: 'contexto-bar', key: 'snapshot' } as const, null)
 const objetivo = atom({ plugin: 'contexto-bar', key: 'objetivo' } as const, null)
 const turno = atom({ plugin: 'contexto-bar', key: 'turno' } as const, 0)
+const cache = atom({ plugin: 'contexto-bar', key: 'cache' } as const, null)
+const pedido = atom({ plugin: 'contexto-bar', key: 'pedido' } as const, null)
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
@@ -118,6 +121,8 @@ export function fmtTokens(n: number): string {
 async function refresh($: EngineInterface, hookTexts: Set<string>) {
   try {
     const usage = await $.session.usage({ breakdown: 'summary' })
+    // O tamanho do último pedido vem pronto: entrada sem cache, lida e gravada no cache, somadas.
+    if (usage.context.tokens) await update($, pedido, () => usage.context.tokens ?? null)
     const b = usage.context.breakdown
     if (!b) return
     let hookChars = 0
@@ -156,6 +161,8 @@ export const chaveObjetivo = (raiz: string) => `objetivo:${raiz}`
 export const arquivoObjetivo = (home: string, raiz: string) => `${home}/.claude/objetivos/${encodeURIComponent(raiz)}.json`
 // Pasta cujo objetivo está no $.state agora (some num reload do módulo; aí recarrega do store).
 let raizCarregada: string | undefined
+// Objetivo (pasta, título e conclusão) cuja conclusão já foi ao modelo: a linha completa sai uma vez por objetivo.
+let conclusaoEnviada: string | undefined
 
 async function raizAtual($: EngineInterface): Promise<string> {
   try {
@@ -208,6 +215,30 @@ async function escreverArquivo($: EngineInterface, arquivo: string, raiz: string
   } catch {
     return false
   }
+}
+
+// Cache de prompt: o transcript dá a semente uma vez por sessão (ou ao carregar o mod numa sessão em curso);
+// depois cada turno da conversa principal soma o seu uso, sem reler o arquivo. Um transcript acima do limite de
+// leitura (4 MiB) não semeia: a conta vale desde o carregamento e o painel diz que é parcial.
+const LIMITE_LEITURA = 4 * 1024 * 1024
+async function semearCache($: EngineInterface): Promise<void> {
+  if (await read($, cache)) return
+  let semente = { acc: CACHE_VAZIO, parcial: false }
+  try {
+    const home = await $.env.get('HOME')
+    const id = await $.session.id()
+    if (home && id) {
+      const pastas = [...new Set([await $.session.cwd().catch(() => ''), await raizAtual($)])].filter(Boolean)
+      const arquivo = (await Promise.all(pastas.map(async d => ((await $.fs.exists(caminhoTranscript(home, d, id))) ? caminhoTranscript(home, d, id) : '')))).find(Boolean)
+      if (arquivo) {
+        const st = await $.fs.stat(arquivo)
+        semente = st.size > LIMITE_LEITURA ? { acc: CACHE_VAZIO, parcial: true } : { acc: doTranscript(await $.fs.read(arquivo)), parcial: false }
+      }
+    }
+  } catch {
+    semente = { acc: CACHE_VAZIO, parcial: true }
+  }
+  await update($, cache, c => c ?? semente)
 }
 
 // Painel automático: com objetivo ativo, cada pedido abre (ou mantém) o painel. Liga por padrão.
@@ -288,6 +319,7 @@ export const register: Register = on => {
     const result = await next(e)
     await refresh($, hookTexts)
     await carregarObjetivo($)
+    await semearCache($)
     return result
   })
 
@@ -305,7 +337,11 @@ export const register: Register = on => {
     const atual = await read($, objetivo)
     // Pedido do operador: ver o objetivo desde o início da atividade, sem esperar o fim do ciclo.
     if (atual && (await painelAuto($))) await abrirPainel($).catch(() => undefined)
-    const linhas = [linhaContexto(atual, await read($, snapshot), TOOL)]
+    // A conclusão vai uma vez por objetivo (recém-definido ou início de sessão); depois, só a linha curta.
+    const chave = atual ? `${raizCarregada}\n${atual.titulo}\n${atual.conclusao}` : undefined
+    const completa = chave !== undefined && chave !== conclusaoEnviada
+    if (chave !== undefined) conclusaoEnviada = chave
+    const linhas = [linhaContexto(atual, await read($, snapshot), TOOL, completa)]
     const aviso = await checarAviso($)
     if (aviso) linhas.push(aviso)
     return next({ ...e, context: [...(e.context ?? []), ...linhas] })
@@ -338,6 +374,12 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
     await update($, turno, n => n + 1)
+    if (!e.agentId) {
+      // Sem semente ainda, o transcript já traz este turno: semeia em vez de somar, para não contar duas vezes.
+      const uso = result.usage ?? e.usage
+      if (!(await read($, cache))) await semearCache($)
+      else if (uso) await update($, cache, c => (c ? { ...c, acc: somar(c.acc, uso) } : c))
+    }
     await refresh($, hookTexts)
     return result
   })
@@ -370,10 +412,14 @@ export const register: Register = on => {
     if (e.props.hasSurvey || snap === null) return next(e)
     const goal = await read($, objetivo)
     const agora = await read($, turno)
+    const pc = taxa((await read($, cache))?.acc ?? null)
 
     const { Box, Text } = $.ui.resolve(e)
     const suffix = ` ${snap.percent}%`
-    const width = Math.max(10, e.props.bodyColumns - suffix.length - 2)
+    // O acerto do cache vai no fim da linha da barra só se couber sem quebrar; o detalhe fica no painel.
+    const cabeCache = pc !== null && e.props.bodyColumns - suffix.length - ` · cache ${pc}%`.length - 2 >= 10
+    const extra = cabeCache ? ` · cache ${pc}%` : ''
+    const width = Math.max(10, e.props.bodyColumns - suffix.length - extra.length - 2)
     const cells = cellsFor(snap, width)
     const pctColor = snap.percent >= 80 ? 'error' : snap.percent >= 60 ? 'warning' : 'text'
 
@@ -392,6 +438,7 @@ export const register: Register = on => {
           <Text color={pctColor} weight="bold">
             {suffix}
           </Text>
+          {extra ? <Text color="subtle">{extra}</Text> : null}
         </Text>
         <Text wrap="wrap">
           {GROUPS.map((g, i) => (
@@ -411,11 +458,13 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const goal = await read($, objetivo)
     const snap = await read($, snapshot)
+    const linhaCache = <LinhaCache c={await read($, cache)} req={await read($, pedido)} Text={Text} />
     if (!goal) {
       return (
         <Box flexDirection="column">
           <Text dimColor>Nenhum objetivo ativo.</Text>
           <Text dimColor>/objetivo texto :: passo que conclui</Text>
+          {linhaCache}
         </Box>
       )
     }
@@ -451,6 +500,7 @@ export const register: Register = on => {
             {p.feitas}/{p.total} feitas · {ESTADO[p.estado]} · precisa ~{fmtTokens(p.necessario)} de {fmtTokens(p.livre)} livres
           </Text>
         </Box>
+        {linhaCache}
       </Box>
     )
   })
@@ -463,29 +513,53 @@ const COR_ESTADO = { cabe: 'success', apertado: 'warning', 'nao-cabe': 'error', 
 function GoalBand({ goal, snap, agora, Text }: { goal: Goal; snap: Snapshot; agora: number; Text: any }) {
   const p = projetar(goal, snap)
   const parado = agora - goal.atualizadoTurno
-  const caixas = goal.itens.map(i => (i.feito ? '■' : '□')).join('')
   const prox = proxima(goal)
+  // A próxima é a própria caixa dela na barra de passos, em destaque: sem texto a mais na banda.
+  const corProx = prox?.nivel === 'bloqueante' ? 'error' : prox?.dono === 'operador' ? 'warning' : 'claude'
   return (
     <Text wrap="wrap">
       <Text weight="bold">◎ {goal.titulo}</Text>
       {goal.conclusao ? <Text dimColor> · conclui: {goal.conclusao}</Text> : null}
       {'  '}
-      {caixas ? `[${caixas}] ` : ''}
+      {goal.itens.length ? (
+        <Text>
+          [
+          {goal.itens.map(i =>
+            i.id === prox?.id ? (
+              <Text key={String(i.id)} color={corProx} weight="bold">
+                ▣
+              </Text>
+            ) : i.feito ? (
+              '■'
+            ) : (
+              '□'
+            ),
+          )}
+          ]{' '}
+        </Text>
+      ) : null}
       {p.feitas}/{p.total}
       {p.abertasClaude ? ` · Claude ${p.abertasClaude}` : ''}
       {p.abertasOperador ? <Text color="warning"> · sua vez {p.abertasOperador}</Text> : null}
-      {prox ? (
-        <Text color={prox.nivel === 'bloqueante' ? 'error' : undefined}>
-          {' '}· próxima #{prox.id}
-          {prox.dono === 'operador' ? ' (sua)' : ''}
-        </Text>
-      ) : null}
       {p.abertasClaude ? (
         <Text color={COR_ESTADO[p.estado]}>
           {' '}· ~{fmtTokens(p.unidade)}/un{p.comHistorico ? '' : '*'} · {ESTADO[p.estado]}
         </Text>
       ) : null}
       {parado >= 3 ? <Text dimColor> · sem atualização há {parado} turnos</Text> : null}
+    </Text>
+  )
+}
+
+/** No painel: acerto do cache da sessão e tamanho do último pedido, medidos pelo mod. */
+function LinhaCache({ c, req, Text }: { c: { acc: { lidos: number; total: number; n: number }; parcial: boolean } | null; req: number | null; Text: any }) {
+  const pc = taxa(c?.acc ?? null)
+  if (pc === null && !req) return null
+  return (
+    <Text color="subtle" wrap="wrap">
+      {pc !== null ? `cache ${pc}% (${fmtTokens(c!.acc.lidos)} de ${fmtTokens(c!.acc.total)} lidos${c!.parcial ? ', desde o carregamento' : ''})` : ''}
+      {pc !== null && req ? ' · ' : ''}
+      {req ? `último pedido ${fmtTokens(req)}` : ''}
     </Text>
   )
 }

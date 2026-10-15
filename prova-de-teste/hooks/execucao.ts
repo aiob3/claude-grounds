@@ -203,6 +203,23 @@ export function detectarComando(r: ArquivosDoRepo, tocados: string[], raiz: stri
   return []
 }
 
+/**
+ * O ambiente de todo comando de teste. O CPython valida o .pyc pelo mtime do fonte em segundos inteiros e pelo tamanho:
+ * mutante do mesmo tamanho escrito no mesmo segundo do anterior rodava o bytecode velho (16 sobreviventes falsos em 20
+ * na reprodução, 15/10/2026), e o mutante restaurado no mesmo segundo seguia valendo nos mutantes de outros arquivos
+ * (12 mortes falsas em 15). Sem .pyc gravado, cada execução compila do fonte; o JS/TS ignora a variável.
+ */
+export const AMBIENTE_DE_TESTE: Record<string, string> = { PYTHONDONTWRITEBYTECODE: '1' }
+
+/**
+ * As pastas __pycache__ ao lado dos .py que podem ser mutados: a cópia leva as do original, e um .pyc que não é
+ * validado pelo fonte (unchecked-hash) seria lido em todo mutante. Só essas: as de dependências nunca mudam.
+ */
+export function pycachesDe(enviados: string[]): string[] {
+  const pastas = enviados.filter(f => /\.pyw?$/.test(f)).map(f => (f.includes('/') ? `${f.slice(0, f.lastIndexOf('/'))}/__pycache__` : '__pycache__'))
+  return [...new Set(pastas)]
+}
+
 export type Mapa = { g: Map<string, string[]>; testes: string[] }
 
 /**
@@ -222,6 +239,13 @@ export function planoIncremental(alvo: string, mapa: Mapa | undefined, cobrem: C
   const comandos = cobrem.filter(c => t.some(x => naPasta(c, x)))
   return { escopo: `incremental: ${t.length}/${noEscopo.length} arquivos de teste`, alcancam: t, comandos }
 }
+
+/**
+ * O mesmo recorte (testes visíveis e comandos) dá a mesma chave. Cada recorte roda uma vez sem mutante antes de valer:
+ * um teste que lê a árvore do repositório falha com os testes escondidos, e a morte seria do recorte, não do mutante
+ * (rodada no publico, 0.8.2: SaidaReal "matou" mutantes do leitor_frio.py que, aplicados à mão, sobrevivem).
+ */
+export const chaveDoRecorte = (alcancam: string[], comandos: Comando[]) => `${[...alcancam].sort().join('\n')}\0${comandos.map(c => c.argv.join(' ')).join('\n')}`
 
 /** Os comandos que valem para um arquivo: os do plugin onde ele está e os do repositório todo. */
 export function comandosPara(arquivo: string, cs: Comando[]): Comando[] {

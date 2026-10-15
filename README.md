@@ -2,16 +2,126 @@
 
 <p align="center"><a href="README.en.md">English</a> · <b>Português</b></p>
 
-<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 49" src="https://img.shields.io/badge/falhas_reais_achadas-49-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
+<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 78" src="https://img.shields.io/badge/falhas_reais_achadas-78-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
 
-Quando o agente do Claude Code diz "pronto, testado", como você confere? O claude-grounds transforma essa frase num
-ciclo. Antes de começar, o agente declara o que é "pronto", com a prova dentro. A cada pedido, a prova pendente
-volta à frente dele. A prova roda às cegas, e o objetivo só fecha quando o registro cumpre o que foi declarado. O
-objetivo e a prova ficam gravados, e a próxima sessão retoma com a evidência junto.
+**Os testes que o agente escreve passam. Mas pegam bug?**
 
-São dois mods do Claude Code (plugins cujo código roda dentro dele, disponíveis desde a versão 2.1.287) que
-funcionam em par: o `contexto-bar` guarda e mostra a afirmação, o `prova-de-teste` produz o fundamento dela. Cada um
-se instala sozinho, e não há hook para configurar.
+O Claude Code escreve o código, escreve os testes, e tudo fica verde. Só que teste verde não quer dizer teste que
+protege, e muitas vezes você só descobre que ele não conferia nada quando o bug aparece. Em tarefa longa ainda há
+outro problema: o combinado se perde quando a sessão compacta ou recomeça.
+
+O claude-grounds é para quem usa o Claude Code para escrever código com testes, em tarefas que atravessam sessões.
+São dois **mods do Claude Code**, o recurso que chegou na versão 2.1.287 para rodar código dentro dele. Instalados
+juntos, formam uma cadeia. A faixa deixa à vista a carga de contexto e o objetivo do projeto, que passa de uma
+sessão para a outra. O objetivo pede a prova. A prova é feita por um modelo independente, que vê só o diff: ele
+planta bugs no código que o agente mudou, e a tarefa só fecha quando os testes pegam. O registro guarda cada rodada
+e recusa número inflado. Não há settings hook para configurar nem gate travando o agente.
+
+Construindo os próprios mods, a prova achou 78 falhas reais de teste. Em três projetos privados, sem relação com
+estes, achou mais 77. Num projeto com 8881 testes, provar uma mudança leva uns 2 minutos e meio,
+2,8 vezes menos que rodar a suíte completa para cada bug plantado, com os mesmos vereditos.
+
+## O que você ganha
+
+<p align="center"><img src="assets/ganhos.svg" alt="A faixa pede a prova, a prova vai ao registro, e o registro volta à faixa na próxima sessão" width="100%"></p>
+
+### A faixa: o contexto do projeto à vista
+
+<p align="center"><img src="assets/demo/06.webp" alt="Tela real: a faixa acima do prompt com a carga de contexto por origem e o objetivo em 5/5, e o painel do objetivo ao lado" width="100%"></p>
+
+Acima do prompt, o `contexto-bar` mostra quanto da janela de contexto está ocupado e por quê (sistema, memória,
+MCP, skills, hooks, conversa), e se o que falta fazer cabe antes da compactação. Embaixo vem o objetivo do projeto,
+com as pendências por dono e a barra de etapas. O agente recebe esse objetivo a cada pedido, então a prova pendente
+não sai da frente dele. O objetivo fica num arquivo por projeto: fechar a sessão, reiniciar a máquina ou abrir outra
+sessão em paralelo não apaga nada. Na volta, ele está lá.
+
+Isso também é economia. Nas sessões em que estes mods foram construídos, uma sessão longa chegou a pedidos de 338 mil
+a 701 mil tokens, com 99% de acerto no cache. Uma sessão nova começou com 42 mil a 53 mil tokens, o objetivo de volta
+na faixa e, nos cinco primeiros pedidos, de 78% a 89% de acerto. Fechar uma sessão pesada e abrir outra deixa cada
+pedido de 7 a 14 vezes menor, sem perder o fio. A faixa mostra o acerto do cache da sessão no fim da linha, e o
+painel, o tamanho do último pedido.
+
+### A prova: o critério que se reaplica sozinho
+
+<p align="center"><img src="assets/demo/03.webp" alt="Tela real: o contexto-bar conclui uma pendência e, em seguida, o prova-de-teste executa a rodada de mutantes" width="100%"></p>
+
+O objetivo nasce com a prova dentro, e é aí que o `prova-de-teste` entra (na tela acima, logo depois de uma
+pendência concluída). Ele copia o repositório para uma pasta temporária, pede a um modelo sem ferramentas e sem
+histórico bugs plausíveis para o código que mudou, roda os testes contra cada um e entrega o relatório. Esse modelo vê
+só o diff, nunca os testes, então o agente não tem como escolher os bugs fáceis. Teste que deixa um bug passar é
+teste fraco, e a pendência não fecha até ele ser reforçado.
+
+Até aqui, um critério assim ficava escrito num arquivo de instruções, e ninguém garantia que o agente o seguiria nem
+que ele sobreviveria à próxima sessão. Aqui ele roda sozinho, do mesmo jeito em toda tarefa, e o agente sabe de
+antemão o que vai ser cobrado.
+
+### O registro: nada se perde, nada infla
+
+Cada rodada vira uma linha no log. O `registrar` só aceita os números da última execução e recusa estado melhor que o
+executado sem justificativa escrita. O objetivo só fecha quando a prova está registrada, e a próxima sessão, outro dia
+ou outro projeto retoma dali.
+
+**O que ele não faz:** não bloqueia ações destrutivas (isso é segurança, outra categoria) e não garante que o código
+está certo. Garante que os testes pegam os bugs plantados.
+
+## Do lado do agente
+
+Pedi ao agente que construiu e usou os mods uma avaliação do próprio trabalho, sem enfeite. Os números saem do log.
+
+- **Ele deixou de decidir sozinho quando um teste está bom.** Nas rodadas das versões 0.7.0 a 0.8.1 apareceram 13
+  falhas reais nos testes dos próprios mods, e mais uma no projeto grande. Todos os testes estavam verdes antes, e
+  sem a rodada teriam sido entregues como "testado".
+- **O critério vale mesmo quando ele esquece.** As regras estão no `registrar`, não na memória do agente. Um estado
+  melhor que o executado é recusado.
+- **O fio não se perdeu nem com a máquina reiniciada.** A sessão caiu num reboot e depois foi compactada. Ela voltou
+  sabendo o objetivo, o que estava feito e de quem era cada pendência, porque isso estava no arquivo do objetivo, e
+  não só no resumo da conversa.
+- **O instrumento pegou erros dele mesmo.** A confirmação na suíte completa mostrou que três "sobreviventes" eram
+  falsos.
+- **Onde não ajudou:** na mensagem. Os erros de comunicação do mesmo dia (texto sem contexto para quem chega, termo
+  errado, um nome privado publicado) foram pegos pelo operador, não pelos mods. A prova é mecânica para código e não
+  cobria o texto. Por isso nasceu o [EXP-002](EXP-002.md): o README agora passa por checagens automáticas e por um
+  leitor frio, um modelo que só vê a página e precisa dizer para quem ela é, que dor resolve e o que se ganha.
+
+## Instalar
+
+```sh
+claude plugin marketplace add aiob3/claude-grounds
+claude plugin install contexto-bar@claude-grounds
+claude plugin install prova-de-teste@claude-grounds
+```
+
+| Mod | Versão | Papel |
+|---|---|---|
+| [`contexto-bar`](contexto-bar/) | 0.9.0 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
+| [`prova-de-teste`](prova-de-teste/) | 0.8.3 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
+
+O log do `prova-de-teste` vai para `PROVA_DE_TESTE_LOG` ou, sem essa variável, para
+`~/.claude/prova-de-teste/EXP-001-log.md`. O agente usa as ferramentas `objetivo`, `executar` e `registrar`; você usa
+o `/objetivo`:
+
+| Você digita | O que acontece |
+|---|---|
+| `/objetivo` | abre o painel |
+| `/objetivo Migrar o login :: testes verdes em produção` | define o objetivo e o passo que o encerra |
+| `/objetivo feito 2 3` | conclui as pendências 2 e 3 |
+| `/objetivo bloqueante 4` | sobe a pendência 4 para o topo da fila |
+| `/objetivo meu revisar o contrato` | acrescenta uma pendência sua |
+| `/objetivo encerrar` | encerra o objetivo do projeto |
+
+## Primeiros cinco minutos
+
+```sh
+git clone https://github.com/aiob3/claude-grounds-demo && cd claude-grounds-demo
+claude
+```
+
+Cole o pedido da gravação: *"Bug: mediana([10, 9, 2]) devolve 2, mas o certo é 9. Corrija em src/estatistica.js.
+Antes de mexer, defina o objetivo da tarefa. Escreva o teste que pega o bug e mostre ele falhando antes da correção
+(red first). Depois da correção, prove o teste com a ferramenta executar do prova-de-teste e registre a rodada."*
+
+Você deve ver a faixa com o objetivo, o teste falhando, o relatório do `executar` e o painel no fim. Feche a sessão,
+abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
 
 ## O ciclo, numa sessão real
 
@@ -106,7 +216,7 @@ como morto, um caminho devolvido pelo modelo que fazia 18 mutantes não serem ap
 teste. A demo gravada acrescentou o último da lista: o `registrar` aceitava um estado melhor que o executado sem
 justificativa.
 
-<p align="center"><img src="assets/rodadas.svg" alt="49 falhas reais de teste encontradas" width="100%"></p>
+<p align="center"><img src="assets/rodadas.svg" alt="78 falhas reais de teste encontradas" width="100%"></p>
 
 As garantias de honestidade são mecânicas, não promessas:
 
@@ -184,46 +294,6 @@ Por isso, quanto melhores os testes, mais rápida a rodada: com menos sobreviven
 3 s por mutante. O relatório e o log trazem esses números a cada rodada (`custo: base, por mutante, repositório,
 diff`), medidos pelo próprio mod.
 
-## Instalar
-
-```sh
-claude plugin marketplace add aiob3/claude-grounds
-claude plugin install contexto-bar@claude-grounds
-claude plugin install prova-de-teste@claude-grounds
-```
-
-| Mod | Versão | Papel |
-|---|---|---|
-| [`contexto-bar`](contexto-bar/) | 0.8.0 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
-| [`prova-de-teste`](prova-de-teste/) | 0.8.1 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
-
-O log do `prova-de-teste` vai para `PROVA_DE_TESTE_LOG` ou, sem essa variável, para
-`~/.claude/prova-de-teste/EXP-001-log.md`. O agente usa as ferramentas `objetivo`, `executar` e `registrar`; você usa
-o `/objetivo`:
-
-| Você digita | O que acontece |
-|---|---|
-| `/objetivo` | abre o painel |
-| `/objetivo Migrar o login :: testes verdes em produção` | define o objetivo e o passo que o encerra |
-| `/objetivo feito 2 3` | conclui as pendências 2 e 3 |
-| `/objetivo bloqueante 4` | sobe a pendência 4 para o topo da fila |
-| `/objetivo meu revisar o contrato` | acrescenta uma pendência sua |
-| `/objetivo encerrar` | encerra o objetivo do projeto |
-
-## Primeiros cinco minutos
-
-```sh
-git clone https://github.com/aiob3/claude-grounds-demo && cd claude-grounds-demo
-claude
-```
-
-Cole o pedido da gravação: *"Bug: mediana([10, 9, 2]) devolve 2, mas o certo é 9. Corrija em src/estatistica.js.
-Antes de mexer, defina o objetivo da tarefa. Escreva o teste que pega o bug e mostre ele falhando antes da correção
-(red first). Depois da correção, prove o teste com a ferramenta executar do prova-de-teste e registre a rodada."*
-
-Você deve ver a faixa com o objetivo, o teste falhando, o relatório do `executar` e o painel no fim. Feche a sessão,
-abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
-
 ## Limites e próximos passos
 
 - O `prova-de-teste` acha o comando de teste por convenção (`claude plugin test`, `npm test`, `pytest`). Para outro
@@ -237,7 +307,7 @@ abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
 - Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
-Em aberto: a duração mínima foi atingida (16 medições); falta o instrumento ficar estável, com 3 medições seguidas na mesma versão, para o operador decidir se o método vira critério; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
+Em aberto: a duração mínima foi atingida (21 medições); falta o instrumento ficar estável, com 3 medições seguidas na mesma versão, para o operador decidir se o método vira critério; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 
 ## Avaliar

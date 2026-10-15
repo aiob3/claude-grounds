@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 888" width="1200" height="888" role="img" aria-label="Linha do tempo das rodadas de calibração do instrumento" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1212" width="1200" height="1212" role="img" aria-label="Linha do tempo das rodadas de calibração do instrumento" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Linha do tempo das rodadas de calibração do instrumento</title>
 <style>
   .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
@@ -13,7 +13,7 @@
   }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 </style>
-<rect width="1200" height="888" rx="16" class="sup"/>
+<rect width="1200" height="1212" rx="16" class="sup"/>
   <text x="56" y="50" font-size="24" font-weight="800" class="t1">Construído com ele mesmo</text>
   <text x="56" y="74" font-size="15" class="t2">Cada versão passou pelo próprio método. Em todas as rodadas o instrumento achou um defeito em si ou ganhou uma regra nova.</text>
   <line x1="74" y1="126" x2="74" y2="164" class="acs" stroke-width="2.5"/>
@@ -62,15 +62,39 @@
   <text x="152" y="663" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.5.0</text>
   <text x="100" y="684" font-size="14.5" class="t2">nova versão: estado acima do executado exige equivalentes justificados, gravados no log</text><text x="1150" y="663" font-size="14" class="ac" text-anchor="end" font-weight="700">2 falhas reais nos testes</text><line x1="74" y1="720" x2="74" y2="758" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="712" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="717" font-size="16" font-weight="700" class="t1">demo</text>
+  <text x="100" y="717" font-size="16" font-weight="700" class="t1">R12</text>
   <text x="152" y="717" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.7.0</text>
-  <text x="100" y="738" font-size="14.5" class="t2">mutação com nota entre parênteses depois do trecho (`a` → `b` (explicação)) saía como fora…</text><line x1="74" y1="774" x2="74" y2="812" class="acs" stroke-width="2.5"/>
+  <text x="100" y="738" font-size="14.5" class="t2">mutação com nota entre parênteses depois do trecho (`a` → `b` (explicação)) saía como fora…</text><text x="1150" y="717" font-size="14" class="ac" text-anchor="end" font-weight="700">4 falhas reais nos testes</text><line x1="74" y1="774" x2="74" y2="812" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="766" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="771" font-size="16" font-weight="700" class="t1">demo</text>
+  <text x="100" y="771" font-size="16" font-weight="700" class="t1">R13</text>
   <text x="152" y="771" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.0</text>
-  <text x="100" y="792" font-size="14.5" class="t2">1ª execução: os #13, #14 e #20 sobreviveram no incremental e morreram na confirmação com a…</text>
+  <text x="100" y="792" font-size="14.5" class="t2">1ª execução: os #13, #14 e #20 sobreviveram no incremental e morreram na confirmação com a…</text><text x="1150" y="771" font-size="14" class="ac" text-anchor="end" font-weight="700">3 falhas reais nos testes</text><line x1="74" y1="828" x2="74" y2="866" class="acs" stroke-width="2.5"/>
   <circle cx="74" cy="820" r="8" class="sup2 acs" stroke-width="2.5"/>
-  <text x="100" y="825" font-size="16" font-weight="700" class="t1">demo</text>
+  <text x="100" y="825" font-size="16" font-weight="700" class="t1">R14</text>
   <text x="152" y="825" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.1</text>
-  <text x="100" y="846" font-size="14.5" class="t2">alias com curinga deduzido pela barra final (`~x*` virava exato), achado ao reforçar o #2:…</text>
+  <text x="100" y="846" font-size="14.5" class="t2">alias com curinga deduzido pela barra final (`~x*` virava exato), achado ao reforçar o #2:…</text><text x="1150" y="825" font-size="14" class="ac" text-anchor="end" font-weight="700">6 falhas reais nos testes</text><line x1="74" y1="882" x2="74" y2="920" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="874" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="879" font-size="16" font-weight="700" class="t1">R15</text>
+  <text x="152" y="879" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.2</text>
+  <text x="100" y="900" font-size="14.5" class="t2">bytecode velho entre mutantes Python do mesmo tamanho no mesmo segundo (16/20 vereditos er…</text><text x="1150" y="879" font-size="14" class="ac" text-anchor="end" font-weight="700">1 falha real nos testes</text><line x1="74" y1="936" x2="74" y2="974" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="928" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="933" font-size="16" font-weight="700" class="t1">R16</text>
+  <text x="152" y="933" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.2</text>
+  <text x="100" y="954" font-size="14.5" class="t2">morte falsa no modo de testes afetados: esconder os outros testes (.prova-fora) derruba um…</text><text x="1150" y="933" font-size="14" class="ac" text-anchor="end" font-weight="700">1 falha real nos testes</text><line x1="74" y1="990" x2="74" y2="1028" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="982" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="987" font-size="16" font-weight="700" class="t1">R18</text>
+  <text x="152" y="987" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.3</text>
+  <text x="100" y="1008" font-size="14.5" class="t2">mutante #3 com crase escapada dentro do trecho recusado como &quot;trecho não encontrado&quot; (mesm…</text><text x="1150" y="987" font-size="14" class="ac" text-anchor="end" font-weight="700">2 falhas reais nos testes</text><line x1="74" y1="1044" x2="74" y2="1082" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="1036" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="1041" font-size="16" font-weight="700" class="t1">R21</text>
+  <text x="152" y="1041" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.3</text>
+  <text x="100" y="1062" font-size="14.5" class="t2">mutante com crase escapada no trecho recusado como &quot;trecho não encontrado&quot; (terceira ocorr…</text><text x="1150" y="1041" font-size="14" class="ac" text-anchor="end" font-weight="700">1 falha real nos testes</text><line x1="74" y1="1098" x2="74" y2="1136" class="acs" stroke-width="2.5"/>
+  <circle cx="74" cy="1090" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="1095" font-size="16" font-weight="700" class="t1">R22</text>
+  <text x="152" y="1095" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.3</text>
+  <text x="100" y="1116" font-size="14.5" class="t2">#2 e #16, com crase escapada no trecho, recusados como &quot;trecho não encontrado&quot;; e a rodada…</text><text x="1150" y="1095" font-size="14" class="ac" text-anchor="end" font-weight="700">1 falha real nos testes</text>
+  <circle cx="74" cy="1144" r="8" class="sup2 acs" stroke-width="2.5"/>
+  <text x="100" y="1149" font-size="16" font-weight="700" class="t1">R22</text>
+  <text x="152" y="1149" font-size="13" class="t3" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">v0.8.3</text>
+  <text x="100" y="1170" font-size="14.5" class="t2">mutantes com crase escapada no trecho seguem recusados como &quot;trecho não encontrado&quot;; rodad…</text><text x="1150" y="1149" font-size="14" class="ac" text-anchor="end" font-weight="700">1 falha real nos testes</text>
 </svg>

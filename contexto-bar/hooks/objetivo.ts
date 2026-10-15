@@ -180,7 +180,6 @@ export function projetar(g: Goal, snap: Snapshot | null): Projecao {
 
 const k = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
 
-/** Linha curta que acompanha cada prompt, para o modelo saber o que está em curso. */
 /**
  * A checagem de alinhamento, devolvida ao definir ou acrescentar pendências: a conclusão é o efeito que se quer, e
  * cada pendência precisa aproximar dele. Nasceu de uma falha real (lançamento do claude-grounds, 14/10/2026): as
@@ -195,27 +194,32 @@ export function alinhamento(g: Goal): string {
   )
 }
 
-export function linhaContexto(g: Goal | null, snap: Snapshot | null, tool: string): string {
+const JANELA = { cabe: ' · janela cabe', apertado: ' · janela apertada', 'nao-cabe': ' · janela não cabe', 'sem-dados': '' } as const
+const curto = (t: string) => (t.length > 60 ? `${t.slice(0, 59)}…` : t)
+
+/**
+ * Linha que acompanha cada prompt: título, progresso, a próxima com o dono e a janela. Vai em todo pedido, então
+ * fica curta: as listas e a conclusão saem pela ferramenta (acao "ver") e nas respostas de definir e concluir.
+ * `completa` (objetivo recém-definido ou início de sessão) acrescenta uma vez a conclusão e como marcar.
+ */
+export function linhaContexto(g: Goal | null, snap: Snapshot | null, tool: string, completa = false): string {
   if (!g) {
     return `[objetivo] Nenhum objetivo ativo. Se este pedido for uma tarefa com etapas, defina-o com ${tool} (acao "definir": titulo, conclusao = o passo que encerra, itens com dono claude|operador e tamanho P|M|G).`
   }
   const p = projetar(g, snap)
-  const abertas = ordenar(g.itens.filter(i => !i.feito))
-  const lista = (d: Owner) =>
-    abertas
-      .filter(i => i.dono === d)
-      .map(i => `#${i.id} ${etiqueta(i)}${i.texto}`)
-      .join('; ') || 'nenhuma'
   const prox = proxima(g)
+  const temConclusao = !!g.conclusao?.trim()
+  const linha =
+    `[objetivo] ${g.titulo} · ${p.feitas}/${p.total}` +
+    (prox ? ` · próxima #${prox.id} ${etiqueta(prox)}${curto(prox.texto)} (${prox.dono})` : ' · tudo feito') +
+    JANELA[p.estado] +
+    (temConclusao ? ' · antes de agir: isso aproxima da conclusão?' : '')
+  if (!completa) return linha
   return (
-    `[objetivo] ${g.titulo}` +
-    (g.conclusao ? ` · conclui quando: ${g.conclusao}` : '') +
-    ` · ${p.feitas}/${p.total} feitas.` +
-    (prox ? ` Próxima: #${prox.id} (${prox.dono === 'claude' ? 'sua' : 'do operador'}).` : '') +
-    (g.conclusao?.trim() ? ` Antes da próxima ação: ela aproxima de "${g.conclusao}"?` : '') +
-    ` Pendências do Claude: ${lista('claude')}. Pendências do operador: ${lista('operador')}. ` +
-    `Janela: ~${k(p.necessario)} estimados para as suas, ${k(p.livre)} livres (${p.estado}). ` +
-    `Ao concluir cada pendência, marque com ${tool} (acao "concluir", ids); se o trabalho mostrar que uma trava outra ou pode esperar, ajuste com acao "priorizar" (ids, nivel bloqueante|requisito|melhoria); ao fechar o ciclo, diga ao operador o que ainda é dele.`
+    linha +
+    (temConclusao ? ` Conclui quando: ${g.conclusao}.` : '') +
+    ` Ao concluir cada pendência, marque com ${tool} (acao "concluir", ids); a lista inteira sai com acao "ver"; ` +
+    'se uma trava outra ou pode esperar, acao "priorizar" (ids, nivel); ao fechar o ciclo, diga ao operador o que ainda é dele.'
   )
 }
 

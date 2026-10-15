@@ -7,6 +7,8 @@ const LOG_PATH = '/dados/experimentos/EXP-001-log.md'
 
 const FORMATO = ['--no-color', '--no-ext-diff', '--src-prefix=a/', '--dst-prefix=b/']
 
+const DIFF_PY = 'diff --git a/src/calc.py b/src/calc.py\n--- a/src/calc.py\n+++ b/src/calc.py\n@@ -1 +1,2 @@\n+def dobro(x):\n+    return x * 2\n'
+
 const DIFF =
   'diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n+export const soma = (a, b) => a + b\n' +
   'diff --git a/src/a.test.ts b/src/a.test.ts\n--- a/src/a.test.ts\n+++ b/src/a.test.ts\n@@ -1 +1 @@\n+expect(soma(1, 2)).toBe(3) // SEGREDO-DO-TESTE\n'
@@ -194,8 +196,14 @@ test('sem HOME, /prova ~/pasta não inventa uma pasta', async ($, on) => {
 })
 
 /** Um repositório em memória: git, cópia, comando de teste e sistema de arquivos. */
-function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string } } = {}) {
-  const fs = new Map<string, string>([
+function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean } = {}) {
+  const fs = new Map<string, string>(o.python ? [
+    ['/repo/pyproject.toml', '[tool.pytest.ini_options]\n'],
+    ['/repo/src/calc.py', 'def dobro(x):\n    return x * 2\n'],
+    ['/repo/src/test_calc.py', 'from calc import dobro\nassert dobro(3) == 6\n'],
+    // O .pyc que veio do original e não é validado pelo fonte (unchecked-hash): vale para qualquer tamanho.
+    ...(o.pycVelho ? [['/repo/src/__pycache__/calc.cpython-315.pyc', JSON.stringify({ tamanho: null, codigo: 'def dobro(x):\n    return x * 2\n' })] as [string, string]] : []),
+  ] : [
     ['/repo/src/a.ts', 'export const soma = (a, b) => a + b\n'],
     // Por alias do tsconfig: sem ler os aliases, nenhum teste alcançaria a.ts (rodada 0.8.1, #13).
     ['/repo/src/a.test.ts', "import { soma } from '@/a'\nexpect(soma(1, 2)).toBe(3)\n"],
@@ -208,17 +216,19 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
   const apagadas: string[] = []
   const sobrouEscondido: string[] = []
   const rodadas: string[][] = []
+  const ambientes: (Record<string, string> | undefined)[] = []
   const modelo = { chamadas: 0 }
   const TMP = '/tmp/prova-de-teste-abc'
   mock.env(on, { PROVA_DE_TESTE_LOG: LOG_PATH })
   on('process.run', (_$, e) => {
-    const { argv, init } = e as { argv: string[]; init?: { cwd?: string } }
+    const { argv, init } = e as { argv: string[]; init?: { cwd?: string; env?: Record<string, string> } }
     const r = (stdout: string, exitCode = 0) => ({ value: { exitCode, stdout, stderr: '' } }) as never
     const a = argv.slice(1).filter(x => !FORMATO.includes(x)).join(' ')
     if (argv[0] === 'git') {
       if (a === 'rev-parse --show-toplevel') return r('/repo\n')
-      if (a === 'diff HEAD') return r(DIFF)
+      if (a === 'diff HEAD') return r(o.python ? DIFF_PY : DIFF)
       if (a === 'status --porcelain') return r(' M src/a.ts\n')
+      if (a === 'ls-files --cached --others --exclude-standard' && o.python) return r('pyproject.toml\nsrc/calc.py\nsrc/test_calc.py\n')
       if (a === 'ls-files --cached --others --exclude-standard') return r('src/a.ts\nsrc/a.test.ts\nsrc/b.ts\nsrc/b.test.ts\ntsconfig.json\n')
       if (a === 'ls-tree -r -l HEAD') return r('100644 blob aaa     30\tsrc/a.ts\n100644 blob bbb     2018\tsrc/a.test.ts\n')
       return r('')
@@ -238,17 +248,36 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       }
       return r('')
     }
+    if (argv[0] === 'rm' && o.rmFalha && argv.some(x => x.endsWith('__pycache__'))) {
+      return { value: { exitCode: 1, stdout: '', stderr: 'rm: permissão negada' } } as never
+    }
     if (argv[0] === 'rm') {
       sobrouEscondido.push(...[...fs.keys()].filter(k => k.endsWith('.prova-fora')))
       apagadas.push(argv.at(-1)!)
       for (const k of [...fs.keys()]) if (k.startsWith(argv.at(-1)!)) fs.delete(k)
       return r('')
     }
+    if (argv[0] === 'python3') {
+      rodadas.push([...argv, init?.cwd ?? ''])
+      ambientes.push(init?.env)
+      // O CPython no pior caso, tudo no mesmo segundo: o .pyc vale quando o tamanho do fonte bate (ou quando não é validado).
+      const fonte = fs.get(`${TMP}/repo/src/calc.py`) ?? ''
+      const pyc = `${TMP}/repo/src/__pycache__/calc.cpython-315.pyc`
+      const salvo = fs.has(pyc) ? (JSON.parse(fs.get(pyc)!) as { tamanho: number | null; codigo: string }) : undefined
+      const valido = salvo && (salvo.tamanho === null || salvo.tamanho === fonte.length)
+      if (!valido && init?.env?.PYTHONDONTWRITEBYTECODE !== '1') fs.set(pyc, JSON.stringify({ tamanho: fonte.length, codigo: fonte }))
+      return (valido ? salvo.codigo : fonte).includes('x + 2')
+        ? r('FAILED src/test_calc.py::test_dobro - assert 5 == 6\n1 failed in 0.01s\n', 1)
+        : r('1 passed in 0.01s\n')
+    }
     if (argv[0] === 'npm' || argv[0] === 'claude') {
       rodadas.push([...argv, init?.cwd ?? ''])
+      ambientes.push(init?.env)
       // O teste falso só pega a troca de + por -.
       const fonte = fs.get(`${TMP}/repo/src/a.ts`) ?? ''
       if (o.baseFalha) return r('  ✕ soma dá 3 (1 ms)\n', 1)
+      // Um teste que lê a árvore do repositório (o SaidaReal do publico): sem os testes escondidos, falha sem mutante nenhum.
+      if (o.leRepo && [...fs.keys()].some(k => k.endsWith('.prova-fora'))) return r('  ✕ lê o repositório (1 ms)\nTests:  1 total\n', 1)
       if (fonte.includes('=> a +\n')) return r("(fail) the file did not load\n\nSyntaxError: Unexpected token '\\n'\n", 1)
       // Só os testes visíveis rodam; o de a.ts só pega a troca de + por -.
       const visiveis = [...fs.keys()].filter(k => k.startsWith(`${TMP}/repo/`) && k.endsWith('.test.ts'))
@@ -277,7 +306,11 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       value: {
         isAnswered: true,
         usage: {},
-        text: [
+        text: (o.python ? [
+          // Os dois do mesmo tamanho: o equivalente sobrevive, o segundo tem de morrer.
+          'src/calc.py:2 | livre | `x * 2` → `2 * x`',
+          'src/calc.py:2 | condição invertida | `x * 2` → `x + 2`',
+        ] : [
           // Caminho curto, como o modelo devolveu na 1ª execução real: tem de ser aplicado mesmo assim.
           'a.ts:1 | condição invertida | `a + b` → `a - b`',
           'src/a.ts:1 | null/inválido | `(a, b) => a + b` → `(a, b) => b + a`',
@@ -285,20 +318,20 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
           ...(o.quebra ? ['src/a.ts:1 | borda/vazio | `=> a + b` → `=> a +`'] : []),
           'n/a | borda/vazio | sem listas',
           'n/a | empate/ordem | sem ordenação',
-        ].join('\n'),
+        ]).join('\n'),
       },
     }) as never,
   )
-  return { fs, apagadas, rodadas, TMP, modelo, sobrouEscondido }
+  return { fs, apagadas, rodadas, ambientes, TMP, modelo, sobrouEscondido }
 }
 
 test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver de verdade, restaura e não toca o original', async ($, on) => {
   const m = mundo(on)
   const original = m.fs.get('/repo/src/a.ts')
   const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
-  // npm test detectado pelo package.json, rodado na cópia: base, o morto só com o teste que alcança a.ts,
-  // o sobrevivente com esse teste e depois confirmado na suíte inteira.
-  expect(m.rodadas.length).toBe(4)
+  // npm test detectado pelo package.json, rodado na cópia: base, o recorte de a.ts uma vez sem mutante (vale para os dois),
+  // o morto só com o teste que alcança a.ts, o sobrevivente com esse teste e depois confirmado na suíte inteira.
+  expect(m.rodadas.length).toBe(5)
   expect(r).toContain('MORTO por \\"soma dá 3\\" [incremental: 1/2 arquivos de teste]')
   expect(r).toContain('SOBREVIVENTE → reforçar ou justificar como equivalente [incremental: 1/2 arquivos de teste, sobrevivente confirmado na suíte inteira]')
   // Nenhum teste fica escondido na cópia, e a restauração confere.
@@ -313,8 +346,10 @@ test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver 
   expect(r).toContain('Estado:     FRACO')
   expect(r).toContain('original ✔ intocado')
   expect(m.fs.get('/repo/src/a.ts')).toBe(original)
-  // A pasta temporária foi apagada, e só ela.
+  // A pasta temporária foi apagada, e só ela: sem .py no diff, nenhum __pycache__.
   expect(m.apagadas).toEqual([m.TMP])
+  // Todo comando de teste roda sem gravar .pyc, a base inclusive.
+  expect(m.ambientes.every(x => x?.PYTHONDONTWRITEBYTECODE === '1')).toBe(true)
 
   // registrar: números diferentes da execução são recusados; os executados passam; a execução vale uma vez.
   m.fs.set(LOG_PATH, '# log\n')
@@ -331,6 +366,44 @@ test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver 
   // Gasta no registro: o próximo não fica preso aos números dela (sobrevivente #16 da rodada 5).
   const depois = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'soma', aplicados: 3, mortos: 3, sobreviventes: 0, reais: 0, estado: 'PROVADO', tempo: 5 } as never))
   expect(depois).toContain('mutantes: 3/3/0')
+})
+
+test('executar: mutantes Python do mesmo tamanho não rodam o bytecode do anterior (sobrevivente falso, 15/10/2026)', async ($, on) => {
+  const m = mundo(on, { python: true })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'dobro' } as never))
+  expect(m.rodadas[0]!.slice(0, 4)).toEqual(['python3', '-m', 'pytest', '-q'])
+  expect(r).toContain('2 | src/calc.py:2 | condição invertida | `x * 2` → `x + 2` | MORTO por \\"src/test_calc.py::test_dobro\\"')
+  expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes')
+  expect(m.ambientes.every(x => x?.PYTHONDONTWRITEBYTECODE === '1')).toBe(true)
+})
+
+test('executar: o __pycache__ que veio na cópia ao lado do .py mutável sai antes da base (pyc unchecked-hash)', async ($, on) => {
+  const m = mundo(on, { python: true, pycVelho: true })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'dobro' } as never))
+  expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes')
+  // Só o da cópia e a pasta temporária: o original não é tocado.
+  expect(m.apagadas).toEqual([`${m.TMP}/repo/src/__pycache__`, m.TMP])
+  expect(m.fs.has('/repo/src/__pycache__/calc.cpython-315.pyc')).toBe(true)
+})
+
+test('executar: se o __pycache__ da cópia não sai, a rodada para antes da base (sem bytecode velho no veredito)', async ($, on) => {
+  const m = mundo(on, { python: true, pycVelho: true, rmFalha: true })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'dobro' } as never))
+  expect(r).toContain('Erro: não apaguei o __pycache__ da cópia (rm: permissão negada).')
+  expect(r).toContain('"isError":true')
+  expect(m.rodadas).toEqual([])
+})
+
+test('executar: recorte que falha sem mutante (teste que lê o repositório) não mata ninguém; a suíte inteira decide (rodada no publico, 0.8.2)', async ($, on) => {
+  const m = mundo(on, { leRepo: true })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
+  expect(r).not.toContain('lê o repositório')
+  expect(r).toContain('1 | src/a.ts:1 | condição invertida | `a + b` → `a - b` | MORTO por \\"soma dá 3\\" [suíte inteira (o recorte de 1 arquivos de teste falha sem mutante)]')
+  expect(r).toContain('2 | src/a.ts:1 | null/inválido | `(a, b) => a + b` → `(a, b) => b + a` | SOBREVIVENTE')
+  expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes')
+  // O recorte inválido roda uma vez só, não uma por mutante: base, recorte, e um run por mutante.
+  expect(m.rodadas.length).toBe(4)
+  expect(m.sobrouEscondido).toEqual([])
 })
 
 test('executar com incremental false roda a suíte inteira em todos os mutantes, sem esconder nada', async ($, on) => {

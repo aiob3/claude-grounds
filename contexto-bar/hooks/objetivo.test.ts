@@ -69,10 +69,27 @@ test('o aviso de janela sai uma vez por nível', () => {
   expect(avisoJanela(g, snapCom(100000)).nivel).toBe(null)
 })
 
-test('a linha de contexto lista as pendências de cada um', () => {
+test('a linha de contexto é curta: progresso, próxima com dono e janela, sem listas nem conclusão; completa só quando pedida', () => {
   const linha = linhaContexto(definido(), snapCom(100000), 'TOOL')
-  expect(linha).toContain('#1 instalar')
-  expect(linha).toContain('Pendências do operador: #3 rodar /reload-plugins')
+  expect(linha).toContain('[objetivo] Barra permanente · 0/3 · próxima #1 instalar (claude) · janela cabe')
+  expect(linha).not.toContain('testar')
+  expect(linha).not.toContain('rodar /reload-plugins')
+  expect(linha).not.toContain('mostra a versão instalada')
+  expect(linha.length).toBeLessThan(160)
+  // Recém-definido (ou início de sessão): a conclusão uma vez e como marcar, mas ainda sem as listas.
+  const completa = linhaContexto(definido(), snapCom(100000), 'TOOL', true)
+  expect(completa.split('mostra a versão instalada').length).toBe(2)
+  expect(completa).toContain('acao "ver"')
+  expect(completa).not.toContain('rodar /reload-plugins')
+  // Texto longo da próxima sai cortado; sem dados de janela, a janela some; tudo feito não tem próxima.
+  const longo = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: 'x'.repeat(200) }] }, 'claude', 0, 1).goal!
+  expect(linhaContexto(longo, null, 'TOOL')).toContain(`#1 ${'x'.repeat(59)}… (claude)`)
+  expect(linhaContexto(longo, null, 'TOOL')).not.toContain('janela')
+  // Exatamente 60 caracteres ainda cabem inteiros, sem reticências (sobrevivente #2 da rodada da 0.9.0).
+  const sessenta = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: 'y'.repeat(60) }] }, 'claude', 0, 1).goal!
+  expect(linhaContexto(sessenta, null, 'TOOL')).toContain(`#1 ${'y'.repeat(60)} (claude)`)
+  const feito = aplicar(longo, { acao: 'concluir', ids: [1] }, 'claude', 0, 2).goal!
+  expect(linhaContexto(feito, null, 'TOOL')).toContain('1/1 · tudo feito')
   expect(linhaContexto(null, null, 'TOOL')).toContain('Nenhum objetivo ativo')
 })
 
@@ -135,8 +152,8 @@ test('prioridade: sem nível vale requisito; priorizar muda o nível; a ordem é
 
   // A linha ao modelo segue a ordem e marca só o que não é requisito.
   const linha = linhaContexto(g, null, 'TOOL')
-  expect(linha).toContain('Pendências do Claude: #4 [bloqueante] testar; #2 escrever módulo; #1 [melhoria] polir textos')
-  expect(linha).toContain('Próxima: #4')
+  expect(linha).toContain('próxima #4 [bloqueante] testar (claude)')
+  expect(linha).not.toContain('escrever módulo')
 })
 
 test('o operador reprioriza pelo /objetivo', () => {
@@ -165,10 +182,10 @@ test('alinhamento: a conclusão é o efeito, e a linha de cada pedido pergunta s
   expect(alinhamento(g)).toContain('"/reload-plugins mostra a versão instalada"')
   expect(alinhamento(g)).toContain('mostra que o efeito aconteceu')
   expect(alinhamento({ ...g, conclusao: '' })).toContain('sem conclusão')
-  expect(linhaContexto(g, snapCom(100000), 'TOOL')).toContain('Antes da próxima ação: ela aproxima de "/reload-plugins mostra a versão instalada"?')
-  expect(linhaContexto({ ...g, conclusao: '' }, snapCom(100000), 'TOOL')).not.toContain('Antes da próxima ação')
+  expect(linhaContexto(g, snapCom(100000), 'TOOL')).toContain('antes de agir: isso aproxima da conclusão?')
+  expect(linhaContexto({ ...g, conclusao: '' }, snapCom(100000), 'TOOL')).not.toContain('antes de agir')
   // Só espaços conta como vazia; ausente não derruba (rodada 11, #1 #2 #5).
   expect(alinhamento({ ...g, conclusao: '   ' })).toContain('sem conclusão')
   expect(alinhamento({ ...g, conclusao: undefined as never })).toContain('sem conclusão')
-  expect(linhaContexto({ ...g, conclusao: '   ' }, snapCom(100000), 'TOOL')).not.toContain('Antes da próxima ação')
+  expect(linhaContexto({ ...g, conclusao: '   ' }, snapCom(100000), 'TOOL')).not.toContain('antes de agir')
 })

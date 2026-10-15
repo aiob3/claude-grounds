@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Escolha, ExecucaoFeita } from '../types'
-import { aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
+import { AMBIENTE_DE_TESTE, chaveDoRecorte, pycachesDe, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
 import { avisoNovos, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
@@ -267,6 +267,12 @@ async function executar(
     const cp = await $.process.run(['cp', '-a', '--reflink=auto', `${raiz}/.`, copia], { timeoutMs: 600_000 })
     if (cp.exitCode !== 0) return { texto: `Erro: a cópia falhou (${cp.stderr.trim()}).`, erro: true }
     const naCopia = comandos.map(c => ({ ...c, argv: c.argv.map(x => x.replaceAll('{COPIA}', copia)) }))
+    // Os .pyc que vieram na cópia, ao lado do que pode ser mutado, saem antes da base (ver AMBIENTE_DE_TESTE).
+    const pycaches = pycachesDe(e.enviados).map(p => `${copia}/${p}`)
+    if (pycaches.length) {
+      const rm = await $.process.run(['rm', '-rf', '--', ...pycaches])
+      if (rm.exitCode !== 0) return { texto: `Erro: não apaguei o __pycache__ da cópia (${rm.stderr.trim()}).`, erro: true }
+    }
     /** Os arquivos JS/TS/Python do repositório e quem importa quem; grande demais ou ilegível, nada. */
     const mapear = async () => {
       const ls = await git($, ['ls-files', '--cached', '--others', '--exclude-standard'], copia)
@@ -289,7 +295,7 @@ async function executar(
       return { g: grafo(fontes, aliases), testes: [...fontes.keys()].filter(ehEntradaDeTeste) }
     }
     const rodarUm = async (argv: string[]) =>
-      $.process.run(argv, { cwd: copia, timeoutMs }).catch(err => ({
+      $.process.run(argv, { cwd: copia, timeoutMs, env: AMBIENTE_DE_TESTE }).catch(err => ({
         exitCode: -1,
         stdout: '',
         stderr: `não rodou: ${err instanceof Error ? err.message : String(err)}`,
@@ -349,6 +355,8 @@ async function executar(
       },
     }
     if (exec.linhaDeBase.passou) {
+      /** Por recorte: se ele passa sem mutante (ver chaveDoRecorte). */
+      const basesDoRecorte = new Map<string, boolean>()
       let n = 0
       for (const m of e.mutantes) {
         n++
@@ -375,9 +383,18 @@ async function executar(
         }
         r.linhaReal = ap.linhaReal
         r.ocorrencias = ap.ocorrencias
+        let plano = planoIncremental(alvo.arquivo, mapa, cobrem)
+        if (plano.alcancam) {
+          // Ainda sem o mutante: o recorte novo roda uma vez no código original; falhando, a suíte inteira decide.
+          const chave = chaveDoRecorte(plano.alcancam, plano.comandos)
+          if (!basesDoRecorte.has(chave)) {
+            await ajustar(new Set(plano.alcancam))
+            basesDoRecorte.set(chave, (await rodar(plano.comandos)).exitCode === 0)
+          }
+          if (!basesDoRecorte.get(chave)) plano = { escopo: `suíte inteira (o recorte de ${plano.alcancam.length} arquivos de teste falha sem mutante)`, comandos: cobrem }
+        }
         await $.fs.write(caminho, ap.texto)
         try {
-          const plano = planoIncremental(alvo.arquivo, mapa, cobrem)
           r.escopo = plano.escopo
           let t: Awaited<ReturnType<typeof rodar>>
           if (plano.alcancam) {

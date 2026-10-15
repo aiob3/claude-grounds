@@ -32,8 +32,25 @@ export type Goal = {
   aviso: 'apertado' | 'nao-cabe' | null
 }
 
+/** Somas do cache de prompt da sessão: tokens lidos do cache, tokens de entrada no total e quantas respostas contaram. */
+export type Cache = {
+  lidos: number
+  total: number
+  n: number
+  /** Id da última resposta somada do transcript: o transcript grava uma linha por bloco, todas com o mesmo uso. */
+  ultimoId?: string
+}
+
 declare module 'claude-code' {
   interface PluginState {
-    'contexto-bar': { snapshot: Snapshot | null; objetivo: Goal | null; turno: number }
+    'contexto-bar': {
+      snapshot: Snapshot | null
+      objetivo: Goal | null
+      turno: number
+      /** Somas do cache de prompt da sessão; `parcial` quando o transcript não pôde ser lido e conta só desde o carregamento. */
+      cache: { acc: Cache; parcial: boolean } | null
+      /** Tamanho do último pedido (entrada sem cache + lida + gravada no cache). */
+      pedido: number | null
+    }
   }
 }
