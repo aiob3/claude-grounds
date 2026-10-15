@@ -1109,3 +1109,35 @@ test('caderno: o texto longo aparece inteiro numa prévia enquanto o operador di
   await ui.unmount()
   expect(JSON.parse(c.texto().trim()).texto).toBe(longo)
 })
+
+test('caderno: nota entregue e sem resposta volta inteira a cada 8 passos; triada, não volta mais (sessão paralela, 15/10)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  const c = comCaderno(on)
+  await comObjetivo($)
+  await $.command.run({ command: 'objetivo', args: 'nota conferir o lembrete' } as never)
+  const passo = async () => JSON.stringify(await $.tool.call({ tool: 'Bash', command: 'true' } as never))
+  expect(await passo()).toContain('[caderno] Nota nova')
+  for (let i = 0; i < 7; i++) expect(await passo()).not.toContain('[caderno]')
+  const oitavo = await passo()
+  expect(oitavo).toContain('[caderno] Lembrete: 1 nota do operador segue sem resposta')
+  expect(oitavo).toContain('conferir o lembrete')
+  // O intervalo recomeça a cada lembrete; nota nova no mesmo passo de um lembrete vem antes dele (sobrevivente #3 da 0.14.0).
+  for (let i = 0; i < 7; i++) expect(await passo()).not.toContain('[caderno]')
+  await $.command.run({ command: 'objetivo', args: 'nota chegou junto' } as never)
+  const junto = await passo()
+  expect(junto).toContain('Lembrete')
+  expect(junto.indexOf('Nota nova') >= 0 && junto.indexOf('Nota nova') < junto.indexOf('Lembrete')).toBe(true)
+  const id2 = JSON.parse(c.texto().trim().split('\n').at(-1)!).id
+  await $.tool.call({ tool: TOOL, acao: 'triar', nota: id2, decisao: 'registrada', motivo: 'ok' } as never)
+  // Triada, sai dos lembretes.
+  const id = JSON.parse(c.texto().trim().split('\n')[0]!).id
+  await $.tool.call({ tool: TOOL, acao: 'triar', nota: id, decisao: 'registrada', motivo: 'ok' } as never)
+  for (let i = 0; i < 10; i++) expect(await passo()).not.toContain('[caderno]')
+  // Subagente não conta passo.
+  await $.command.run({ command: 'objetivo', args: 'nota outra' } as never)
+  expect(await passo()).toContain('[caderno] Nota nova')
+  for (let i = 0; i < 9; i++) await $.tool.call({ tool: 'Read', file_path: '/x', agentId: 'sub' } as never)
+  for (let i = 0; i < 7; i++) expect(await passo()).not.toContain('Lembrete')
+  expect(await passo()).toContain('Lembrete')
+})

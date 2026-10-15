@@ -115,6 +115,24 @@ export function entrega(notas: Nota[], comProposito: boolean, agora: number): st
   return `[caderno] ${notas.length === 1 ? 'Nota nova' : `${notas.length} notas novas`} do operador: ${corpo} — ${limite}${comProposito ? ` ${PROPOSITO}` : ' Responda com acao "triar".'}`
 }
 
+/** De quantos em quantos passos (ferramentas da conversa principal) uma nota entregue e sem resposta volta. */
+export const INTERVALO_LEMBRETE = 8
+
+/**
+ * As notas entregues que seguem sem resposta há pelo menos `intervalo` passos desde a última entrega. Entregar não é
+ * o mesmo que ser lido: na sessão paralela de 15/10, 6 notas chegaram e nenhuma foi triada.
+ */
+export function paraLembrar(notas: Nota[], ultimaEntrega: Record<string, number>, passo: number, intervalo = INTERVALO_LEMBRETE): Nota[] {
+  return semResposta(notas).filter(n => ultimaEntrega[n.id] !== undefined && passo - ultimaEntrega[n.id]! >= intervalo)
+}
+
+/** O lembrete: o texto inteiro de cada nota de novo, com a idade, e o pedido de triagem. */
+export function lembrete(notas: Nota[], agora: number): string {
+  if (!notas.length) return ''
+  const corpo = notas.map(n => `${n.id} (${n.tipo}${n.ref ? `, sobre ${n.ref}` : ''}, ${idade(n.em, agora)}): ${n.texto}`).join(' | ')
+  return `[caderno] Lembrete: ${notas.length === 1 ? '1 nota do operador segue' : `${notas.length} notas do operador seguem`} sem resposta: ${corpo} — triar cada uma com acao "triar" (aceita, recusada, muda-plano ou registrada, com o motivo); o operador espera a resposta no painel.`
+}
+
 /** Sufixo da linha de cada pedido: quantas notas esperam resposta. */
 export function pendenciaDoCaderno(notas: Nota[]): string {
   const n = semResposta(notas).length

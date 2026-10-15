@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { entrega, idade, lerCaderno, linha, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, triagem } from './caderno'
+import { entrega, idade, INTERVALO_LEMBRETE, lembrete, lerCaderno, linha, novaNota, paraLembrar, pendenciaDoCaderno, PROPOSITO, semResposta, triagem } from './caderno'
 
 const EM = '2026-10-15T21:30:05.123Z'
 
@@ -71,4 +71,25 @@ test('idade: menos de 1 min, minutos e horas; data ilegível não quebra', () =>
   expect(idade(EM, t + 59 * 60000)).toBe('há 59 min')
   expect(idade(EM, t + 60 * 60000)).toBe('há 1 h')
   expect(idade('', t)).toBe('agora há pouco')
+})
+
+test('lembrete: só a entregue e sem resposta, depois do intervalo desde a última entrega; texto inteiro com o pedido de triagem', () => {
+  const a = novaNota('olhar o contraste do painel', 'nota', EM, 'a')!
+  const b = novaNota('#3 rever o rótulo', 'agora', EM, 'b')!
+  const triada = { ...novaNota('já respondida', 'nota', EM, 'c')!, triagem: triagem('x', 'aceita', 'ok', EM) }
+  const nao = novaNota('nunca entregue', 'nota', EM, 'd')!
+  const ultima = { [a.id]: 2, [b.id]: 5, [triada.id]: 0 }
+  expect(paraLembrar([a, b, triada, nao], ultima, 9).map(n => n.id)).toEqual([])
+  expect(paraLembrar([a, b, triada, nao], ultima, 10).map(n => n.id)).toEqual([a.id])
+  expect(paraLembrar([a, b, triada, nao], ultima, 13).map(n => n.id)).toEqual([a.id, b.id])
+  expect(paraLembrar([a], { [a.id]: 2 }, 10, INTERVALO_LEMBRETE).length).toBe(1)
+  expect(paraLembrar([a], { [a.id]: 3 }, 10, INTERVALO_LEMBRETE).length).toBe(0)
+  const t = lembrete([a, b], Date.parse(EM) + 5 * 60000)
+  expect(t).toContain('[caderno] Lembrete: 2 notas do operador seguem sem resposta:')
+  expect(t).toContain(`${a.id} (nota, há 5 min): olhar o contraste do painel`)
+  expect(t).toContain(`${b.id} (agora, sobre #3, há 5 min): rever o rótulo`)
+  expect(t).toContain('triar cada uma com acao "triar"')
+  expect(lembrete([a], Date.parse(EM))).toContain('Lembrete: 1 nota do operador segue sem resposta')
+  expect(lembrete([], Date.parse(EM))).toBe('')
+  expect(INTERVALO_LEMBRETE).toBe(8)
 })

@@ -7,7 +7,7 @@ import type { Acao } from './objetivo'
 import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
 import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
 import type { SegundoPlano } from './segundo-plano'
-import { DECISOES, entrega, GLIFO_DECISAO, idade, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
+import { DECISOES, entrega, GLIFO_DECISAO, idade, lembrete, paraLembrar, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
 import { centralizar, centroIndicador, COR_INDICADOR, encurtar, ESTADOS, nomeModelo, textoAtividade, validarIndicadores } from './painel'
 import { estiloDoTerminal, gauge, LARGURA_GAUGE, LINHAS_GAUGE, pedacos } from './gauge'
 import type { EstiloGauge } from './gauge'
@@ -28,6 +28,8 @@ const tipoNota = atom({ plugin: 'contexto-bar', key: 'tipoNota' } as const, 'not
 const envios = atom({ plugin: 'contexto-bar', key: 'envios' } as const, 0)
 const executores = atom({ plugin: 'contexto-bar', key: 'executores' } as const, { subagentes: [] })
 const rascunho = atom({ plugin: 'contexto-bar', key: 'rascunho' } as const, '')
+const passos = atom({ plugin: 'contexto-bar', key: 'passos' } as const, 0)
+const ultimaEntrega = atom({ plugin: 'contexto-bar', key: 'ultimaEntrega' } as const, {})
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
@@ -228,14 +230,23 @@ async function triar($: EngineInterface, a: { nota?: string; decisao?: string; m
   return `Triagem gravada: ${n.id} ${a.decisao}${a.destino ? ` → ${a.destino}` : ''}. ${resta ? `Ainda sem resposta: ${resta}.` : 'Nenhuma nota sem resposta.'}`
 }
 
-/** As notas sem resposta que o Claude ainda não recebeu nesta sessão viram texto e passam a contar como entregues. */
+/**
+ * As notas sem resposta que o Claude ainda não recebeu nesta sessão viram texto e passam a contar como entregues; as
+ * já entregues que seguem sem resposta há INTERVALO_LEMBRETE passos voltam inteiras, como lembrete.
+ */
 async function notasParaEntregar($: EngineInterface): Promise<string> {
   await lerDoCaderno($).catch(() => undefined)
   const ja = new Set(await read($, entregues))
-  const novas = semResposta(await read($, caderno)).filter(n => !ja.has(n.id))
-  if (!novas.length) return ''
-  await update($, entregues, l => [...l, ...novas.map(n => n.id)])
-  return entrega(novas, ja.size === 0, await $.clock.now().catch(() => Date.now()))
+  const notas = await read($, caderno)
+  const novas = semResposta(notas).filter(n => !ja.has(n.id))
+  const passo = await read($, passos)
+  const lembrar = paraLembrar(notas, await read($, ultimaEntrega), passo)
+  const marcar = [...novas, ...lembrar].map(n => n.id)
+  if (!marcar.length) return ''
+  if (novas.length) await update($, entregues, l => [...l, ...novas.map(n => n.id)])
+  await update($, ultimaEntrega, u => ({ ...u, ...Object.fromEntries(marcar.map(id => [id, passo])) }))
+  const agoraMs = await $.clock.now().catch(() => Date.now())
+  return [novas.length ? entrega(novas, ja.size === 0, agoraMs) : '', lembrete(lembrar, agoraMs)].filter(Boolean).join(' ')
 }
 
 // O desenho dos gauges depende do terminal, que não muda durante a sessão: lido uma vez.
@@ -647,6 +658,7 @@ export const register: Register = on => {
   // Quase tempo real: relê depois de cada ferramenta da conversa principal (estimativa local, sem custo).
   on('tool.call', async ($, e, next) => {
     if (!e.agentId) await marcar($, { estado: 'trabalhando', ferramenta: e.tool as string })
+    if (!e.agentId) await update($, passos, n => n + 1).catch(() => undefined)
     const result = await next(e)
     if (!e.agentId) await marcar($, { estado: 'trabalhando' })
     if (e.agentId || (e.tool as string) === TOOL) return result

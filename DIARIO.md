@@ -226,6 +226,11 @@ Diário de um experimento operacional: usar mods (plugins locais do Claude Code)
 - **O caderno na sessão paralela:** o operador escreveu 6 notas lá; as 6 foram entregues (cada id está no transcript, e a linha de cada pedido repetiu "6 sem resposta" 9 vezes), e o agente não triou nenhuma. Entregar não é o mesmo que ser lido: vem aí a reentrega com o texto inteiro.
 - **Rodadas:** 18/10/8 (6 reais), reforço 18/16/2 (2 equivalentes, PROVADO; calibração por mexer no instrumento).
 
+### contexto-bar 0.14.0: a nota que não foi lida volta (2026-10-15, noite)
+- Na sessão paralela, 6 notas do operador chegaram ao agente e nenhuma foi triada; a linha de cada pedido repetia "6 sem resposta" e não bastou. Agora a nota entregue e sem resposta volta com o texto inteiro e o pedido de triagem a cada 8 passos (ferramentas da conversa principal; subagente não conta), até ser respondida. Não trava nada: só acompanha o resultado da ferramenta. Nota nova e lembrete no mesmo passo: a nova vem antes.
+- As 30 linhas do projeto do motor saíram do log compartilhado para o log local dele (decisão do operador); o histórico fica como está.
+- Rodadas: 11/10/1 (1 real), reforço 11/11/0 e +1 manual, PROVADO.
+
 ## Próximas observações
 - [ ] prova-de-teste: o `repetir` roda só os sobreviventes da execução anterior e herda os mortos (o reforço cairia de ~50 s para ~5 s). Fazer quando a próxima rodada com testes pedir.
 - [x] Confirmar numa sessão nova que o objetivo de `~/Work` volta sozinho. **Validado pelo operador em 2026-10-14:** a sessão nova recebeu o objetivo da F1 inteiro (título, conclusão, 8 itens), sem restauração manual; ali o objetivo foi fechado em 8/8.

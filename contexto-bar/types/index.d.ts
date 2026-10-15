@@ -111,6 +111,9 @@ declare module 'claude-code' {
       executores: Executores
       /** O que o operador está escrevendo no caderno, para a prévia (o campo do motor é de uma linha). */
       rascunho: string
+      /** Passos (ferramentas da conversa principal) desta sessão, e o passo da última entrega de cada nota. */
+      passos: number
+      ultimaEntrega: Record<string, number>
     }
   }
 }
