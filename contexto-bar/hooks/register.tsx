@@ -162,14 +162,19 @@ async function refresh($: EngineInterface, hookTexts: Set<string>) {
   }
 }
 
-/** Lê ~/.claude/indicadores/*.json (o contrato em painel.ts) e guarda só o que mudou. */
+/**
+ * Lê os indicadores (o contrato em painel.ts): os globais em ~/.claude/indicadores/*.json e os do projeto da sessão
+ * em ~/.claude/indicadores/<raiz>/*.json. Os de outra raiz nunca entram: cada sessão vê os números do seu projeto.
+ */
 async function lerIndicadores($: EngineInterface): Promise<void> {
   const home = await $.env.get('HOME')
   if (!home) return
-  const pasta = `${home}/.claude/indicadores`
+  const base = `${home}/.claude/indicadores`
+  const raiz = await raizAtual($)
   const lidos: Indicador[] = []
-  if (await $.fs.exists(pasta)) {
-    const nomes = (await $.fs.list(pasta)).filter(f => f.kind === 'file' && f.name.endsWith('.json')).map(f => f.name).sort()
+  for (const pasta of [base, ...(raiz ? [`${base}/${encodeURIComponent(raiz)}`] : [])]) {
+    if (!(await $.fs.exists(pasta).catch(() => false))) continue
+    const nomes = (await $.fs.list(pasta).catch(() => [])).filter(f => f.kind === 'file' && f.name.endsWith('.json')).map(f => f.name).sort()
     for (const nome of nomes) {
       try {
         lidos.push(...validarIndicadores(JSON.parse(await $.fs.read(`${pasta}/${nome}`))))

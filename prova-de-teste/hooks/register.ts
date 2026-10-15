@@ -5,7 +5,7 @@ import type { Escolha, ExecucaoFeita } from '../types'
 import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
 import { efetividade, indicadoresDeEfetividade } from './placar'
-import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, logDoProjeto, PASTA_PROJETOS, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
+import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, logDoProjeto, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
 import type { Alias } from './alcance'
 import { aliasesDe, cabeNoMapa, ehConfigDeAlias, ehEntradaDeTeste, ehMapeavel, grafo, SUFIXO_FORA, testesQueAlcancam } from './alcance'
@@ -149,13 +149,6 @@ async function escolher(
   }
 }
 
-async function caminhoDoLog($: EngineInterface): Promise<string | undefined> {
-  const doEnv = await $.env.get('PROVA_DE_TESTE_LOG').catch(() => undefined)
-  if (doEnv) return doEnv
-  const home = await $.env.get('HOME').catch(() => undefined)
-  return home ? logPadrao(home) : undefined
-}
-
 /** O repositório de uma pasta, o mesmo para todas as worktrees dele (o diretório comum do git, sem o /.git). */
 async function repositorioDe($: EngineInterface, pasta: string): Promise<string | undefined> {
   const r = await git($, ['rev-parse', '--path-format=absolute', '--git-common-dir'], pasta).catch(() => undefined)
@@ -188,24 +181,23 @@ async function versaoDoMod($: EngineInterface): Promise<string> {
   return versaoDe(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`).catch(() => ''))
 }
 
-/** A efetividade do ciclo vai a ~/.claude/indicadores/prova-de-teste.json, que o painel do contexto-bar mostra. */
+/**
+ * A efetividade do projeto da sessão vai a ~/.claude/indicadores/<raiz da sessão>/prova-de-teste.json, que o painel do
+ * contexto-bar daquela raiz mostra. Só o log desse projeto entra: cada sessão vê os números dela, nunca a soma de
+ * todos (nota do operador, 15/10/2026: os gauges das duas sessões mostravam a mesma mistura).
+ */
 async function publicarPlacar($: EngineInterface): Promise<void> {
   const home = await $.env.get('HOME').catch(() => undefined)
-  const caminho = await caminhoDoLog($)
-  if (!home || !caminho) return
-  // Os números de todos os logs, o compartilhado e os locais de cada projeto, somados aqui: nenhum texto sai.
-  const real = (await $.fs.stat(caminho, { resolve: true }).catch(() => undefined))?.realPath ?? caminho
-  const logs = [(await $.fs.exists(real)) ? await $.fs.read(real) : '']
-  const pasta = PASTA_PROJETOS(home)
-  if (await $.fs.exists(pasta).catch(() => false)) {
-    for (const f of (await $.fs.list(pasta).catch(() => [])).filter(f => f.kind === 'file' && f.name.endsWith('.md')).map(f => f.name).sort()) {
-      logs.push(await $.fs.read(`${pasta}/${f}`).catch(() => ''))
-    }
-  }
-  if (!logs.some(Boolean)) return
-  const texto = indicadoresDeEfetividade(efetividade(logs.join('\n')))
-  const destino = `${home}/.claude/indicadores/prova-de-teste.json`
-  if ((await $.fs.read(destino).catch(() => '')) !== texto) await $.fs.write(destino, texto)
+  if (!home) return
+  const raiz = (await $.session.root().catch(() => '')) || (await $.session.cwd().catch(() => ''))
+  if (!raiz) return
+  const destino = await destinoDoLog($, raiz)
+  if (!destino) return
+  const real = (await $.fs.stat(destino.caminho, { resolve: true }).catch(() => undefined))?.realPath ?? destino.caminho
+  if (!(await $.fs.exists(real))) return
+  const texto = indicadoresDeEfetividade(efetividade(await $.fs.read(real)))
+  const arquivo = `${home}/.claude/indicadores/${encodeURIComponent(raiz)}/prova-de-teste.json`
+  if ((await $.fs.read(arquivo).catch(() => '')) !== texto) await $.fs.write(arquivo, texto)
 }
 
 async function registrar($: EngineInterface, r: Partial<Registro> & { defeitoInstrumento?: string }): Promise<{ texto: string; erro: boolean }> {

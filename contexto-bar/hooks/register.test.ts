@@ -1141,3 +1141,86 @@ test('caderno: nota entregue e sem resposta volta inteira a cada 8 passos; triad
   for (let i = 0; i < 7; i++) expect(await passo()).not.toContain('Lembrete')
   expect(await passo()).toContain('Lembrete')
 })
+
+// Indicadores em pastas: um mundo de arquivos com pastas, para os testes por raiz.
+const mundoIndicadores = (on: Parameters<TestBody>[1], o: { raiz?: string | null; listaFalha?: string; existeFalha?: string } = {}) => {
+  if (o.raiz === null) {
+    on('session.root', () => {
+      throw new Error('sem raiz')
+    })
+    on('session.cwd', () => {
+      throw new Error('sem pasta')
+    })
+  } else on('session.root', () => ({ value: o.raiz ?? '/proj/a' }) as never)
+  mock.env(on, { HOME: '/h' })
+  const ind = (fonte: string, rotulo: string, valor: number) => JSON.stringify({ versao: 1, fonte, itens: [{ id: 'i', rotulo, valor, meta: 100, texto: `${valor}%` }] })
+  const fs = new Map<string, string>([
+    ['/h/.claude/indicadores/global.json', ind('global', 'global', 10)],
+    ['/h/.claude/indicadores/velho.json.bak', ind('velho', 'backup velho', 5)],
+    ['/h/.claude/indicadores/%2Fproj%2Fa/prova-de-teste.json', ind('prova-de-teste', 'desta raiz', 20)],
+    ['/h/.claude/indicadores/%2Fproj%2Fb/prova-de-teste.json', ind('prova-de-teste', 'da outra raiz', 30)],
+  ])
+  const pastas = new Set(['/h/.claude/indicadores', '/h/.claude/indicadores/%2Fproj%2Fa', '/h/.claude/indicadores/%2Fproj%2Fb'])
+  on('fs.exists', (_$, e) => {
+    if ((e as { path: string }).path === o.existeFalha) throw new Error('EACCES')
+    return { value: pastas.has((e as { path: string }).path) || fs.has((e as { path: string }).path) } as never
+  })
+  on('fs.list', (_$, e) => {
+    const d = (e as { path: string }).path
+    if (d === o.listaFalha) throw new Error('EACCES')
+    const p = `${d}/`
+    const arquivos = [...fs.keys()].filter(k => k.startsWith(p) && !k.slice(p.length).includes('/')).map(k => ({ name: k.slice(p.length), kind: 'file' }))
+    const sub = [...pastas].filter(x => x.startsWith(p) && !x.slice(p.length).includes('/')).map(x => ({ name: x.slice(p.length), kind: 'dir' }))
+    return { value: [...arquivos, ...sub] } as never
+  })
+  on('fs.read', (_$, e) => {
+    const t = fs.get((e as { path: string }).path)
+    if (t === undefined) throw new Error('ENOENT')
+    return { value: t } as never
+  })
+  on('session.usage', () => usageWith(50000))
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  return { fs, pastas }
+}
+
+test('painel: indicadores globais e os da raiz da sessão; os de outra raiz não entram (nota do operador, 15/10)', async ($, on) => {
+  const m = mundoIndicadores(on)
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  let pane = await painel($)
+  expect(pane).toContain('global')
+  expect(pane).toContain('desta raiz')
+  expect(pane).not.toContain('da outra raiz')
+  // Só .json: o backup ao lado não entra (sobrevivente #2 da 0.14.1); os globais vêm antes dos do projeto (#4).
+  expect(pane).not.toContain('backup vel')
+  expect(pane.indexOf('global') < pane.indexOf('desta raiz')).toBe(true)
+  // A pasta inteira some: os gauges saem também (#1).
+  m.pastas.clear()
+  m.fs.clear()
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  pane = await painel($)
+  expect(pane).not.toContain('global')
+  expect(pane).not.toContain('desta raiz')
+})
+
+test('painel: sem raiz, os globais aparecem uma vez só; a pasta do projeto ilegível não esconde os globais (sobreviventes #5, #6 e #7 da 0.14.1)', async ($, on) => {
+  mundoIndicadores(on, { raiz: null })
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  const pane = await painel($)
+  expect(pane.match(/"  global   "/g)?.length).toBe(1)
+})
+
+test('painel: lista da pasta do projeto que falha não derruba a leitura dos globais', async ($, on) => {
+  mundoIndicadores(on, { listaFalha: '/h/.claude/indicadores/%2Fproj%2Fa' })
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  const pane = await painel($)
+  expect(pane).toContain('global')
+  expect(pane).not.toContain('desta raiz')
+})
+
+test('painel: checar a pasta do projeto que dá erro não derruba a leitura dos globais (sobrevivente #6 da 0.14.1)', async ($, on) => {
+  mundoIndicadores(on, { existeFalha: '/h/.claude/indicadores/%2Fproj%2Fa' })
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  const pane = await painel($)
+  expect(pane).toContain('global')
+  expect(pane).not.toContain('desta raiz')
+})

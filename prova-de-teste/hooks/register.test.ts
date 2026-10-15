@@ -653,11 +653,12 @@ test('resposta do escolhedor no teto de tokens: a última linha sai e o aviso di
 })
 
 test('a efetividade do ciclo vai ao arquivo de indicadores a cada registro, com o log já gravado', async ($, on) => {
+  on('session.root', () => ({ value: '/repo' }) as never)
   mock.env(on, { HOME: '/home/u', PROVA_DE_TESTE_LOG: LOG_PATH })
   gitFalso(on)
   let log = '# log\n2026-10-15 | a | v1.2 | mutantes: 5/5/0 | reais: 1 | PROVADO | 30 | instrumento: mod 0.9.0 | medição\n'
   const escritas: Record<string, string[]> = {}
-  const destino = '/home/u/.claude/indicadores/prova-de-teste.json'
+  const destino = '/home/u/.claude/indicadores/%2Frepo/prova-de-teste.json'
   on('fs.exists', () => ({ value: true }) as never)
   on('fs.stat', () => {
     throw new Error('sem link')
@@ -684,11 +685,11 @@ test('a efetividade do ciclo vai ao arquivo de indicadores a cada registro, com 
 })
 
 // Isolamento por projeto (0.11.0): o log compartilhado mora num repositório git (que vai ao GitHub e ao público).
-const isolado = (on: On, o: { cwd: string; logEmGit?: boolean; listaInvertida?: boolean }) => {
+const isolado = (on: On, o: { cwd: string; logEmGit?: boolean; listaInvertida?: boolean; raiz?: string | null }) => {
   mock.env(on, { HOME: '/h' })
   const fs = new Map<string, string>([['/mods/publico/EXP-001-log.md', '# log\n']])
   const gits: string[][] = []
-  const repos: Record<string, string> = { '/mods/publico': '/mods/.git', '/tmp/wt': '/mods/.git', '/data/sensivel': '/data/sensivel/.git', '/data/sensivel-wt': '/data/sensivel/.git' }
+  const repos: Record<string, string> = { '/mods/publico': '/mods/.git', '/tmp/wt': '/mods/.git', '/data/sensivel': '/data/sensivel/.git', '/data/sensivel-wt': '/data/sensivel/.git', '/data/sensivel/sub': '/data/sensivel/.git' }
   on('process.run', (_$, e) => {
     const { argv, init } = e as { argv: string[]; init?: { cwd?: string } }
     gits.push([...argv, init?.cwd ?? ''])
@@ -700,6 +701,11 @@ const isolado = (on: On, o: { cwd: string; logEmGit?: boolean; listaInvertida?: 
     return r('')
   })
   on('session.cwd', () => ({ value: o.cwd }) as never)
+  if (o.raiz !== undefined)
+    on('session.root', () => {
+      if (o.raiz === null) throw new Error('sem raiz')
+      return { value: o.raiz } as never
+    })
   on('fs.stat', (_$, e) => {
     const p = (e as { path: string }).path
     if (p === '/h/.claude/prova-de-teste/EXP-001-log.md') return { value: { kind: 'file', size: 1, mtimeMs: 0, isLink: true, realPath: '/mods/publico/EXP-001-log.md' } } as never
@@ -723,6 +729,7 @@ const isolado = (on: On, o: { cwd: string; logEmGit?: boolean; listaInvertida?: 
   })
   return { fs, gits }
 }
+const prov = (n: string, a: number, mo: number) => `2026-10-15 | ${n}: x | v1.2 | mutantes: ${a}/${mo}/${a - mo} | reais: 0 | PROVADO | 10 | instrumento: mod 0.10.0 | medição`
 const registro = { tool: 'mcp__prova-de-teste__registrar', tarefa: 'tarefa x: detalhe', aplicados: 2, mortos: 2, sobreviventes: 0, reais: 0, estado: 'PROVADO', tempo: 3 }
 
 test('isolamento: rodada de outro projeto vai ao log local dele, fora de qualquer git, e o log compartilhado não muda', async ($, on) => {
@@ -764,34 +771,55 @@ test('isolamento: worktree de outro projeto vai ao log do repositório dele; pas
   expect(logDoProjeto('/h', '')).toBe('/h/.claude/prova-de-teste/projetos/sem-projeto.md')
 })
 
-test('isolamento: com o compartilhado vazio os locais contam; só .md entra; a ordem é a dos nomes, qualquer que seja a da pasta (sobreviventes #2, #4 e #5)', async ($, on) => {
-  const m = isolado(on, { cwd: '/data/sensivel', listaInvertida: true })
-  m.fs.delete('/mods/publico/EXP-001-log.md')
-  m.fs.set('/h/.claude/prova-de-teste/projetos', '')
-  const prov = (n: string, a: number, mo: number) => `2026-10-15 | ${n}: x | v1.2 | mutantes: ${a}/${mo}/${a - mo} | reais: 0 | PROVADO | 10 | instrumento: mod 0.10.0 | medição`
-  // a.md: uma tarefa com 0% na 1ª passada; b.md: cinco com 100%. Pela ordem dos nomes, as últimas 5 são as de b.
-  m.fs.set('/h/.claude/prova-de-teste/projetos/a.md', `${prov('a1', 4, 0)}\n`)
-  m.fs.set('/h/.claude/prova-de-teste/projetos/b.md', [1, 2, 3, 4, 5].map(i => prov(`b${i}`, 4, 4)).join('\n'))
-  m.fs.set('/h/.claude/prova-de-teste/projetos/c.bak', [6, 7, 8].map(i => prov(`c${i}`, 4, 0)).join('\n'))
-  await $.tool.call({ ...registro, tarefa: 'a0: y', aplicados: 4, mortos: 0, sobreviventes: 4, reais: 4, estado: 'FRACO' } as never)
-  const ind = JSON.parse(m.fs.get('/h/.claude/indicadores/prova-de-teste.json')!)
-  expect(ind.itens[0].detalhe).toContain('últimas 5 tarefas: 100%')
-})
-
 test('isolamento: pasta que não é repositório vai ao log local com o nome da pasta', async ($, on) => {
   const m = isolado(on, { cwd: '/home/u/solta' })
   await $.tool.call(registro as never)
   expect(m.fs.get('/h/.claude/prova-de-teste/projetos/%2Fhome%2Fu%2Fsolta.md')).toContain('| tarefa x: detalhe |')
 })
 
-test('isolamento: a efetividade soma os números do log compartilhado e dos locais, sem levar texto a lugar nenhum', async ($, on) => {
+
+test('indicadores por projeto: cada sessão vê só a efetividade do log do seu projeto, num arquivo da sua raiz (nota do operador, 15/10)', async ($, on) => {
   const m = isolado(on, { cwd: '/data/sensivel' })
+  on('session.root', () => ({ value: '/data/sensivel' }) as never)
+  m.fs.set('/mods/publico/EXP-001-log.md', `# log\n${prov('dos mods', 4, 4)}\n`)
+  m.fs.set('/h/.claude/prova-de-teste/projetos/%2Fdata%2Fsensivel.md', `${prov('sensivel', 4, 1)}\n`)
+  await $.tool.call({ ...registro, tarefa: 'sensivel 2: y', aplicados: 4, mortos: 3, sobreviventes: 1, reais: 1, estado: 'FRACO' } as never)
+  const ind = JSON.parse(m.fs.get('/h/.claude/indicadores/%2Fdata%2Fsensivel/prova-de-teste.json')!)
+  // Só as do projeto: a provada "sensivel" (1 de 4 na 1ª lista); a dos mods não entra; a nova ainda está aberta.
+  expect(ind.itens[0].detalhe).toContain('últimas 1 tarefas: 25%')
+  // Nada no arquivo global, nem na pasta de outra raiz.
+  expect(m.fs.has('/h/.claude/indicadores/prova-de-teste.json')).toBe(false)
+  expect([...m.fs.keys()].filter(k => k.startsWith('/h/.claude/indicadores/')).length).toBe(1)
+})
+
+test('indicadores por projeto: a sessão dos mods vê só o log compartilhado, mesmo com logs locais de outros projetos', async ($, on) => {
+  const m = isolado(on, { cwd: '/tmp/wt' })
+  on('session.root', () => ({ value: '/tmp/wt' }) as never)
+  m.fs.set('/mods/publico/EXP-001-log.md', `# log\n${prov('dos mods', 4, 4)}\n`)
   m.fs.set('/h/.claude/prova-de-teste/projetos', '')
-  m.fs.set('/h/.claude/prova-de-teste/projetos/outro.md', '2026-10-15 | outra: y | v1.2 | mutantes: 4/2/2 | reais: 2 | PROVADO | 10 | instrumento: mod 0.10.0 | medição\n')
-  m.fs.set('/mods/publico/EXP-001-log.md', '# log\n2026-10-15 | mods: z | v1.2 | mutantes: 4/4/0 | reais: 0 | PROVADO | 10 | instrumento: mod 0.10.0 | medição\n')
+  m.fs.set('/h/.claude/prova-de-teste/projetos/%2Fdata%2Fsensivel.md', `${prov('sensivel', 4, 0)}\n`)
   await $.tool.call(registro as never)
-  const ind = JSON.parse(m.fs.get('/h/.claude/indicadores/prova-de-teste.json')!)
-  // Três tarefas: a dos mods, a do outro projeto e a recém-registrada no log local; 1ª passada (4+2+2)/(4+4+2) = 80%.
-  expect(ind.itens[0].detalhe).toContain('últimas 3 tarefas: 80%')
-  expect(JSON.stringify(ind)).not.toContain('outra: y')
+  const ind = JSON.parse(m.fs.get('/h/.claude/indicadores/%2Ftmp%2Fwt/prova-de-teste.json')!)
+  expect(ind.itens[0].detalhe).toContain('últimas 2 tarefas: 100%')
+})
+
+test('indicadores por projeto: raiz que falha cai na pasta da sessão; a raiz vale antes da subpasta; sem nenhuma, nada é escrito (sobreviventes #1, #3 e #5 da 0.12.0)', async ($, on) => {
+  const m = isolado(on, { cwd: '/data/sensivel', raiz: null })
+  m.fs.set('/h/.claude/prova-de-teste/projetos/%2Fdata%2Fsensivel.md', `${prov('sensivel', 4, 4)}\n`)
+  await $.tool.call(registro as never)
+  expect(m.fs.has('/h/.claude/indicadores/%2Fdata%2Fsensivel/prova-de-teste.json')).toBe(true)
+})
+
+test('indicadores por projeto: na subpasta, o arquivo é o da raiz', async ($, on) => {
+  const m = isolado(on, { cwd: '/data/sensivel/sub', raiz: '/data/sensivel' })
+  m.fs.set('/h/.claude/prova-de-teste/projetos/%2Fdata%2Fsensivel.md', `${prov('sensivel', 4, 4)}\n`)
+  await $.tool.call(registro as never)
+  expect(m.fs.has('/h/.claude/indicadores/%2Fdata%2Fsensivel/prova-de-teste.json')).toBe(true)
+  expect([...m.fs.keys()].some(k => k.includes('%2Fsub'))).toBe(false)
+})
+
+test('indicadores por projeto: sem raiz nem pasta da sessão, nada vai ao arquivo global', async ($, on) => {
+  const m = isolado(on, { cwd: '', raiz: '' })
+  await $.tool.call(registro as never)
+  expect([...m.fs.keys()].filter(k => k.startsWith('/h/.claude/indicadores'))).toEqual([])
 })

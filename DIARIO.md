@@ -231,6 +231,11 @@ Diário de um experimento operacional: usar mods (plugins locais do Claude Code)
 - As 30 linhas do projeto do motor saíram do log compartilhado para o log local dele (decisão do operador); o histórico fica como está.
 - Rodadas: 11/10/1 (1 real), reforço 11/11/0 e +1 manual, PROVADO.
 
+### contexto-bar 0.14.1 + prova-de-teste 0.12.0: cada sessão vê os números do seu projeto (2026-10-15, noite)
+- **A nota do operador:** rodando a sessão paralela, ele notou que os gauges não eram individualizados, sobretudo o tempo médio dos testes, e apontou a invasão dos espaços delimitados desde o começo. Confirmado: o arquivo de indicadores era um só na máquina, e a efetividade somava os logs de todos os projetos. Só números, mas cruzando o limite.
+- **A correção:** indicadores por projeto, em `~/.claude/indicadores/<raiz>/`; os do topo da pasta ficam para o que é de fato global. O prova-de-teste publica a efetividade só do log do projeto da sessão, na pasta da raiz dela; o painel lê os globais e os da sua raiz, nunca os de outra. O arquivo antigo, com a mistura, foi apagado.
+- **Rodadas:** prova-de-teste 11/5/6 (3 reais, entre eles o que mandaria ao arquivo global quando a sessão não tem raiz), reforço 11/8/3 (3 equivalentes); contexto-bar 12/5/7 (6 reais), reforços 12/9/3 e 12/11/1 (1 equivalente).
+
 ## Próximas observações
 - [ ] prova-de-teste: o `repetir` roda só os sobreviventes da execução anterior e herda os mortos (o reforço cairia de ~50 s para ~5 s). Fazer quando a próxima rodada com testes pedir.
 - [x] Confirmar numa sessão nova que o objetivo de `~/Work` volta sozinho. **Validado pelo operador em 2026-10-14:** a sessão nova recebeu o objetivo da F1 inteiro (título, conclusão, 8 itens), sem restauração manual; ali o objetivo foi fechado em 8/8.
