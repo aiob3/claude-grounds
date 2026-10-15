@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
+  realocar,
   AMBIENTE_DE_TESTE,
   chaveDoRecorte,
   pycachesDe,
@@ -315,4 +316,37 @@ test('nenhum comando de teste grava .pyc, e saem só os __pycache__ ao lado dos 
   expect(AMBIENTE_DE_TESTE.PYTHONDONTWRITEBYTECODE).toBe('1')
   expect(pycachesDe(['src/calc.py', 'src/util.py', 'calc.py', 'gui/app.pyw', 'hooks/a.ts', 'src/py.ts'])).toEqual(['src/__pycache__', '__pycache__', 'gui/__pycache__'])
   expect(pycachesDe(['hooks/a.ts', 'a.pyi'])).toEqual([])
+})
+
+test('crase escapada dentro do trecho é a crase do código: os 4 "não encontrado" falsos de 15/10/2026', () => {
+  const ok = (fonte: string, mutacao: string, esperado: string) => {
+    const r = aplicarTrecho(fonte, 1, mutacao)
+    expect('erro' in r ? r.erro : r.texto).toBe(esperado)
+  }
+  const py = "const pastas = enviados.map(f => (f.includes('/') ? `${f.slice(0, f.lastIndexOf('/'))}/__pycache__` : '__pycache__'))\n"
+  ok(py, "`(f.includes('/') ? \\`${f.slice(0, f.lastIndexOf('/'))}/__pycache__\\` : '__pycache__')` → `('__pycache__')`", "const pastas = enviados.map(f => ('__pycache__'))\n")
+  ok('const ps = xs.map(p => `${copia}/${p}`)\n', '`.map(p => \\`${copia}/${p}\\`)` → `.map(p => p)`', 'const ps = xs.map(p => p)\n')
+  // A crase escapada também no trecho mutado (contexto-bar).
+  ok('const c = t.length > 60 ? `${t.slice(0, 59)}…` : t\n', '`t.length > 60 ? \\`${t.slice(0, 59)}…\\` : t` → `t.length >= 60 ? \\`${t.slice(0, 59)}…\\` : t`', 'const c = t.length >= 60 ? `${t.slice(0, 59)}…` : t\n')
+  // Com crases duplas por fora, como o escolhedor às vezes devolve, continua valendo.
+  ok('const ps = xs.map(p => `${copia}/${p}`)\n', '`` .map(p => `${copia}/${p}`) `` → `` .map(p => p) ``', 'const ps = xs.map(p => p)\n')
+  // Crases duplas por fora e a de dentro escapada mesmo assim.
+  ok('const ps = xs.map(p => `${copia}/${p}`)\n', '`` .map(p => \\`${copia}/${p}\\`) `` → `` .map(p => p) ``', 'const ps = xs.map(p => p)\n')
+  // Código com \` de verdade (crase escapada dentro do template): tirar só a barra antes de cada crase ainda acha o trecho.
+  ok('const s = `a\\`b`\n', '`\\`a\\\\`b\\`` → `\\`ab\\``', 'const s = `ab`\n')
+  expect(lerMutacoes('`\\`x\\`` → `y`')).toEqual([{ de: '\\`x\\`', para: 'y' }, { de: '`x`', para: 'y' }])
+})
+
+test('realocar troca a raiz pela cópia só onde ela é um caminho inteiro (venv copiado, 0.8.3)', () => {
+  const c = '/tmp/p/repo'
+  expect(realocar('/repo/src\n', '/repo', c)).toBe('/tmp/p/repo/src\n')
+  // A raiz no fim do texto, sem nada depois (um .pth sem quebra de linha final).
+  expect(realocar('/repo', '/repo', c)).toBe('/tmp/p/repo')
+  expect(realocar('#!/repo/.venv/bin/python\n', '/repo', c)).toBe('#!/tmp/p/repo/.venv/bin/python\n')
+  expect(realocar("VIRTUAL_ENV='/repo/.venv'\nMAPPING = {'calc': '/repo/src/calc'}\n/repo\n", '/repo', c)).toBe("VIRTUAL_ENV='/tmp/p/repo/.venv'\nMAPPING = {'calc': '/tmp/p/repo/src/calc'}\n/tmp/p/repo\n")
+  expect(realocar('PATH=/x:/repo/bin\n', '/repo', c)).toBe('PATH=/x:/tmp/p/repo/bin\n')
+  // Começo igual e meio de outro caminho não contam.
+  expect(realocar('/repository/src\n/data/repo/src\n', '/repo', c)).toBe('/repository/src\n/data/repo/src\n')
+  // Raiz com caracteres de regex.
+  expect(realocar('/a+b (1)/src\n', '/a+b (1)', c)).toBe('/tmp/p/repo/src\n')
 })

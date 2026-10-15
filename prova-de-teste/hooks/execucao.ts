@@ -15,7 +15,7 @@ export function lerMutacoes(mutacao: string): { de: string; para: string }[] {
   // O escolhedor às vezes explica a mutação depois dela: `a` → `b` (remove a guarda). A nota não faz parte do trecho.
   const t = mutacao.trim().replace(/(`)\s+\([^`]*\)$/, '$1')
   const dupla = /^``\s(.+?)\s``\s*→\s*``\s(.*?)\s``$/.exec(t)
-  if (dupla) return [{ de: dupla[1]!, para: dupla[2]! }]
+  if (dupla) return comEscapes([{ de: dupla[1]!, para: dupla[2]! }])
   if (!t.startsWith('`') || !t.endsWith('`')) return []
   const miolo = t.slice(1, -1)
   const leituras: { de: string; para: string }[] = []
@@ -23,7 +23,17 @@ export function lerMutacoes(mutacao: string): { de: string; para: string }[] {
     const de = miolo.slice(0, corte.index)
     if (de) leituras.push({ de, para: miolo.slice(corte.index! + corte[0].length) })
   }
-  return leituras
+  return comEscapes(leituras)
+}
+
+/**
+ * O escolhedor escapa a crase de dentro do trecho (`` `\`${a}\`` ``): cada leitura com \` ganha a versão sem a barra.
+ * As duas ficam; quem aplica fica com a que existe no arquivo (código com \` de verdade continua achando a literal).
+ * Recusados como "não encontrado" 4 vezes num dia (0.8.3).
+ */
+function comEscapes(leituras: { de: string; para: string }[]): { de: string; para: string }[] {
+  const tira = (s: string) => s.replaceAll('\\`', '`')
+  return leituras.flatMap(l => (l.de.includes('\\`') || l.para.includes('\\`') ? [l, { de: tira(l.de), para: tira(l.para) }] : [l]))
 }
 
 export type Aplicacao = { texto: string; linhaReal: number; ocorrencias: number }
@@ -218,6 +228,29 @@ export const AMBIENTE_DE_TESTE: Record<string, string> = { PYTHONDONTWRITEBYTECO
 export function pycachesDe(enviados: string[]): string[] {
   const pastas = enviados.filter(f => /\.pyw?$/.test(f)).map(f => (f.includes('/') ? `${f.slice(0, f.lastIndexOf('/'))}/__pycache__` : '__pycache__'))
   return [...new Set(pastas)]
+}
+
+/**
+ * Os arquivos do venv que guardam o caminho absoluto do projeto: o .pth da instalação editável, o egg-link, o
+ * localizador __editable__ do setuptools e os scripts de bin (shebang, activate). Copiados, ainda apontam para o original
+ * e a cópia importaria o código ORIGINAL (o 19/0/19 da 1ª passada do motor, rodada 59). O script lista, entre eles,
+ * só os de texto (grep -I) que citam a raiz ($1). Link sai depois, no $.fs.stat de quem reescreve: aqui não daria para testar.
+ */
+export const ACHAR_NO_VENV =
+  'for c in */pyvenv.cfg .*/pyvenv.cfg; do [ -f "$c" ] || continue; v=${c%/pyvenv.cfg}; ' +
+  'for f in "$v"/bin/* "$v"/lib*/python*/site-packages/*.pth "$v"/lib*/python*/site-packages/*.egg-link "$v"/lib*/python*/site-packages/__editable__*.py; do ' +
+  '[ -f "$f" ] && grep -qIF -e "$1" -- "$f" && printf "%s\\n" "$f"; done; done; true'
+
+/** Sobrescreve $2 com o conteúdo de $1 no mesmo arquivo: o modo (executável, nos scripts de bin) fica. */
+export const SOBRESCREVER = 'cat -- "$1" > "$2"'
+
+/**
+ * Troca a raiz pela cópia só onde ela é o caminho inteiro ou o começo de um (`/repo/src`, não `/repository`).
+ * Reescrever o que o venv já dizia, em vez de pôr PYTHONPATH, mantém a ordem e o layout que o projeto escolheu.
+ */
+export function realocar(texto: string, raiz: string, copia: string): string {
+  const r = raiz.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return texto.replace(new RegExp(`(?<=^|[\\s"'=:;,(!])${r}(?=[/\\s"':;,)\\]]|$)`, 'gm'), copia)
 }
 
 export type Mapa = { g: Map<string, string[]>; testes: string[] }

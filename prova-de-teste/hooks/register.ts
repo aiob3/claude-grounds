@@ -2,9 +2,9 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Escolha, ExecucaoFeita } from '../types'
-import { AMBIENTE_DE_TESTE, chaveDoRecorte, pycachesDe, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
+import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
-import { avisoNovos, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, ehArquivoDeTeste } from './prova'
+import { avisoNovos, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
 import type { Alias } from './alcance'
 import { aliasesDe, cabeNoMapa, ehConfigDeAlias, ehEntradaDeTeste, ehMapeavel, grafo, SUFIXO_FORA, testesQueAlcancam } from './alcance'
@@ -233,6 +233,16 @@ async function pastasDePlugin($: EngineInterface, raiz: string, tocados: string[
   return [...achadas]
 }
 
+/** Os nomes dos plugins a que os arquivos tocados pertencem, pelo plugin.json de cada um. */
+async function pluginsTocados($: EngineInterface, raiz: string, tocados: string[]): Promise<string[]> {
+  const nomes: string[] = []
+  for (const p of await pastasDePlugin($, raiz, tocados)) {
+    const nome = nomeDe(await $.fs.read(`${raiz}/${p ? `${p}/` : ''}.claude-plugin/plugin.json`).catch(() => ''))
+    if (nome) nomes.push(nome)
+  }
+  return nomes
+}
+
 async function executar(
   $: EngineInterface,
   a: { tarefa?: string; cwd?: string; base?: string; modelo?: string; novos?: boolean; comando?: string[]; timeoutSegundos?: number; repetir?: boolean; incremental?: boolean },
@@ -272,6 +282,19 @@ async function executar(
     if (pycaches.length) {
       const rm = await $.process.run(['rm', '-rf', '--', ...pycaches])
       if (rm.exitCode !== 0) return { texto: `Erro: não apaguei o __pycache__ da cópia (${rm.stderr.trim()}).`, erro: true }
+    }
+    // O venv copiado passa a apontar para a cópia (ver ACHAR_NO_VENV).
+    const doVenv = await $.process.run(['sh', '-c', ACHAR_NO_VENV, 'sh', raiz], { cwd: copia })
+    for (const f of doVenv.stdout.split('\n').filter(Boolean)) {
+      // Link fica de fora: escrever nele escreveria no alvo, que pode ser o venv do original.
+      const st = await $.fs.stat(`${copia}/${f}`).catch(() => undefined)
+      if (!st || st.isLink) continue
+      const t = await $.fs.read(`${copia}/${f}`)
+      const novo = realocar(t, raiz, copia)
+      if (novo === t) continue
+      await $.fs.write(`${pasta}/realocado`, novo)
+      const w = await $.process.run(['sh', '-c', SOBRESCREVER, 'sh', `${pasta}/realocado`, `${copia}/${f}`])
+      if (w.exitCode !== 0) return { texto: `Erro: não apontei o venv da cópia para a cópia (${f}: ${w.stderr.trim()}).`, erro: true }
     }
     /** Os arquivos JS/TS/Python do repositório e quem importa quem; grande demais ou ilegível, nada. */
     const mapear = async () => {
@@ -443,7 +466,13 @@ async function executar(
       quando: new Date().toISOString(),
       versao: await versaoDoMod($),
       // O diff mexe no próprio mod: a rodada mede o instrumento enquanto ele muda (v1.2: calibração).
-      alteraInstrumento: tocaOInstrumento(raiz, e.enviados, $.plugin.root),
+      alteraInstrumento: tocaOInstrumento(
+        raiz,
+        e.enviados,
+        $.plugin.root,
+        await pluginsTocados($, raiz, e.enviados),
+        nomeDe(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`).catch(() => '')),
+      ),
       custo: resumoCusto(exec),
     }
     await update($, execucao, () => feita)

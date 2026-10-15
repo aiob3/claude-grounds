@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { avisoNovos, CABECALHO_LOG, defeitosDoInstrumento, protocoloEm, ehArquivoDeTeste, instrumentoDe, tocaOInstrumento, versaoDe, lacunas, lerArgs, lerResposta, linhaLog, separar } from './prova'
+import { avisoNovos, CABECALHO_LOG, defeitosDoInstrumento, protocoloEm, ehArquivoDeTeste, instrumentoDe, tocaOInstrumento, nomeDe, versaoDe, lacunas, lerArgs, lerResposta, linhaLog, separar } from './prova'
 
 const bloco = (arquivo: string, corpo = '+x') =>
   `diff --git a/${arquivo} b/${arquivo}\nindex 1..2 100644\n--- a/${arquivo}\n+++ b/${arquivo}\n@@ -1 +1 @@\n${corpo}\n`
@@ -172,6 +172,20 @@ test('v1.2: versão, instrumento e "o diff toca o mod" (rodada 8)', () => {
   // Pasta vizinha com o mesmo começo não é o mod.
   expect(tocaOInstrumento('/m', ['prova-de-teste-velho/a.ts'], mod)).toBe(false)
   expect(tocaOInstrumento('/m', [], mod)).toBe(false)
+  // Um clone do repositório dos mods fora da pasta do mod: vale o nome do plugin tocado (0.8.3: entrou como medição).
+  expect(tocaOInstrumento('/tmp/x/r-prova-de-teste', ['prova-de-teste/hooks/b.ts'], mod, ['prova-de-teste'])).toBe(true)
+  expect(tocaOInstrumento('/tmp/x/r', ['contexto-bar/a.ts'], mod, ['contexto-bar'])).toBe(false)
+  // O nome do mod vem do manifesto dele; sem manifesto legível, o padrão.
+  expect(tocaOInstrumento('/tmp/x', ['a.ts'], mod, ['outro-nome'], 'outro-nome')).toBe(true)
+  expect(tocaOInstrumento('/tmp/x', ['a.ts'], mod, ['prova-de-teste'], undefined)).toBe(true)
+  expect(nomeDe('{"name":"prova-de-teste"}')).toBe('prova-de-teste')
+  expect(nomeDe('{"name":""}')).toBeUndefined()
+  // Nome que não é texto, mesmo verdadeiro, não é nome.
+  expect(nomeDe('{"name":5}')).toBeUndefined()
+  expect(nomeDe('{"name":{"x":"prova-de-teste"}}')).toBeUndefined()
+  expect(nomeDe('{"name":true}')).toBeUndefined()
+  expect(nomeDe('{inválido')).toBeUndefined()
+  expect(nomeDe('')).toBeUndefined()
 })
 
 test('o protocolo viaja com o mod e o cabeçalho do log novo traz o formato da versão atual (rodada 9)', () => {

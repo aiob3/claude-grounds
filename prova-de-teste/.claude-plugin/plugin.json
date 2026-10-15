@@ -1,6 +1,6 @@
 {
   "name": "prova-de-teste",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "Instrumento do EXP-001 Prova de Teste: percebe tarefas com teste, escolhe mutantes às cegas (modelo sem ferramentas, só o diff do código-fonte) e grava o log do experimento",
   "types": "./types/index.d.ts",
   "author": {

@@ -193,9 +193,22 @@ export function versaoDe(pluginJson: string): string {
 /** O instrumento da linha: o mod na versão que executou; sem execução do mod, a rota manual (undefined). */
 export const instrumentoDe = (feita: { versao?: string } | null | undefined) => (feita ? `mod ${feita.versao ?? '?'}` : undefined)
 
-/** O diff mexe no próprio mod (arquivos sob a pasta dele, numa fronteira de pasta). */
-export const tocaOInstrumento = (raiz: string, enviados: string[], pastaDoMod: string) =>
-  enviados.some(f => `${raiz}/${f}`.startsWith(`${pastaDoMod}/`))
+/** O nome no plugin.json; ilegível, nada. */
+export function nomeDe(pluginJson: string): string | undefined {
+  try {
+    const nome = (JSON.parse(pluginJson) as { name?: unknown }).name
+    return typeof nome === 'string' && nome ? nome : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * O diff mexe no próprio mod: arquivos sob a pasta dele, numa fronteira de pasta, ou sob um plugin com o nome dele,
+ * onde quer que esteja (um clone do repositório dos mods em /tmp entrava como medição, 0.8.3).
+ */
+export const tocaOInstrumento = (raiz: string, enviados: string[], pastaDoMod: string, pluginsTocados: string[] = [], nomeDoMod = 'prova-de-teste') =>
+  enviados.some(f => `${raiz}/${f}`.startsWith(`${pastaDoMod}/`)) || pluginsTocados.includes(nomeDoMod)
 
 /** Valida o registro; devolve o erro ou a linha no formato v1.2 do log. */
 export function linhaLog(r: Partial<Registro>, data: string): { linha?: string; erro?: string } {

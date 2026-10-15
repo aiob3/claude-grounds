@@ -196,12 +196,25 @@ test('sem HOME, /prova ~/pasta não inventa uma pasta', async ($, on) => {
 })
 
 /** Um repositório em memória: git, cópia, comando de teste e sistema de arquivos. */
-function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean } = {}) {
+function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean; nomeDoPlugin?: string; venvEditavel?: boolean; sobrescreverFalha?: boolean } = {}) {
   const fs = new Map<string, string>(o.python ? [
     ['/repo/pyproject.toml', '[tool.pytest.ini_options]\n'],
     ['/repo/src/calc.py', 'def dobro(x):\n    return x * 2\n'],
     ['/repo/src/test_calc.py', 'from calc import dobro\nassert dobro(3) == 6\n'],
     // O .pyc que veio do original e não é validado pelo fonte (unchecked-hash): vale para qualquer tamanho.
+    // O venv do projeto com a instalação editável: o .pth e o shebang apontam para o original.
+    ...(o.venvEditavel
+      ? ([
+          ['/repo/.venv/pyvenv.cfg', 'home = /usr/bin\n'],
+          ['/repo/.venv/lib/python3.15/site-packages/_calc.pth', '/repo/src\n'],
+          ['/repo/.venv/bin/pytest', '#!/repo/.venv/bin/python\nimport pytest\n'],
+          ['/repo/.venv/lib/python3.15/site-packages/vizinho.pth', '/repository/src\n'],
+          // Um link na cópia: escrever nele escreveria no alvo.
+          ['/repo/.venv/bin/ligado', '#!/repo/.venv/bin/python\n'],
+          // Listado, mas o stat falha (sumiu ou não dá para ler): sem saber o que é, não se escreve nele.
+          ['/repo/.venv/bin/sumido', '#!/repo/.venv/bin/python\n'],
+        ] as [string, string][])
+      : []),
     ...(o.pycVelho ? [['/repo/src/__pycache__/calc.cpython-315.pyc', JSON.stringify({ tamanho: null, codigo: 'def dobro(x):\n    return x * 2\n' })] as [string, string]] : []),
   ] : [
     ['/repo/src/a.ts', 'export const soma = (a, b) => a + b\n'],
@@ -211,12 +224,13 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
     // Um módulo com o teste dele, que não alcança a.ts: a execução incremental o esconde nos mutantes de a.ts.
     ['/repo/src/b.ts', 'export const um = 1\n'],
     ['/repo/src/b.test.ts', "import { um } from './b.js'\nexpect(um).toBe(1)\n"],
-    o.pluginNaRaiz ? ['/repo/.claude-plugin/plugin.json', '{"name":"x"}'] : ['/repo/package.json', '{"scripts":{"test":"vitest run"}}'],
+    o.pluginNaRaiz ? ['/repo/.claude-plugin/plugin.json', JSON.stringify({ name: o.nomeDoPlugin ?? 'x' })] : ['/repo/package.json', '{"scripts":{"test":"vitest run"}}'],
   ])
   const apagadas: string[] = []
   const sobrouEscondido: string[] = []
   const rodadas: string[][] = []
   const ambientes: (Record<string, string> | undefined)[] = []
+  const sobrescritos = new Map<string, string>()
   const modelo = { chamadas: 0 }
   const TMP = '/tmp/prova-de-teste-abc'
   mock.env(on, { PROVA_DE_TESTE_LOG: LOG_PATH })
@@ -236,6 +250,17 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
     if (argv[0] === 'mktemp') return r(`${TMP}\n`)
     if (argv[0] === 'cp') {
       for (const [k, v] of [...fs]) if (k.startsWith('/repo/')) fs.set(`${TMP}/repo/${k.slice(6)}`, v)
+      return r('')
+    }
+    if (argv[0] === 'sh' && argv[2]!.includes('pyvenv.cfg')) {
+      // ACHAR_NO_VENV: os arquivos do venv da cópia que citam a raiz.
+      const achados = [...fs.keys()].filter(k => k.startsWith(`${init?.cwd}/.venv/`) && /\/(bin\/[^/]+|site-packages\/[^/]+\.pth)$/.test(k) && fs.get(k)!.includes(argv[4]!))
+      return r(achados.map(k => `${k.slice(init!.cwd!.length + 1)}\n`).join(''))
+    }
+    if (argv[0] === 'sh' && argv[2]!.startsWith('cat ')) {
+      if (o.sobrescreverFalha) return { value: { exitCode: 1, stdout: '', stderr: 'sh: permissão negada' } } as never
+      fs.set(argv[5]!, fs.get(argv[4]!)!)
+      sobrescritos.set(argv[5]!, fs.get(argv[4]!)!)
       return r('')
     }
     if (argv[0] === 'sh') {
@@ -261,7 +286,9 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       rodadas.push([...argv, init?.cwd ?? ''])
       ambientes.push(init?.env)
       // O CPython no pior caso, tudo no mesmo segundo: o .pyc vale quando o tamanho do fonte bate (ou quando não é validado).
-      const fonte = fs.get(`${TMP}/repo/src/calc.py`) ?? ''
+      // Com o venv, o import segue o .pth: o código que roda é o da pasta para onde ele aponta.
+      const pth = fs.get(`${TMP}/repo/.venv/lib/python3.15/site-packages/_calc.pth`)
+      const fonte = fs.get(`${pth ? pth.trim() : `${TMP}/repo/src`}/calc.py`) ?? ''
       const pyc = `${TMP}/repo/src/__pycache__/calc.cpython-315.pyc`
       const salvo = fs.has(pyc) ? (JSON.parse(fs.get(pyc)!) as { tamanho: number | null; codigo: string }) : undefined
       const valido = salvo && (salvo.tamanho === null || salvo.tamanho === fonte.length)
@@ -288,6 +315,11 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
     return r('', 127)
   })
   on('fs.exists', (_$, e) => ({ value: fs.has((e as { path: string }).path) }) as never)
+  on('fs.stat', (_$, e) => {
+    const p = (e as { path: string }).path
+    if (p.endsWith('/.venv/bin/sumido')) throw new Error('ENOENT: stat falhou')
+    return { value: { kind: 'file', size: (fs.get(p) ?? '').length, mtimeMs: 0, isLink: p.endsWith('/.venv/bin/ligado') } } as never
+  })
   on('fs.read', (_$, e) => {
     const p = (e as { path: string }).path
     // O plugin.json do próprio mod (fora do repositório falso): a versão que o teste controla.
@@ -322,7 +354,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       },
     }) as never,
   )
-  return { fs, apagadas, rodadas, ambientes, TMP, modelo, sobrouEscondido }
+  return { fs, apagadas, rodadas, ambientes, sobrescritos, TMP, modelo, sobrouEscondido }
 }
 
 test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver de verdade, restaura e não toca o original', async ($, on) => {
@@ -406,6 +438,30 @@ test('executar: recorte que falha sem mutante (teste que lê o repositório) nã
   expect(m.sobrouEscondido).toEqual([])
 })
 
+test('executar: o venv copiado aponta para a cópia, e o teste vê o código mutado, não o original (0.8.3, 1ª passada da rodada 59)', async ($, on) => {
+  const m = mundo(on, { python: true, venvEditavel: true })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'dobro' } as never))
+  expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes')
+  // Na cópia (já apagada no fim), pelo que foi sobrescrito: o .pth e o shebang; o vizinho, que só começa igual, não.
+  const venv = `${m.TMP}/repo/.venv`
+  expect(Object.fromEntries(m.sobrescritos)).toEqual({
+    [`${venv}/lib/python3.15/site-packages/_calc.pth`]: `${m.TMP}/repo/src\n`,
+    [`${venv}/bin/pytest`]: `#!${m.TMP}/repo/.venv/bin/python\nimport pytest\n`,
+  })
+  // O link e o que não deu stat não foram sobrescritos (estão fora da lista acima); o venv do original fica como estava.
+  expect(m.fs.get('/repo/.venv/lib/python3.15/site-packages/_calc.pth')).toBe('/repo/src\n')
+})
+
+test('executar: sem conseguir apontar o venv para a cópia, a rodada para com o erro e nenhum mutante roda', async ($, on) => {
+  const m = mundo(on, { python: true, venvEditavel: true, sobrescreverFalha: true })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'dobro' } as never))
+  expect(r).toContain('Erro: não apontei o venv da cópia para a cópia (.venv/')
+  expect(r).toContain('sh: permissão negada')
+  expect(m.rodadas).toEqual([])
+  // A pasta temporária sai mesmo assim.
+  expect(m.apagadas.at(-1)).toBe(m.TMP)
+})
+
 test('executar com incremental false roda a suíte inteira em todos os mutantes, sem esconder nada', async ($, on) => {
   const m = mundo(on)
   const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma', incremental: false } as never))
@@ -449,6 +505,24 @@ test('executar: o mutante que não carrega diz o erro de carga no relatório (ro
   mundo(on, { quebra: true })
   const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
   expect(r).toContain('NÃO APLICADO: mutante inválido: o código mutado não carregou (SyntaxError: Unexpected token')
+})
+
+test('registrar v1.2: o diff num clone do próprio mod, fora da pasta dele, é calibração (r-prova-de-teste em /tmp, 0.8.3)', async ($, on) => {
+  // /repo não fica sob a pasta do mod: só o nome no plugin.json diz que é o instrumento.
+  const m = mundo(on, { pluginNaRaiz: true, nomeDoPlugin: 'prova-de-teste' })
+  await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never)
+  m.fs.set(LOG_PATH, '# log\n')
+  await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'soma', aplicados: 2, mortos: 1, sobreviventes: 1, reais: 1, estado: 'FRACO', tempo: 5 } as never)
+  expect(m.fs.get(LOG_PATH)).toContain('calibração: o diff altera o próprio instrumento')
+})
+
+test('registrar v1.2: o plugin de outro nome na mesma situação continua medição', async ($, on) => {
+  const m = mundo(on, { pluginNaRaiz: true, nomeDoPlugin: 'contexto-bar' })
+  await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never)
+  m.fs.set(LOG_PATH, '# log\n')
+  await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'soma', aplicados: 2, mortos: 1, sobreviventes: 1, reais: 1, estado: 'FRACO', tempo: 5 } as never)
+  expect(m.fs.get(LOG_PATH)).toContain('| medição')
+  expect(m.fs.get(LOG_PATH)).not.toContain('calibração')
 })
 
 test('registrar v1.2: o mod que muda de versão entre executar e registrar faz da rodada calibração (rodada 8, #15)', async ($, on) => {
