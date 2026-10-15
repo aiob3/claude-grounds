@@ -500,3 +500,100 @@ test('a caixa da próxima tem a cor do caso: bloqueante error, do operador warni
   await $.command.run({ command: 'objetivo', args: 'bloqueante 2' } as never)
   expect(await corDaProxima()).toBe('error')
 })
+
+// Uma sessão com relógio na mão e um Bash que vai para o segundo plano.
+const sessaoComSegundoPlano = (on: any, opts: { mtime?: (agora: number) => number } = {}) => {
+  let agora = 1_000_000
+  on('clock.now', () => ({ value: agora }) as never)
+  on('session.usage', () => usageWith(50000))
+  on('prompt.submit', (_$: unknown, e: { text: string; context?: string[] }) => ({ text: e.text, context: e.context }) as never)
+  on('turn.start', (_$: unknown, e: { turnId: string }) => ({ turnId: e.turnId }) as never)
+  on('turn.complete', () => ({ text: 'ok' }) as never)
+  on('classic.Stop', () => ({}) as never)
+  on('fs.stat', () => ({ value: { kind: 'file', size: 0, mtimeMs: opts.mtime ? opts.mtime(agora) : 1_000_000, isLink: false } }) as never)
+  on('tool.call', (_$: unknown, e: { tool: string }) =>
+    (e.tool === 'Bash'
+      ? { result: { stdout: '', stderr: '', interrupted: false, backgroundTaskId: 'b1' }, text: 'Command running in background with ID: b1. Output is being written to: /tmp/t/tasks/b1.output. You will be notified when it completes.' }
+      : { result: { text: 'ok' } }) as never)
+  return { passar: (min: number) => (agora += min * 60000) }
+}
+const contextoDe = async ($: Engine, text: string) => JSON.stringify(((await $.prompt.submit({ text } as never)) as unknown as { context?: string[] }).context)
+const painel = async ($: Engine) => JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'terminal', props: {} } as never))
+
+test('segundo plano: tarefa muda e sem volta agendada aparece no painel e na linha do próximo pedido; a notificação limpa', async ($, on) => {
+  const s = sessaoComSegundoPlano(on)
+  await $.tool.call({ tool: 'Bash', command: 'python3 verifica.py', description: 'verificação longa', run_in_background: true } as never)
+  await umTurno($, 't1')
+  s.passar(12)
+  expect(await contextoDe($, 'concluiu?')).toContain(' · ⚠ tarefa em segundo plano sem saída há 12 min, sem volta agendada')
+  expect(await painel($)).toContain('segundo plano: verificação longa · sem saída há 12 min · nada agendado para voltar')
+  // A barra acima do prompt não ganha linha nova.
+  expect(await barText($)).not.toContain('segundo plano')
+  const fim = await contextoDe($, '<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n</task-notification>')
+  expect(fim).not.toContain('⚠')
+  expect(await painel($)).not.toContain('segundo plano')
+})
+
+test('segundo plano: com ScheduleWakeup depois da tarefa e saída que se mexe, nada alerta; o Stop que não lista a tarefa a tira', async ($, on) => {
+  const s = sessaoComSegundoPlano(on, { mtime: agora => agora - 60000 })
+  await $.tool.call({ tool: 'Bash', command: 'python3 -u verifica.py', run_in_background: true } as never)
+  await $.tool.call({ tool: 'ScheduleWakeup', delaySeconds: 300, prompt: 'conferir', reason: 'r' } as never)
+  await umTurno($, 't1')
+  s.passar(12)
+  expect(await contextoDe($, 'e aí?')).not.toContain('⚠')
+  expect(await painel($)).toContain('segundo plano: python3 -u verifica.py · em curso')
+  await $.classic.Stop({ stop_hook_active: false, background_tasks: [], session_crons: [] } as never)
+  expect(await painel($)).not.toContain('segundo plano')
+})
+
+test('segundo plano: TaskStop tira a tarefa; tarefa de subagente não é registrada', async ($, on) => {
+  const s = sessaoComSegundoPlano(on)
+  await $.tool.call({ tool: 'Bash', command: 'sleep 999', run_in_background: true, agentId: 'sub' } as never)
+  await umTurno($, 't1')
+  s.passar(12)
+  expect(await contextoDe($, 'oi')).not.toContain('⚠')
+  await $.tool.call({ tool: 'Bash', command: 'sleep 999', run_in_background: true } as never)
+  await $.tool.call({ tool: 'TaskStop', task_id: 'b1' } as never)
+  await umTurno($, 't2')
+  s.passar(12)
+  expect(await contextoDe($, 'oi')).not.toContain('⚠')
+})
+
+test('segundo plano: TaskStop sem id não tira nada; pelo shell_id tira (sobrevivente #13 da 0.10.0)', async ($, on) => {
+  const s = sessaoComSegundoPlano(on)
+  await $.tool.call({ tool: 'Bash', command: 'sleep 999', run_in_background: true } as never)
+  await $.tool.call({ tool: 'TaskStop' } as never)
+  await umTurno($, 't1')
+  s.passar(12)
+  expect(await contextoDe($, 'oi')).toContain('⚠ tarefa em segundo plano')
+  await $.tool.call({ tool: 'TaskStop', shell_id: 'b1' } as never)
+  expect(await contextoDe($, 'oi')).not.toContain('⚠')
+})
+
+test('segundo plano: Monitor depois da tarefa também é volta agendada (sobrevivente #25 da 0.10.0)', async ($, on) => {
+  const s = sessaoComSegundoPlano(on)
+  await $.tool.call({ tool: 'Bash', command: 'sleep 999', run_in_background: true } as never)
+  await $.tool.call({ tool: 'Monitor', command: 'tail -f x' } as never)
+  await umTurno($, 't1')
+  s.passar(1)
+  expect(await contextoDe($, 'oi')).not.toContain('sem volta agendada')
+})
+
+test('publicar com a verificação aberta: a nota vem com o resultado, sem negar; sem pendência aberta ou com git status, nada', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('session.root', () => ({ value: '/proj/pub' }) as never)
+  mock.store(on)
+  on('tool.call', () => ({ result: { stdout: '', stderr: '', interrupted: false }, text: 'ok' }) as never)
+  const notas = async (command: string) => {
+    const r = (await $.tool.call({ tool: 'Bash', command } as never)) as { deny?: string; context?: string[] }
+    expect(r.deny).toBe(undefined)
+    return JSON.stringify(r.context ?? [])
+  }
+  expect(await notas('git push')).not.toContain('esta ação publica')
+  await $.command.run({ command: 'objetivo', args: 'Camada no ar :: operador abre a URL' } as never)
+  await $.command.run({ command: 'objetivo', args: 'add verificar a camada no ar' } as never)
+  expect(await notas('cp -r build/ output/espelhos/camada')).toContain('esta ação publica e a pendência #1 \\"verificar a camada no ar\\" está aberta')
+  expect(await notas('git status')).not.toContain('esta ação publica')
+  await $.command.run({ command: 'objetivo', args: 'feito 1' } as never)
+  expect(await notas('git push')).not.toContain('esta ação publica')
+})

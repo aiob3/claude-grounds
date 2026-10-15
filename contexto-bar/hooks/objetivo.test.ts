@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { alinhamento, aoCarregar, aplicar, avisoJanela, comando, linhaContexto, nivelDe, ordenar, projetar, proxima, UNIDADE_PADRAO } from './objetivo'
+import { alinhamento, aoCarregar, aplicar, avisoJanela, comando, linhaContexto, nivelDe, notaPublicacao, ordenar, projetar, proxima, publica, UNIDADE_PADRAO, verificacaoAberta } from './objetivo'
 import type { Snapshot } from '../types'
 
 const snapCom = (livre: number): Snapshot => ({
@@ -188,4 +188,41 @@ test('alinhamento: a conclusão é o efeito, e a linha de cada pedido pergunta s
   expect(alinhamento({ ...g, conclusao: '   ' })).toContain('sem conclusão')
   expect(alinhamento({ ...g, conclusao: undefined as never })).toContain('sem conclusão')
   expect(linhaContexto({ ...g, conclusao: '   ' }, snapCom(100000), 'TOOL')).not.toContain('antes de agir')
+})
+
+test('publicar: a lista curta pega o que publica e deixa passar o resto', () => {
+  for (const c of ['git push origin main', 'cd x && git push', 'npm publish --access public', 'gh release create v1', 'npm run deploy', './deploy.sh prod', 'bin/publicar camada', 'promover', 'rsync -a out/ host:/srv', 'scp a host:', 'cp -r dist/ output/espelhos/site', 'mv a.html /data/output/espelhos/a.html && ls'])
+    expect([c, publica(c)]).toEqual([c, true])
+  for (const c of ['git status', 'git pushd', 'cat docs/deploy.md', 'grep deployment x', 'cp output/espelhos/a.html /tmp/a.html', 'ls output/espelhos/', 'npm test', 'echo republicar', 'python3 rsync_helper.py'])
+    expect([c, publica(c)]).toEqual([c, false])
+})
+
+test('publicar: o texto que o comando só carrega não conta (heredoc, string com espaço); caminho entre aspas conta', () => {
+  expect(publica("python3 - <<'EOF'\nexpect(notaPublicacao(g, 'git push')).toBe(x)\nEOF")).toBe(false)
+  expect(publica('cat > nota.md <<EOF\nrodar git push depois\nEOF\ngit status')).toBe(false)
+  expect(publica('python3 -c "import os; os.system(\'git push\')"')).toBe(false)
+  expect(publica('echo "vou fazer deploy amanhã"')).toBe(false)
+  expect(publica('cp camada.json "output/espelhos/site--ao-vivo/camada.json"')).toBe(true)
+  expect(publica("cat x <<EOF\ntexto\nEOF\ngit push origin main")).toBe(true)
+  expect(publica('git push')).toBe(true)
+})
+
+test('publicar: a nota sai com pendência do Claude aberta que é bloqueante ou de verificar/provar/capturar; nunca por pendência do operador ou feita', () => {
+  const g = aplicar(null, { acao: 'definir', titulo: 'Camada', itens: [{ texto: 'escrever camada' }, { texto: 'Verificação da camada no ar', tamanho: 'P' }, { texto: 'conferir no celular', dono: 'operador', nivel: 'bloqueante' }] }, 'claude', 0, 1).goal!
+  expect(verificacaoAberta(g)?.id).toBe(2)
+  expect(notaPublicacao(g, 'git push')).toBe('[objetivo] esta ação publica e a pendência #2 "Verificação da camada no ar" está aberta: conclua a verificação antes, ou diga ao operador por que não')
+  expect(notaPublicacao(g, 'git status')).toBe(undefined)
+  const feito = aplicar(g, { acao: 'concluir', ids: [2] }, 'claude', 0, 2).goal!
+  expect(verificacaoAberta(feito)).toBe(undefined)
+  expect(notaPublicacao(feito, 'git push')).toBe(undefined)
+  const bloq = aplicar(feito, { acao: 'priorizar', ids: [1], nivel: 'bloqueante' }, 'claude', 0, 3).goal!
+  expect(verificacaoAberta(bloq)?.id).toBe(1)
+  for (const t of ['provar o ciclo', 'captura da tela']) {
+    const h = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: t }] }, 'claude', 0, 1).goal!
+    expect(verificacaoAberta(h)?.id).toBe(1)
+  }
+  expect(notaPublicacao(null, 'git push')).toBe(undefined)
+  // Com duas abertas, a nota cita a de maior prioridade, não a primeira da lista (sobrevivente #6 da 0.10.0).
+  const duas = aplicar(null, { acao: 'definir', titulo: 'D', itens: [{ texto: 'verificar o rodapé' }, { texto: 'provar a camada', nivel: 'bloqueante' }] }, 'claude', 0, 1).goal!
+  expect(verificacaoAberta(duas)?.id).toBe(2)
 })

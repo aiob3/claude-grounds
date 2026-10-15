@@ -223,6 +223,45 @@ export function linhaContexto(g: Goal | null, snap: Snapshot | null, tool: strin
   )
 }
 
+// Comandos que publicam: o que sai daqui chega a outras pessoas. Lista curta, por palavra inteira do comando.
+const PUBLICA = [
+  /\bgit\s+push\b/,
+  /\bnpm\s+publish\b/,
+  /\bgh\s+release\b/,
+  /(^|[\s;&|(])(\S*\/)?(deploy|publicar|promover)(\.sh|\.py)?(?=$|[\s;&|)])/,
+  /(^|[\s;&|(])(rsync|scp)\s/,
+  // cp/mv cujo destino (o último argumento) cai em output/espelhos/
+  /(^|[\s;&|(])(cp|mv)\s[^;&|]*\s\S*output\/espelhos\/\S*\s*($|[;&|])/,
+]
+/**
+ * O comando sem o texto que ele só carrega: corpo de heredoc e string entre aspas com espaço (prosa, código de
+ * teste) somem; a string sem espaço (um caminho entre aspas) fica sem as aspas. Um `git push` escrito num teste
+ * não é publicar (achado na própria rodada da 0.10.0).
+ */
+export function semTexto(comando: string): string {
+  return comando
+    .replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2\s*(?=\n|$)/g, ' ')
+    .replace(/'([^']*)'|"((?:[^"\\]|\\.)*)"/g, (_m, a?: string, b?: string) => {
+      const dentro = a ?? b ?? ''
+      return /\s/.test(dentro) ? ' ' : dentro
+    })
+}
+export const publica = (comando: string) => PUBLICA.some(r => r.test(semTexto(comando)))
+
+/** A pendência do Claude aberta que uma publicação atropelaria: bloqueante, ou de verificar, provar ou capturar. */
+export function verificacaoAberta(g: Goal | null): GoalItem | undefined {
+  if (!g) return undefined
+  return ordenar(g.itens.filter(i => !i.feito && i.dono === 'claude')).find(i => nivelDe(i) === 'bloqueante' || /verifica|provar|captura/i.test(i.texto))
+}
+
+/** Nota ao modelo numa chamada que publica com a verificação aberta; vazia quando não é o caso. Nunca trava. */
+export function notaPublicacao(g: Goal | null, comando: string): string | undefined {
+  if (!publica(comando)) return undefined
+  const i = verificacaoAberta(g)
+  if (!i) return undefined
+  return `[objetivo] esta ação publica e a pendência #${i.id} "${curto(i.texto)}" está aberta: conclua a verificação antes, ou diga ao operador por que não`
+}
+
 /** Aviso ao modelo quando a projeção piora; devolve o novo nível para não repetir. */
 export function avisoJanela(g: Goal, snap: Snapshot | null): { nivel: Goal['aviso']; texto?: string } {
   const p = projetar(g, snap)

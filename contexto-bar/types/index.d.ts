@@ -41,6 +41,19 @@ export type Cache = {
   ultimoId?: string
 }
 
+/** Um comando no segundo plano: id da tarefa, o que é, onde escreve, quando começou e a última mudança vista na saída. */
+export type Tarefa = { id: string; descricao: string; saida?: string; inicio: number; mtime?: number }
+
+export type SegundoPlano = {
+  tarefas: Tarefa[]
+  /** Última vez que o agente agendou a volta (ScheduleWakeup, Monitor, CronCreate). */
+  voltaEm: number | null
+  /** Último fim de turno da conversa principal. */
+  fimTurno: number | null
+  /** O Stop disse que há crons da sessão para acordá-la. */
+  cronsAtivos: boolean
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'contexto-bar': {
@@ -51,6 +64,7 @@ declare module 'claude-code' {
       cache: { acc: Cache; parcial: boolean } | null
       /** Tamanho do último pedido (entrada sem cache + lida + gravada no cache). */
       pedido: number | null
+      segundoPlano: SegundoPlano | null
     }
   }
 }

@@ -2,15 +2,18 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Goal, GroupKey, Segment, Snapshot } from '../types'
-import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, ordenar, projetar, proxima, resumo, usado } from './objetivo'
+import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
 import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
+import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
+import type { SegundoPlano } from './segundo-plano'
 
 const snapshot = atom({ plugin: 'contexto-bar', key: 'snapshot' } as const, null)
 const objetivo = atom({ plugin: 'contexto-bar', key: 'objetivo' } as const, null)
 const turno = atom({ plugin: 'contexto-bar', key: 'turno' } as const, 0)
 const cache = atom({ plugin: 'contexto-bar', key: 'cache' } as const, null)
 const pedido = atom({ plugin: 'contexto-bar', key: 'pedido' } as const, null)
+const segundoPlano = atom({ plugin: 'contexto-bar', key: 'segundoPlano' } as const, null)
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
@@ -241,6 +244,47 @@ async function semearCache($: EngineInterface): Promise<void> {
   await update($, cache, c => c ?? semente)
 }
 
+// Segundo plano: só observa e nunca trava. Um erro aqui fica aqui, sem chegar à chamada observada.
+const agora = ($: EngineInterface) => $.clock.now().catch(() => Date.now())
+async function mudarSegundoPlano($: EngineInterface, fn: (sp: SegundoPlano) => SegundoPlano): Promise<void> {
+  await update($, segundoPlano, sp => fn(sp ?? SP_VAZIO)).catch(() => undefined)
+}
+
+/** Relê a hora da última escrita de cada saída em curso (um stat por tarefa, sem ler o arquivo). */
+async function olharSaidas($: EngineInterface): Promise<void> {
+  const sp = await read($, segundoPlano)
+  if (!sp?.tarefas.some(t => t.saida)) return
+  const vistos = new Map<string, number>()
+  for (const t of sp.tarefas) {
+    if (!t.saida) continue
+    const st = await $.fs.stat(t.saida).catch(() => undefined)
+    if (st) vistos.set(t.id, st.mtimeMs)
+  }
+  await mudarSegundoPlano($, cur => ({ ...cur, tarefas: cur.tarefas.map(t => (vistos.has(t.id) ? { ...t, mtime: vistos.get(t.id) } : t)) }))
+}
+
+/** O que a chamada da conversa principal diz do segundo plano: tarefa nova, volta agendada, tarefa parada. */
+async function observarChamada($: EngineInterface, e: { tool: string; [k: string]: unknown }, result: { result?: unknown; text?: string }): Promise<void> {
+  const quando = await agora($)
+  const r = (result.result ?? {}) as { backgroundTaskId?: string; backgroundEndsWithFinalResponse?: true }
+  if (e.tool === 'Bash' && r.backgroundTaskId && !r.backgroundEndsWithFinalResponse) {
+    const descricao = String(e.description || e.command || r.backgroundTaskId).trim()
+    await mudarSegundoPlano($, sp => registrarTarefa(sp, { id: r.backgroundTaskId!, descricao, saida: caminhoSaida(result.text), inicio: quando }))
+  } else if (FERRAMENTAS_DE_VOLTA.includes(e.tool)) {
+    await mudarSegundoPlano($, sp => ({ ...sp, voltaEm: quando }))
+  } else if (e.tool === 'TaskStop' && (e.task_id ?? e.shell_id) != null) {
+    // O id em qualquer forma: um TaskStop legítimo nunca é ignorado pelo tipo (sobrevivente #13 da 0.10.0).
+    await mudarSegundoPlano($, sp => concluirTarefa(sp, String(e.task_id ?? e.shell_id)))
+  }
+}
+
+/** O aviso do segundo plano para a linha do próximo pedido; vazio sem alerta. */
+async function avisoSegundoPlano($: EngineInterface): Promise<string> {
+  await olharSaidas($).catch(() => undefined)
+  const sp = await read($, segundoPlano)
+  return sp ? avisoAoModelo(alertas(sp, await agora($))) : ''
+}
+
 // Painel automático: com objetivo ativo, cada pedido abre (ou mantém) o painel. Liga por padrão.
 const CHAVE_AUTO = 'painel-auto'
 async function painelAuto($: EngineInterface): Promise<boolean> {
@@ -332,6 +376,9 @@ export const register: Register = on => {
   // Cada prompt leva ao modelo uma linha com o objetivo e as pendências (o operador não a vê).
   on('prompt.submit', async ($, e, next) => {
     if (e.command) return next(e)
+    // A notificação de fim de uma tarefa limpa o alerta dela.
+    const nota = e.origin?.kind === 'task-notification' || e.text.includes('<task-notification>') ? notificacao(e.text) : null
+    if (nota) await mudarSegundoPlano($, sp => concluirTarefa(sp, nota.id))
     // Um /cd muda a pasta do projeto: a linha passa a ser a do objetivo dela.
     await carregarObjetivo($)
     const atual = await read($, objetivo)
@@ -341,7 +388,7 @@ export const register: Register = on => {
     const chave = atual ? `${raizCarregada}\n${atual.titulo}\n${atual.conclusao}` : undefined
     const completa = chave !== undefined && chave !== conclusaoEnviada
     if (chave !== undefined) conclusaoEnviada = chave
-    const linhas = [linhaContexto(atual, await read($, snapshot), TOOL, completa)]
+    const linhas = [linhaContexto(atual, await read($, snapshot), TOOL, completa) + (await avisoSegundoPlano($).catch(() => ''))]
     const aviso = await checarAviso($)
     if (aviso) linhas.push(aviso)
     return next({ ...e, context: [...(e.context ?? []), ...linhas] })
@@ -380,7 +427,21 @@ export const register: Register = on => {
       if (!(await read($, cache))) await semearCache($)
       else if (uso) await update($, cache, c => (c ? { ...c, acc: somar(c.acc, uso) } : c))
     }
+    if (!e.agentId) {
+      const quando = await agora($)
+      await mudarSegundoPlano($, sp => fimDeTurno(sp, quando))
+    }
     await refresh($, hookTexts)
+    return result
+  })
+
+  // O Stop clássico diz o que ainda roda e se há crons para acordar a sessão: a fonte certa no fim do turno.
+  on('classic.Stop', async ($, e, next) => {
+    const result = await next(e)
+    if (!e.agent_id) {
+      const quando = await agora($)
+      await mudarSegundoPlano($, sp => fimDeTurno(sp, quando, e.background_tasks, e.session_crons?.length))
+    }
     return result
   })
 
@@ -390,9 +451,13 @@ export const register: Register = on => {
     if (e.agentId || (e.tool as string) === TOOL) return result
     await refreshSoon($, hookTexts)
     if (result.deny !== undefined || result.isError) return result
+    await observarChamada($, e as never, result).catch(() => undefined)
     // No meio do turno: se a projeção piorou, o aviso chega junto do resultado da ferramenta.
-    const aviso = await checarAviso($)
-    return aviso ? { ...result, context: [...(result.context ?? []), aviso] } : result
+    const notas = [await checarAviso($)]
+    // Publicar com a verificação aberta: a nota vem com o resultado (o mod não tem como falar antes da chamada).
+    if ((e.tool as string) === 'Bash') notas.push(notaPublicacao(await read($, objetivo), String((e as { command?: unknown }).command ?? '')))
+    const ctx = notas.filter((n): n is string => !!n)
+    return ctx.length ? { ...result, context: [...(result.context ?? []), ...ctx] } : result
   })
 
   // A compactação descarta o texto que os hooks tinham injetado; a estimativa de Hooks recomeça do zero.
@@ -458,7 +523,17 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const goal = await read($, objetivo)
     const snap = await read($, snapshot)
-    const linhaCache = <LinhaCache c={await read($, cache)} req={await read($, pedido)} Text={Text} />
+    const sp = await read($, segundoPlano)
+    const linhaCache = (
+      <Box flexDirection="column">
+        <LinhaCache c={await read($, cache)} req={await read($, pedido)} Text={Text} />
+        {(sp ? linhasDoPainel(sp, await agora($)) : []).map(l => (
+          <Text key={l} color={l.endsWith('em curso') ? 'subtle' : 'warning'} wrap="wrap">
+            {l}
+          </Text>
+        ))}
+      </Box>
+    )
     if (!goal) {
       return (
         <Box flexDirection="column">
