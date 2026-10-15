@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" role="img" aria-label="What the two mods give you: the band calls for proof, the proof goes to the record, the record feeds the band" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>What the two mods give you: the band calls for proof, the proof goes to the record, the record feeds the band</title>
+<style>
+  .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
+  .t1 { fill: #0b0b0b; } .t2 { fill: #52514e; } .t3 { fill: #8a887f; }
+  .ac { fill: #2a78d6; } .acs { stroke: #2a78d6; } .acf { fill: #e8f1fb; }
+  .ok { fill: #0f7a3d; } .okf { fill: #e3f3e8; }
+  @media (prefers-color-scheme: dark) {
+    .sup { fill: #1a1a19; } .sup2 { fill: #232322; } .borda { stroke: #3a3936; }
+    .t1 { fill: #f0efec; } .t2 { fill: #c3c2b7; } .t3 { fill: #8f8d84; }
+    .ac { fill: #3987e5; } .acs { stroke: #3987e5; } .acf { fill: #1d2c40; }
+    .ok { fill: #4cc27a; } .okf { fill: #16301f; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+
+  .fluxo { stroke-dasharray: 6 8; animation: anda 1.2s linear infinite; }
+  @keyframes anda { to { stroke-dashoffset: -28; } }
+</style>
+<rect width="1200" height="320" rx="16" class="sup"/>
+  <rect x="15" y="50" width="330" height="176" rx="12" class="sup2 borda" stroke-width="1.5"/>
+  <rect x="15" y="50" width="5" height="176" rx="2" class="ac"/>
+  <text x="37" y="86" font-size="20" font-weight="700" class="t1">The band</text>
+  <text x="37" y="110" font-size="13" class="t2" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">contexto-bar</text><text x="37" y="148" font-size="14" class="t2">context window load, by source</text><text x="37" y="174" font-size="14" class="t2">the project goal, proof built in</text><text x="37" y="200" font-size="14" class="t2">back on every prompt and session</text><line x1="351" y1="138.0" x2="421" y2="138.0" class="acs fluxo" stroke-width="2.5"/><path d="M419,132.0 L429,138.0 L419,144.0 Z" class="ac"/><text x="390.0" y="112.0" font-size="12" class="t3" text-anchor="middle">the goal</text><text x="390.0" y="127.0" font-size="12" class="t3" text-anchor="middle">asks for proof</text>
+  <rect x="435" y="50" width="330" height="176" rx="12" class="sup2 borda" stroke-width="1.5"/>
+  <rect x="435" y="50" width="5" height="176" rx="2" class="ac"/>
+  <text x="457" y="86" font-size="20" font-weight="700" class="t1">The proof</text>
+  <text x="457" y="110" font-size="13" class="t2" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">prova-de-teste</text><text x="457" y="148" font-size="14" class="t2">a model outside the session plants</text><text x="457" y="174" font-size="14" class="t2">bugs in the diff; weak tests surface</text><text x="457" y="200" font-size="14" class="t2">the criterion reapplies every task</text><line x1="771" y1="138.0" x2="841" y2="138.0" class="acs fluxo" stroke-width="2.5"/><path d="M839,132.0 L849,138.0 L839,144.0 Z" class="ac"/><text x="810.0" y="112.0" font-size="12" class="t3" text-anchor="middle">the round</text><text x="810.0" y="127.0" font-size="12" class="t3" text-anchor="middle">goes to the log</text>
+  <rect x="855" y="50" width="330" height="176" rx="12" class="sup2 borda" stroke-width="1.5"/>
+  <rect x="855" y="50" width="5" height="176" rx="2" class="ac"/>
+  <text x="877" y="86" font-size="20" font-weight="700" class="t1">The record</text>
+  <text x="877" y="110" font-size="13" class="t2" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">log + goal</text><text x="877" y="148" font-size="14" class="t2">checked numbers, never inflated</text><text x="877" y="174" font-size="14" class="t2">the goal closes only with proof</text><text x="877" y="200" font-size="14" class="t2">the next session starts here</text>
+  <path d="M1020.0,230 C1020.0,306 180.0,306 180.0,236" fill="none" class="acs fluxo" stroke-width="2.5"/>
+  <path d="M174.0,242 L180.0,232 L186.0,242 Z" class="ac"/>
+  <rect x="330.0" y="272" width="540" height="32" rx="16" class="sup borda" stroke-width="1.2"/>
+  <text x="600.0" y="293" font-size="14" class="t2" text-anchor="middle">another session, another day, another project: picks up where it stopped</text>
+</svg>

@@ -245,8 +245,7 @@ session, open another one in the same folder and type `/objetivo`: the goal is s
 - The mods need Claude Code 2.1.287 or later (the version mods shipped in) and were tested on 2.1.300. They
   work in the terminal and in the Code tab of the Desktop app.
 
-Open: reach 10 measurements with a frozen instrument (1 so far) before deciding whether the method
-becomes a criterion; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
+Open: the minimum duration is reached (16 measurements); the instrument still has to settle, with 3 measurements in a row on the same version, before the operator decides whether the method becomes a criterion; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
 average settles across sessions.
 
 ## Evaluate
