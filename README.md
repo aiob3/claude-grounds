@@ -141,6 +141,31 @@ Nenhum hook dos dois mods segura uma chamada. Os handlers só observam e acresce
 outro lugar: nas ferramentas que o agente chama porque declarou que chamaria, e num registro que recusa número
 inflado e equivalente sem justificativa. O agente trabalha livre, e o "pronto" sem fundamento não passa.
 
+## Quanto custa provar
+
+Um gate num hook não tem memória: a cada rodada ele revalida o código inteiro, e o custo cresce com o código. Aqui
+os mutantes saem só do diff, a prova das rodadas anteriores fica no log, e desde a versão 0.8 cada mutante roda só
+os arquivos de teste que alcançam, pelos imports, o arquivo mutado. Os outros ficam escondidos na cópia.
+
+A comparação rodou num projeto real do operador, com 3929 arquivos e 8881 testes no recorte verde da suíte (vitest),
+sobre uma mudança de 10 linhas. Os mesmos 10 mutantes, na mesma máquina:
+
+| | rodada | por mutante | testes por mutante | vereditos |
+|---|---|---|---|---|
+| suíte inteira em cada mutante | 407 s | 35,9 s | 8881 | 8 mortos, 2 sobreviventes |
+| incremental | 145 s | 10,0 s | 1906 | os mesmos |
+
+Cada mutante morto rodou 12 arquivos de teste, em cerca de 3 s.
+
+O mapa só afeta a velocidade. Uma morte só vale se um teste nomeado falhou, e todo sobrevivente é confirmado na
+suíte inteira. Nos próprios mods, três mutantes sobreviveram no modo incremental e morreram na suíte inteira, porque
+um teste chegava ao código pelo runtime do mod, sem import.
+
+A hipótese se confirmou em parte. O custo de cada mutante morto acompanha o diff. Dois custos continuam do tamanho
+da suíte: a linha de base, inteira de propósito para pegar regressão no código antigo, e a confirmação de cada
+sobrevivente. Quando a tarefa chega a PROVADO, sobra a linha de base. O relatório e o log trazem esses números a
+cada rodada (`custo: base, por mutante, repositório, diff`), e quem os mede é o próprio mod.
+
 ## Instalar
 
 ```sh
@@ -185,6 +210,9 @@ abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
 
 - O `prova-de-teste` acha o comando de teste por convenção (`claude plugin test`, `npm test`, `pytest`). Para outro
   executor, passe `comando` ao `executar`.
+- A execução incremental segue imports estáticos: JS/TS (com os aliases do tsconfig e do vite) e Python. O que chega
+  ao código por outro caminho (runtime, leitura de arquivo, subprocesso) fica fora do mapa. Por isso todo
+  sobrevivente é confirmado na suíte inteira e a linha de base roda inteira. `incremental: false` desliga.
 - A equivalência de um sobrevivente continua sendo julgada pelo agente. O mod exige a justificativa e a grava no
   log, para auditoria, mas não a prova.
 - A projeção da janela é uma estimativa: a média das últimas 8 entregas por unidade de tamanho.
@@ -192,7 +220,7 @@ abra outra na mesma pasta e digite `/objetivo`: o objetivo continua lá.
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
 Em aberto: chegar a 10 medições com o instrumento parado (2 até agora) antes de decidir se o método
-vira critério; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
+vira critério; medir o custo incremental em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 
 ## Avaliar

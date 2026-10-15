@@ -145,6 +145,31 @@ No hook in either mod holds a call. The handlers only observe and add a line of 
 elsewhere: in tools the agent calls because it declared it would, and in a record that refuses inflated numbers and
 unjustified equivalents. The agent works freely, and an ungrounded "done" doesn't get through.
 
+## What proving costs
+
+A gate in a hook has no memory: every round it revalidates the whole codebase, and the cost grows with the code.
+Here the mutants come from the diff alone, earlier proofs stay in the log, and since version 0.8 each mutant runs only
+the test files that reach the mutated file through imports. The rest are hidden in the copy.
+
+The comparison ran on a real project of the operator's, with 3929 files and 8881 tests in the green slice of the
+suite (vitest), over a 10-line change. Same 10 mutants, same machine:
+
+| | round | per mutant | tests per mutant | verdicts |
+|---|---|---|---|---|
+| whole suite for every mutant | 407 s | 35.9 s | 8881 | 8 killed, 2 survivors |
+| incremental | 145 s | 10.0 s | 1906 | the same |
+
+Each killed mutant ran 12 test files, in about 3 s.
+
+The map only affects speed. A kill only counts when a named test failed, and every survivor is confirmed against
+the whole suite. On the mods themselves, three mutants survived in incremental mode and died in the whole suite,
+because a test reached the code through the mod runtime, with no import.
+
+The hypothesis held in part. The cost of each killed mutant tracks the diff. Two costs still scale with the suite:
+the baseline, kept whole on purpose to catch regressions in old code, and confirming each survivor. Once a task
+reaches PROVADO (proven), the baseline is what's left. The report and the log carry these numbers every round
+(`custo`: baseline, per mutant, repository, diff), and the mod measures them itself.
+
 ## Install
 
 ```sh
@@ -192,6 +217,9 @@ session, open another one in the same folder and type `/objetivo`: the goal is s
 
 - `prova-de-teste` finds the test command by convention (`claude plugin test`, `npm test`, `pytest`). For another
   runner, pass `comando` (command) to `executar`.
+- Incremental runs follow static imports: JS/TS (with tsconfig and vite aliases) and Python. Code reached some other
+  way (runtime, file reads, subprocesses) is outside the map. That's why every survivor is confirmed against the
+  whole suite and the baseline runs whole. `incremental: false` turns it off.
 - Whether a survivor is equivalent is still judged by the agent. The mod requires the justification and saves it to
   the log for auditing, but does not prove it.
 - The window projection is an estimate: the average of the last 8 deliveries per size unit.
@@ -199,7 +227,7 @@ session, open another one in the same folder and type `/objetivo`: the goal is s
   work in the terminal and in the Code tab of the Desktop app.
 
 Open: reach 10 measurements with a frozen instrument (2 so far) before deciding whether the method
-becomes a criterion; keep the consumption history per project, independent of the goal; see whether the per-unit
+becomes a criterion; measure the incremental cost on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
 average settles across sessions.
 
 ## Evaluate
