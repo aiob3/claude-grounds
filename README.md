@@ -279,8 +279,15 @@ mutante morto passou de uns 36 s para uns 3 s, porque rodou 12 arquivos de teste
 do agente, sem esperar o CI. O custo de cada mutante morto passou a depender do tamanho da mudança, não do tamanho
 do projeto, e a economia não trocou nenhum veredito.
 
-**O que não prova.** Foi um projeto, um executor de testes e uma mudança pequena. Em projetos com outro desenho de
-imports o ganho pode ser maior ou menor. Medir mais casos está entre os pontos em aberto, no fim deste README.
+**Um segundo caso, que qualquer um pode repetir.** No [rich](https://github.com/Textualize/rich), com 553 arquivos e
+944 testes no recorte verde (pytest), uma mudança de 12 linhas em `rich/tree.py` gerou 6 mutantes. Com a suíte
+completa em cada mutante, a rodada levou 43 s. Só com os testes afetados, 24 s, com os mesmos vereditos: cada
+mutante rodou 2 dos 63 arquivos de teste. O ganho é menor porque a suíte é rápida (4,8 s) e metade dos mutantes
+sobreviveu, e cada sobrevivente é confirmado na suíte completa. Esses 3 sobreviventes são lacunas reais nos testes do
+próprio rich: nenhum teste percebe quando um nó filho herda errado o `highlight` ou o `guide_style` do pai.
+
+**O que não prova.** Foram dois projetos, dois executores de testes e mudanças pequenas. Em projetos com outro desenho
+de imports o ganho pode ser maior ou menor. Medir mais casos está entre os pontos em aberto, no fim deste README.
 
 **Por que não fica ainda mais rápido.** Duas etapas continuam rodando a suíte completa, de propósito:
 
@@ -307,7 +314,7 @@ diff`), medidos pelo próprio mod.
 - Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
-Em aberto: a duração mínima foi atingida (21 medições); falta o instrumento ficar estável, com 3 medições seguidas na mesma versão, para o operador decidir se o método vira critério; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
+Em aberto: a duração mínima foi atingida (23 medições); falta o instrumento ficar estável, com 3 medições seguidas na mesma versão, para o operador decidir se o método vira critério; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 
 ## Avaliar

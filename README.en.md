@@ -288,8 +288,15 @@ went from about 36 s to about 3 s, because it ran 12 test files instead of 1007.
 task, without waiting for CI. The cost of each killed mutant now depends on the size of the change, not the size of
 the project, and the savings didn't flip a single verdict.
 
-**What it doesn't prove.** It was one project, one test runner and one small change. Projects with a different
-import layout may gain more or less. Measuring more cases is among the open items at the end of this README.
+**A second case anyone can repeat.** On [rich](https://github.com/Textualize/rich), with 553 files and 944 tests in
+the green slice (pytest), a 12-line change in `rich/tree.py` produced 6 mutants. With the full suite for every mutant,
+the round took 43 s. With affected tests only, 24 s, with the same verdicts: each mutant ran 2 of the 63 test files.
+The gain is smaller because the suite is fast (4.8 s) and half the mutants survived, and every survivor is confirmed
+against the full suite. Those 3 survivors are real gaps in rich's own tests: no test notices when a child node
+inherits its parent's `highlight` or `guide_style` the wrong way.
+
+**What it doesn't prove.** It was two projects, two test runners and small changes. Projects with a different import
+layout may gain more or less. Measuring more cases is among the open items at the end of this README.
 
 **Why it isn't even faster.** Two steps still run the full suite, on purpose:
 
@@ -316,7 +323,7 @@ measured by the mod itself.
 - The mods need Claude Code 2.1.287 or later (the version mods shipped in) and were tested on 2.1.300. They
   work in the terminal and in the Code tab of the Desktop app.
 
-Open: the minimum duration is reached (21 measurements); the instrument still has to settle, with 3 measurements in a row on the same version, before the operator decides whether the method becomes a criterion; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
+Open: the minimum duration is reached (23 measurements); the instrument still has to settle, with 3 measurements in a row on the same version, before the operator decides whether the method becomes a criterion; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
 average settles across sessions.
 
 ## Evaluate

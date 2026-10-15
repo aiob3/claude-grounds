@@ -36,3 +36,5 @@ Uma linha por rodada do leitor frio (protocolo em EXP-002-mensagem.md). Correç�
 2026-10-15 | readme-en-final | topo | chegou: 3/3 | público ✓, dor ✓, ganho ✓ | PASSOU | 21 | instrumento: leitor_frio 1.0 | medição
 2026-10-15 | readme-en-final | inteiro | chegou: 6/6 | público ✓, dor ✓, ganho ✓, prova ✓, adoção ✓, limite ✓ | PASSOU | 31 | instrumento: leitor_frio 1.0 | medição
 2026-10-15 | readme-pt-final | inteiro | chegou: 6/6 | público ✓, dor ✓, ganho ✓, prova ✓, adoção ✓, limite ✓ | PASSOU | 32 | instrumento: leitor_frio 1.0 | medição
+2026-10-15 | readme-en-rich | inteiro | chegou: 6/6 | público ✓, dor ✓, ganho ✓, prova ✓, adoção ✓, limite ✓ | PASSOU | 28 | instrumento: leitor_frio 1.0 | medição
+2026-10-15 | readme-pt-rich | inteiro | chegou: 6/6 | público ✓, dor ✓, ganho ✓, prova ✓, adoção ✓, limite ✓ | PASSOU | 31 | instrumento: leitor_frio 1.0 | medição
