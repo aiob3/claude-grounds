@@ -337,6 +337,24 @@ test('crase escapada dentro do trecho é a crase do código: os 4 "não encontra
   expect(lerMutacoes('`\\`x\\`` → `y`')).toEqual([{ de: '\\`x\\`', para: 'y' }, { de: '`x`', para: 'y' }])
 })
 
+test('barra vertical escapada no trecho é a do código: os 3 recusados da rodada da 0.9.0', () => {
+  const ok = (fonte: string, mutacao: string, esperado: string) => {
+    const r = aplicarTrecho(fonte, 1, mutacao)
+    expect('erro' in r ? r.erro : r.texto).toBe(esperado)
+  }
+  // No original (#15): "trecho não encontrado".
+  ok('  if (!home || !caminho) return\n', '`if (!home \\|\\| !caminho) return` → `if (!caminho) return`', '  if (!caminho) return\n')
+  // No mutado (#17): o código mutado não carregava.
+  ok("const e = a >= 10 && b ? 'ok' : 'x'\n", "`a >= 10 && b ? 'ok'` → `a >= 10 \\|\\| b ? 'ok'`", "const e = a >= 10 || b ? 'ok' : 'x'\n")
+  // Num tipo (#14), junto com crase escapada no mesmo trecho.
+  ok("type T = 'a' | 'b'\nconst s = `x`\n", "`'a' \\| 'b'` → `'a'`", "type T = 'a'\nconst s = `x`\n")
+  // Regex com \| de verdade continua achando a literal.
+  ok('const r = /a\\|b/\n', '`/a\\|b/` → `/a/`', 'const r = /a/\n')
+  // Duas leituras seguidas com escape: a regex do teste não guarda posição entre chamadas.
+  expect(lerMutacoes('`a \\| b` → `a`').length).toBe(2)
+  expect(lerMutacoes('`c \\| d` → `c`').length).toBe(2)
+})
+
 test('realocar troca a raiz pela cópia só onde ela é um caminho inteiro (venv copiado, 0.8.3)', () => {
   const c = '/tmp/p/repo'
   expect(realocar('/repo/src\n', '/repo', c)).toBe('/tmp/p/repo/src\n')

@@ -124,7 +124,7 @@ test('o operador define e conclui pelo /objetivo, e o painel lista as pendência
   const pane = JSON.stringify(
     await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'terminal', props: {} } as never),
   )
-  expect(pane).toContain('Operador (sua vez)')
+  expect(pane).toContain('SUA VEZ')
   expect(pane).toContain('revisar o ADR')
 })
 
@@ -596,4 +596,229 @@ test('publicar com a verificação aberta: a nota vem com o resultado, sem negar
   expect(await notas('git status')).not.toContain('esta ação publica')
   await $.command.run({ command: 'objetivo', args: 'feito 1' } as never)
   expect(await notas('git push')).not.toContain('esta ação publica')
+})
+
+// Visual 1: o painel novo (medidores, Agora, sua vez com botão, fila, feitas recolhidas, indicadores de outros mods).
+const PAINEL = { component: 'Pane', requestId: 'objetivo', props: { bodyColumns: 48 } } as const
+const comObjetivo = async ($: Engine) => {
+  await $.command.run({ command: 'objetivo', args: 'Painel novo :: o operador usa o painel sem digitar e o efeito aparece no objetivo' } as never)
+  await $.command.run({ command: 'objetivo', args: 'meu conferir a faixa' } as never)
+  await $.command.run({ command: 'objetivo', args: 'add desenhar os medidores com largura exata e sem quebrar em terminal estreito de jeito nenhum' } as never)
+  await $.command.run({ command: 'objetivo', args: 'add escrever os testes' } as never)
+  await $.command.run({ command: 'objetivo', args: 'melhoria 3' } as never)
+}
+
+test('painel: o botão Feito conclui a pendência do operador, e ela vai para as feitas recolhidas', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  await comObjetivo($)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'contexto-bar', surface, ...PAINEL } as never)
+    if (surface === 'terminal') {
+      expect(await ui.find({ key: 'feito-1' } as never)).toBeDefined()
+      await ui.press({ key: 'feito-1' } as never)
+    }
+    expect(await ui.find({ key: 'feito-1' } as never)).toBeUndefined()
+    expect(await ui.find({ type: 'Button', text: /1 feita ▸/ } as never)).toBeDefined()
+    await ui.unmount()
+  }
+  // Concluída pelo operador: a próxima passa a ser do Claude e o resumo marca a #1.
+  const ver = JSON.stringify(await $.tool.call({ tool: TOOL, acao: 'ver' } as never))
+  expect(ver).toContain('[x] #1')
+  expect(ver).toContain('[ ] #2')
+})
+
+test('painel: as feitas abrem e fecham pelo botão; a fila do Claude não repete a próxima e pinta o nível', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  await comObjetivo($)
+  await $.command.run({ command: 'objetivo', args: 'feito 1' } as never)
+  const ui = await $.ui.mount({ plugin: 'contexto-bar', surface: 'terminal', ...PAINEL } as never)
+  expect(await ui.find({ type: 'Text', text: /#1 conferir a faixa/ } as never)).toBeUndefined()
+  await ui.press({ key: 'feitas' } as never)
+  expect(await ui.find({ type: 'Button', text: /1 feita ▾/ } as never)).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /#1 conferir a faixa/ } as never)).toBeDefined()
+  await ui.press({ key: 'feitas' } as never)
+  expect(await ui.find({ type: 'Text', text: /#1 conferir a faixa/ } as never)).toBeUndefined()
+  await ui.unmount()
+  const pane = await painel($)
+  // A #2 é a próxima (no Agora); na fila só a #3, que é melhoria (apagada, ponto subtle).
+  expect(pane).toContain('▣ #')
+  expect(pane.match(/desenhar os medidores/g)?.length).toBe(1)
+  expect(pane).toContain('{"type":"Text","props":{"color":"subtle"},"children":["·"]}," #","3"')
+  expect(pane).toContain('FILA DO CLAUDE')
+})
+
+test('painel: texto longo cabe numa linha e o resto só aparece com o ponteiro em cima', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  await comObjetivo($)
+  await $.command.run({ command: 'objetivo', args: 'add uma pendência com um texto comprido o bastante para não caber em quarenta e oito colunas de painel' } as never)
+  const pane = await painel($)
+  // 48 colunas: '● #4 ' (5) + 43 de texto, a última delas as reticências.
+  expect(pane).toContain('"uma pendência com um texto comprido o bast…"')
+  expect(pane).toContain('{"type":"Box","props":{"display":"none","paddingLeft":5},"hover":{"display":"flex"},"children":[{"type":"Text","props":{"dimColor":true,"wrap":"wrap"},"children":["…","ante para não caber em quarenta e oito colunas de painel"]}]}')
+  // A conclusão também: uma linha de 48, o resto no hover.
+  expect(pane).toContain('"conclui: o operador usa o painel sem digitar e …"')
+  expect(pane).toContain('"…","o efeito aparece no objetivo"')
+  // Texto que cabe não ganha hover.
+  expect(pane).not.toContain('"…","escrever os testes"')
+})
+
+test('painel: o botão auto liga e desliga o painel automático, como o /objetivo auto', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  mock.store(on)
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  const abertos: string[] = []
+  on('ui.open', (_$, e) => {
+    abertos.push((e as { id: string }).id)
+    return { value: { isPlaced: true } } as never
+  })
+  await comObjetivo($)
+  const ui = await $.ui.mount({ plugin: 'contexto-bar', surface: 'terminal', ...PAINEL } as never)
+  expect(await ui.find({ type: 'Button', text: /auto ligado/ } as never)).toBeDefined()
+  await ui.press({ key: 'auto' } as never)
+  expect(await ui.find({ type: 'Button', text: /auto desligado/ } as never)).toBeDefined()
+  await ui.unmount()
+  // Desligado pelo botão: o pedido seguinte não abre o painel.
+  await $.prompt.submit({ text: 'segue' } as never)
+  expect(abertos).toEqual([])
+  await $.command.run({ command: 'objetivo', args: 'auto on' } as never)
+  expect(await painel($)).toContain('auto ligado')
+})
+
+test('painel: o Agora mostra o estado do agente (trabalhando com a ferramenta, concluído no fim do turno)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  let durante = ''
+  on('tool.call', async () => {
+    durante = await painel($)
+    return { result: { text: 'ok' } } as never
+  })
+  on('turn.start', (_$, e) => ({ turnId: (e as { turnId: string }).turnId }) as never)
+  on('turn.complete', () => usoDoTurno(0, 0))
+  expect(await painel($)).toContain('"○"," ","ocioso"')
+  await $.prompt.submit({ text: 'vai' } as never)
+  expect(await painel($)).toContain('"●"," ","trabalhando"')
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect(durante).toContain('trabalhando · Bash')
+  expect(await painel($)).not.toContain('trabalhando · Bash')
+  await umTurno($, 't1')
+  expect(await painel($)).toContain('"✔"," ","concluído"')
+  // Subagente não mexe no estado da conversa principal.
+  await $.tool.call({ tool: 'Read', file_path: '/x', agentId: 'sub' } as never)
+  expect(await painel($)).toContain('concluído')
+  expect(durante).not.toContain('trabalhando · Read')
+})
+
+test('painel: indicadores de outros mods viram medidores; arquivo quebrado não apaga os outros', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  mock.env(on, { HOME: '/home/u' })
+  const pasta = '/home/u/.claude/indicadores'
+  const arquivos: Record<string, string> = {
+    'prova-de-teste.json': JSON.stringify({ versao: 1, fonte: 'prova-de-teste', itens: [{ id: 'exp-001', rotulo: 'EXP-001', valor: 28, meta: 10, estado: 'ok', detalhe: 'promoção: 3/3 critérios' }] }),
+    'quebrado.json': '{ não é json',
+    'outro.json': JSON.stringify({ versao: 1, fonte: 'outro', itens: [{ id: 'n', rotulo: 'rodadas', valor: 3, unidade: 'hoje' }] }),
+    'leia.txt': 'ignorado',
+  }
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path === pasta }) as never)
+  on('fs.list', () => ({ value: [...Object.keys(arquivos).map(name => ({ name, kind: 'file' })), { name: 'sub.json', kind: 'dir' }] }) as never)
+  on('fs.read', (_$, e) => {
+    const nome = (e as { path: string }).path.slice(pasta.length + 1)
+    if (!(nome in arquivos)) throw new Error('ENOENT')
+    return { value: arquivos[nome] } as never
+  })
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  const pane = await painel($)
+  // Ordem estável pelo nome do arquivo, qualquer que seja a ordem da pasta (sobrevivente M5 da 0.11.0).
+  expect(pane.indexOf('"rodadas    "') < pane.indexOf('"EXP-001    "')).toBe(true)
+  expect(pane).toContain('"EXP-001    "')
+  expect(pane).toContain('"28/10 ✓"')
+  expect(pane).toContain('promoção: 3/3 critérios')
+  expect(pane).toContain('"3 hoje"')
+  expect(pane).not.toContain('ignorado')
+  // O arquivo some: o medidor sai no próximo refresh.
+  delete arquivos['prova-de-teste.json']
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect(await painel($)).not.toContain('EXP-001')
+})
+
+test('painel: com o store fora, o botão auto ainda mostra e vale o que o operador escolheu (sobrevivente M9 da 0.11.0)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  on('store.get', () => {
+    throw new Error('store fora')
+  })
+  on('store.set', () => {
+    throw new Error('store fora')
+  })
+  on('store.delete', () => ({ value: undefined }) as never)
+  const abertos: string[] = []
+  on('ui.open', (_$, e) => {
+    abertos.push((e as { id: string }).id)
+    return { value: { isPlaced: true } } as never
+  })
+  await comObjetivo($)
+  const ui = await $.ui.mount({ plugin: 'contexto-bar', surface: 'terminal', ...PAINEL } as never)
+  await ui.press({ key: 'auto' } as never)
+  expect(await ui.find({ type: 'Button', text: /auto desligado/ } as never)).toBeDefined()
+  await ui.unmount()
+  await $.prompt.submit({ text: 'segue' } as never)
+  expect(abertos).toEqual([])
+})
+
+test('painel: a vez do operador vem na ordem da prioridade, bloqueante primeiro (sobrevivente M10 da 0.11.0)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  await $.command.run({ command: 'objetivo', args: 'Ordem :: o operador vê primeiro o que trava' } as never)
+  await $.command.run({ command: 'objetivo', args: 'meu revisar o texto' } as never)
+  await $.command.run({ command: 'objetivo', args: 'meu aprovar o deploy' } as never)
+  await $.command.run({ command: 'objetivo', args: 'bloqueante 2' } as never)
+  const pane = await painel($)
+  const sua = pane.slice(pane.indexOf('SUA VEZ'))
+  expect(sua.indexOf('aprovar o deploy') < sua.indexOf('revisar o texto')).toBe(true)
+})
+
+test('painel: a cor do medidor da janela muda em 60% e em 80% exatos (sobrevivente #7 da 0.11.0)', async ($, on) => {
+  let pct = 0
+  on('session.usage', () => ({ value: { context: { breakdown: { categories: [
+    { name: 'Messages', tokens: pct * 1000, kind: 'used' },
+    { name: 'Free space', tokens: (100 - pct) * 1000, kind: 'free' },
+  ] } } } }) as never)
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  const cor = async (p: number) => {
+    pct = p
+    await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+    const m = /"janela     "\]\},\{"type":"Text","props":\{"color":"(\w+)"\}.*?"(\d+)%/.exec(await painel($))
+    expect(m?.[2]).toBe(String(p))
+    return m?.[1]
+  }
+  expect(await cor(59)).toBe('success')
+  expect(await cor(60)).toBe('warning')
+  expect(await cor(79)).toBe('warning')
+  expect(await cor(80)).toBe('error')
+})
+
+test('painel: as barras dos medidores terminam todas na mesma coluna', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  mock.env(on, { HOME: '/home/u' })
+  const pasta = '/home/u/.claude/indicadores'
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path === pasta }) as never)
+  on('fs.list', () => ({ value: [{ name: 'p.json', kind: 'file' }] }) as never)
+  on('fs.read', () => ({ value: JSON.stringify({ versao: 1, fonte: 'p', itens: [{ id: 'e', rotulo: 'EXP-001', valor: 29, meta: 10 }] }) }) as never)
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  await comObjetivo($)
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  // Pares cheio + vazio de cada medidor (pendências, janela, EXP-001): a soma é a mesma em todos.
+  const pane = await painel($)
+  const somas = [...pane.matchAll(/"children":\["(█*)"\]\},\{"type":"Text","props":\{"dimColor":true\},"children":\["(░*)"\]/g)].map(m => m[1]!.length + m[2]!.length)
+  expect(somas.length).toBe(3)
+  expect(new Set(somas).size).toBe(1)
+})
+
+test('painel: a fila do Claude vem na ordem da prioridade, melhoria por último (sobrevivente #7 da lista final da 0.11.0)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  await comObjetivo($)
+  // #3 é melhoria e veio antes; #4 é requisito e veio depois: na fila, #4 antes de #3.
+  await $.command.run({ command: 'objetivo', args: 'add revisar o contraste' } as never)
+  const pane = await painel($)
+  const fila = pane.slice(pane.indexOf('FILA DO CLAUDE'))
+  expect(fila.indexOf('revisar o contraste') < fila.indexOf('escrever os testes')).toBe(true)
 })

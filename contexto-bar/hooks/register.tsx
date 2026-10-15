@@ -1,12 +1,13 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { Goal, GroupKey, Segment, Snapshot } from '../types'
+import type { Atividade, Goal, GoalItem, GroupKey, Indicador, Segment, Snapshot } from '../types'
 import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
 import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
 import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
 import type { SegundoPlano } from './segundo-plano'
+import { COR_INDICADOR, encurtar, ESTADOS, medidor, sufixoIndicador, textoAtividade, validarIndicadores } from './painel'
 
 const snapshot = atom({ plugin: 'contexto-bar', key: 'snapshot' } as const, null)
 const objetivo = atom({ plugin: 'contexto-bar', key: 'objetivo' } as const, null)
@@ -14,6 +15,10 @@ const turno = atom({ plugin: 'contexto-bar', key: 'turno' } as const, 0)
 const cache = atom({ plugin: 'contexto-bar', key: 'cache' } as const, null)
 const pedido = atom({ plugin: 'contexto-bar', key: 'pedido' } as const, null)
 const segundoPlano = atom({ plugin: 'contexto-bar', key: 'segundoPlano' } as const, null)
+const atividade = atom({ plugin: 'contexto-bar', key: 'atividade' } as const, null)
+const verFeitas = atom({ plugin: 'contexto-bar', key: 'verFeitas' } as const, false)
+const indicadores = atom({ plugin: 'contexto-bar', key: 'indicadores' } as const, [])
+const autoEspelho = atom({ plugin: 'contexto-bar', key: 'painelAuto' } as const, null)
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
@@ -122,6 +127,7 @@ export function fmtTokens(n: number): string {
 
 // Lê o detalhamento do /context (estimativa local, sem custo) e guarda para a barra.
 async function refresh($: EngineInterface, hookTexts: Set<string>) {
+  await lerIndicadores($).catch(() => undefined)
   try {
     const usage = await $.session.usage({ breakdown: 'summary' })
     // O tamanho do último pedido vem pronto: entrada sem cache, lida e gravada no cache, somadas.
@@ -135,6 +141,32 @@ async function refresh($: EngineInterface, hookTexts: Set<string>) {
   } catch {
     // Sem sessão ligada ainda: tenta de novo no próximo turno.
   }
+}
+
+/** Lê ~/.claude/indicadores/*.json (o contrato em painel.ts) e guarda só o que mudou. */
+async function lerIndicadores($: EngineInterface): Promise<void> {
+  const home = await $.env.get('HOME')
+  if (!home) return
+  const pasta = `${home}/.claude/indicadores`
+  const lidos: Indicador[] = []
+  if (await $.fs.exists(pasta)) {
+    const nomes = (await $.fs.list(pasta)).filter(f => f.kind === 'file' && f.name.endsWith('.json')).map(f => f.name).sort()
+    for (const nome of nomes) {
+      try {
+        lidos.push(...validarIndicadores(JSON.parse(await $.fs.read(`${pasta}/${nome}`))))
+      } catch {
+        // Um arquivo quebrado não apaga os outros.
+      }
+    }
+  }
+  const atual = await read($, indicadores)
+  if (JSON.stringify(atual) !== JSON.stringify(lidos)) await update($, indicadores, () => lidos)
+}
+
+/** Estado do agente para o cartão Agora; nunca derruba o evento observado. */
+async function marcar($: EngineInterface, a: Omit<Atividade, 'desde'>): Promise<void> {
+  const desde = await $.clock.now().catch(() => Date.now())
+  await update($, atividade, cur => (cur && cur.estado === a.estado && cur.ferramenta === a.ferramenta ? cur : { ...a, desde })).catch(() => undefined)
 }
 
 // Ferramentas em paralelo viram uma leitura em andamento e, no máximo, mais uma logo depois.
@@ -288,11 +320,18 @@ async function avisoSegundoPlano($: EngineInterface): Promise<string> {
 // Painel automático: com objetivo ativo, cada pedido abre (ou mantém) o painel. Liga por padrão.
 const CHAVE_AUTO = 'painel-auto'
 async function painelAuto($: EngineInterface): Promise<boolean> {
+  const espelho = await read($, autoEspelho).catch(() => null)
+  if (espelho !== null) return espelho
   try {
     return (await $.store.get(CHAVE_AUTO)) !== false
   } catch {
     return true
   }
+}
+
+async function mudarAuto($: EngineInterface, ligado: boolean): Promise<void> {
+  await $.store.set(CHAVE_AUTO, ligado).catch(() => undefined)
+  await update($, autoEspelho, () => ligado)
 }
 
 async function abrirPainel($: EngineInterface) {
@@ -376,6 +415,7 @@ export const register: Register = on => {
   // Cada prompt leva ao modelo uma linha com o objetivo e as pendências (o operador não a vê).
   on('prompt.submit', async ($, e, next) => {
     if (e.command) return next(e)
+    await marcar($, { estado: 'trabalhando' })
     // A notificação de fim de uma tarefa limpa o alerta dela.
     const nota = e.origin?.kind === 'task-notification' || e.text.includes('<task-notification>') ? notificacao(e.text) : null
     if (nota) await mudarSegundoPlano($, sp => concluirTarefa(sp, nota.id))
@@ -397,7 +437,7 @@ export const register: Register = on => {
   on('command.run', { command: 'objetivo' }, async ($, e) => {
     const c = comando(e.args)
     if (c === 'auto-on' || c === 'auto-off') {
-      await $.store.set(CHAVE_AUTO, c === 'auto-on').catch(() => undefined)
+      await mudarAuto($, c === 'auto-on')
       return {
         text:
           c === 'auto-on'
@@ -421,6 +461,7 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
     await update($, turno, n => n + 1)
+    if (!e.agentId) await marcar($, { estado: 'concluido' })
     if (!e.agentId) {
       // Sem semente ainda, o transcript já traz este turno: semeia em vez de somar, para não contar duas vezes.
       const uso = result.usage ?? e.usage
@@ -447,7 +488,9 @@ export const register: Register = on => {
 
   // Quase tempo real: relê depois de cada ferramenta da conversa principal (estimativa local, sem custo).
   on('tool.call', async ($, e, next) => {
+    if (!e.agentId) await marcar($, { estado: 'trabalhando', ferramenta: e.tool as string })
     const result = await next(e)
+    if (!e.agentId) await marcar($, { estado: 'trabalhando' })
     if (e.agentId || (e.tool as string) === TOOL) return result
     await refreshSoon($, hookTexts)
     if (result.deny !== undefined || result.isError) return result
@@ -518,14 +561,137 @@ export const register: Register = on => {
     )
   })
 
-  // O painel: a lista inteira. Acoplado ao lado da conversa no modo tela cheia; acima do prompt fora dele.
+  // O painel, de cima para baixo: medidores, o cartão Agora, a vez do operador com botões, a fila do Claude e as
+  // feitas recolhidas. O texto longo de cada pendência aparece inteiro com o ponteiro em cima (hover).
+  // Acoplado ao lado da conversa no modo tela cheia; acima do prompt fora dele.
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const largura = Math.max(30, (e.props as { bodyColumns?: number }).bodyColumns ?? 48)
     const goal = await read($, objetivo)
     const snap = await read($, snapshot)
     const sp = await read($, segundoPlano)
-    const linhaCache = (
-      <Box flexDirection="column">
+    const pc = taxa((await read($, cache))?.acc ?? null)
+    const inds = await read($, indicadores)
+    const ativ = await read($, atividade)
+    const feitasAbertas = await read($, verFeitas)
+    const auto = await painelAuto($)
+    const p = goal ? projetar(goal, snap) : null
+
+    // Todas as barras terminam na mesma coluna: o sufixo de cada uma ocupa a largura do maior.
+    const sufixos = [
+      p && p.total ? `${p.feitas}/${p.total}` : '',
+      snap ? `${snap.percent}%${p ? ` · ${CURTO[p.estado]}` : ''}` : '',
+      pc !== null ? `${pc}%` : '',
+      ...inds.map(sufixoIndicador),
+    ]
+    const colSufixo = Math.max(0, ...sufixos.map(s => s.length))
+    const linhaMedidor = (id: string, rotulo: string, valor: number, total: number, sufixo: string, cor: string) => {
+      const b = medidor(valor, total, largura - ROTULO - colSufixo - 1)
+      return (
+        <Text key={id}>
+          <Text dimColor>{rotulo.slice(0, ROTULO - 1).padEnd(ROTULO)}</Text>
+          <Text color={cor}>{b.cheio}</Text>
+          <Text dimColor>{b.vazio}</Text>
+          <Text color={cor}> {sufixo}</Text>
+        </Text>
+      )
+    }
+    const medidores = [
+      p && p.total ? linhaMedidor('m-pend', 'pendências', p.feitas, p.total, `${p.feitas}/${p.total}`, 'claude') : null,
+      snap
+        ? linhaMedidor('m-jan', 'janela', snap.percent, 100, `${snap.percent}%${p ? ` · ${CURTO[p.estado]}` : ''}`, snap.percent >= 80 ? 'error' : snap.percent >= 60 ? 'warning' : 'success')
+        : null,
+      pc !== null ? linhaMedidor('m-cache', 'cache', pc, 100, `${pc}%`, 'subtle') : null,
+      ...inds.map(i => {
+        const cor = i.estado ? COR_INDICADOR[i.estado] : 'claude'
+        const linha =
+          i.meta !== undefined ? (
+            linhaMedidor(`m-${i.fonte}-${i.id}`, i.rotulo, i.valor, i.meta, sufixoIndicador(i), cor)
+          ) : (
+            <Text key={`m-${i.fonte}-${i.id}`}>
+              <Text dimColor>{i.rotulo.slice(0, ROTULO - 1).padEnd(ROTULO)}</Text>
+              <Text color={cor}>{sufixoIndicador(i)}</Text>
+            </Text>
+          )
+        return i.detalhe ? (
+          <Box key={`ind-${i.fonte}-${i.id}`} flexDirection="column">
+            {linha}
+            <Box display="none" hover={{ display: 'flex' }} paddingLeft={ROTULO}>
+              <Text dimColor wrap="wrap">
+                {i.detalhe}
+              </Text>
+            </Box>
+          </Box>
+        ) : (
+          linha
+        )
+      }),
+    ].filter(Boolean)
+
+    // Uma pendência numa linha; o resto do texto aparece embaixo com o ponteiro em cima.
+    const linhaItem = (i: GoalItem, glifo: string, cor: string | undefined, reserva: number, botao?: RenderChildren) => {
+      const prefixo = `${glifo} #${i.id} `
+      const { curto, resto } = encurtar(i.texto, largura - prefixo.length - reserva)
+      return (
+        <Box key={`i-${i.id}`} flexDirection="column">
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text dimColor={i.feito || i.nivel === 'melhoria'}>
+              <Text color={cor}>{glifo}</Text> #{i.id} {curto}
+            </Text>
+            {botao ?? null}
+          </Box>
+          {resto ? (
+            <Box display="none" hover={{ display: 'flex' }} paddingLeft={prefixo.length}>
+              <Text dimColor wrap="wrap">
+                …{resto}
+              </Text>
+            </Box>
+          ) : null}
+        </Box>
+      )
+    }
+
+    const est = ativ?.estado ?? 'ocioso'
+    const agoraCard = (
+      <Box flexDirection="column" marginTop={1}>
+        <Text>
+          <Text weight="bold">AGORA </Text>
+          <Text color={ESTADOS[est].cor}>
+            {ESTADOS[est].glifo} {textoAtividade(ativ)}
+          </Text>
+        </Text>
+        {goal ? (
+          (() => {
+            const prox = proxima(goal)
+            if (!prox) return <Text color="success">tudo feito: encerrar ou definir o próximo objetivo</Text>
+            const cor = prox.nivel === 'bloqueante' ? 'error' : prox.dono === 'operador' ? 'warning' : 'claude'
+            return (
+              <Box flexDirection="column">
+                <Text color={cor} weight="bold" wrap="wrap">
+                  ▣ #{prox.id} {prox.texto}
+                </Text>
+                <Text dimColor>
+                  {'  '}
+                  {prox.dono === 'operador' ? 'sua vez' : 'Claude'} · {prox.tamanho} · {prox.nivel ?? 'requisito'}
+                </Text>
+              </Box>
+            )
+          })()
+        ) : null}
+      </Box>
+    )
+
+    const rodape = (
+      <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="row">
+          <Button key="auto" plain label={`auto ${auto ? 'ligado' : 'desligado'}`} onPress={() => void mudarAuto($, !auto)} />
+          {p && p.abertasClaude ? (
+            <Text dimColor>
+              {' '}
+              · ~{fmtTokens(p.unidade)}/un{p.comHistorico ? '' : '*'} · precisa ~{fmtTokens(p.necessario)} de {fmtTokens(p.livre)}
+            </Text>
+          ) : null}
+        </Box>
         <LinhaCache c={await read($, cache)} req={await read($, pedido)} Text={Text} />
         {(sp ? linhasDoPainel(sp, await agora($)) : []).map(l => (
           <Text key={l} color={l.endsWith('em curso') ? 'subtle' : 'warning'} wrap="wrap">
@@ -534,52 +700,84 @@ export const register: Register = on => {
         ))}
       </Box>
     )
+
     if (!goal) {
       return (
         <Box flexDirection="column">
-          <Text dimColor>Nenhum objetivo ativo.</Text>
-          <Text dimColor>/objetivo texto :: passo que conclui</Text>
-          {linhaCache}
+          {medidores}
+          {agoraCard}
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Nenhum objetivo ativo.</Text>
+            <Text dimColor>/objetivo texto :: passo que conclui</Text>
+          </Box>
+          {rodape}
         </Box>
       )
     }
-    const p = projetar(goal, snap)
-    const grupo = (dono: 'claude' | 'operador', rotulo: string) => {
-      const itens = ordenar(goal.itens.filter(i => i.dono === dono))
-      if (!itens.length) return null
-      return (
-        <Box flexDirection="column" marginTop={1}>
-          <Text weight="bold">{rotulo}</Text>
-          {itens.map(i => (
-            <Text key={String(i.id)} dimColor={i.feito} wrap="wrap">
-              {i.feito ? '✔' : '○'} #{i.id} [{i.tamanho}] {etiqueta(i)}{i.texto}
-            </Text>
-          ))}
-        </Box>
-      )
-    }
+
+    const prox = proxima(goal)
+    const suaVez = ordenar(goal.itens.filter(i => i.dono === 'operador' && !i.feito))
+    const fila = ordenar(goal.itens.filter(i => i.dono === 'claude' && !i.feito && i.id !== prox?.id))
+    const feitas = goal.itens.filter(i => i.feito)
+    const conc = goal.conclusao ? encurtar(`conclui: ${goal.conclusao}`, largura) : null
     return (
       <Box flexDirection="column">
-        <Text weight="bold" wrap="wrap">
-          {goal.titulo}
-        </Text>
-        {goal.conclusao ? (
-          <Text dimColor wrap="wrap">
-            conclui quando: {goal.conclusao}
+        <Box key="titulo" flexDirection="column">
+          <Text weight="bold" wrap="wrap">
+            ◎ {goal.titulo}
           </Text>
-        ) : null}
-        {grupo('claude', 'Claude')}
-        {grupo('operador', 'Operador (sua vez)')}
-        <Box marginTop={1}>
-          <Text color={COR_ESTADO[p.estado]} wrap="wrap">
-            {p.feitas}/{p.total} feitas · {ESTADO[p.estado]} · precisa ~{fmtTokens(p.necessario)} de {fmtTokens(p.livre)} livres
-          </Text>
+          {conc ? <Text dimColor>{conc.curto}</Text> : null}
+          {conc?.resto ? (
+            <Box display="none" hover={{ display: 'flex' }}>
+              <Text dimColor wrap="wrap">
+                …{conc.resto}
+              </Text>
+            </Box>
+          ) : null}
         </Box>
-        {linhaCache}
+        <Box flexDirection="column" marginTop={1}>
+          {medidores}
+        </Box>
+        {agoraCard}
+        {suaVez.length ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text>
+              <Text color="warning" weight="bold">
+                SUA VEZ
+              </Text>
+              <Text dimColor> · {suaVez.length}</Text>
+            </Text>
+            {suaVez.map(i =>
+              linhaItem(i, '○', 'warning', BOTAO, <Button key={`feito-${i.id}`} label="Feito" onPress={() => void mudarObjetivo($, { acao: 'concluir', ids: [i.id] } as Acao, 'operador')} />),
+            )}
+          </Box>
+        ) : null}
+        {fila.length ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text>
+              <Text weight="bold">FILA DO CLAUDE</Text>
+              <Text dimColor> · {fila.length}</Text>
+            </Text>
+            {fila.map(i => linhaItem(i, i.nivel === 'melhoria' ? '·' : '●', COR_NIVEL[i.nivel ?? 'requisito'], 0))}
+          </Box>
+        ) : null}
+        {feitas.length ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Button key="feitas" plain label={`✔ ${feitas.length} ${feitas.length === 1 ? 'feita' : 'feitas'} ${feitasAbertas ? '▾' : '▸'}`} onPress={() => void update($, verFeitas, v => !v)} />
+            {feitasAbertas ? feitas.map(i => linhaItem(i, '✔', 'success', 0)) : null}
+          </Box>
+        ) : null}
+        {rodape}
       </Box>
     )
   })
 }
+
+// Colunas do rótulo dos medidores e do botão "[ Feito ]" ao lado das pendências do operador.
+const ROTULO = 11
+const BOTAO = 10
+const CURTO = { cabe: 'cabe', apertado: 'apertado', 'nao-cabe': 'não cabe', 'sem-dados': 'sem dados' } as const
+const COR_NIVEL = { bloqueante: 'error', requisito: 'text', melhoria: 'subtle' } as const
 
 const ESTADO = { cabe: 'cabe na janela', apertado: 'apertado', 'nao-cabe': 'não cabe', 'sem-dados': 'sem dados' } as const
 const COR_ESTADO = { cabe: 'success', apertado: 'warning', 'nao-cabe': 'error', 'sem-dados': 'text' } as const

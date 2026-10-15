@@ -54,6 +54,24 @@ export type SegundoPlano = {
   cronsAtivos: boolean
 }
 
+/** Estado do agente no vocabulário do herdr: idle, working, blocked, done. */
+export type Estado = 'ocioso' | 'trabalhando' | 'bloqueado' | 'concluido'
+
+export type Atividade = { estado: Estado; /** Ferramenta em curso, quando trabalhando. */ ferramenta?: string; desde: number }
+
+/** Um número que outro mod publica em ~/.claude/indicadores/<fonte>.json para o painel mostrar. */
+export type Indicador = {
+  fonte: string
+  id: string
+  rotulo: string
+  valor: number
+  /** Com meta, o painel desenha um medidor até ela. */
+  meta?: number
+  unidade?: string
+  estado?: 'ok' | 'atencao' | 'alerta'
+  detalhe?: string
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'contexto-bar': {
@@ -65,6 +83,12 @@ declare module 'claude-code' {
       /** Tamanho do último pedido (entrada sem cache + lida + gravada no cache). */
       pedido: number | null
       segundoPlano: SegundoPlano | null
+      atividade: Atividade | null
+      /** Pendências feitas abertas no painel (recolhidas por padrão). */
+      verFeitas: boolean
+      indicadores: Indicador[]
+      /** Espelho do painel automático do store, para o botão redesenhar. */
+      painelAuto: boolean | null
     }
   }
 }

@@ -4,7 +4,8 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Escolha, ExecucaoFeita } from '../types'
 import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
-import { avisoNovos, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
+import { indicadorDoPlacar, placar } from './placar'
+import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
 import type { Alias } from './alcance'
 import { aliasesDe, cabeNoMapa, ehConfigDeAlias, ehEntradaDeTeste, ehMapeavel, grafo, SUFIXO_FORA, testesQueAlcancam } from './alcance'
@@ -107,9 +108,10 @@ async function escolher(
     return { texto: `Nenhum código-fonte alterado contra ${base}${excluidos.length ? ` (só testes: ${excluidos.join(', ')})` : ''}.`, erro: true }
   }
   const modelo = a.modelo?.trim() || (await $.session.model())
-  const r = await $.model.complete({ model: modelo, system: SISTEMA, prompt: montarPrompt(fonte), maxTokens: 4000 })
+  const r = await $.model.complete({ model: modelo, system: SISTEMA, prompt: montarPrompt(fonte), maxTokens: LIMITE_ESCOLHA })
   if (!r.isAnswered) return { texto: `Erro: o modelo não respondeu (${r.reason}).`, erro: true }
-  const lido = lerResposta(r.text)
+  const corte = cortarResposta(r.text, r.usage?.output_tokens ?? 0, LIMITE_ESCOLHA)
+  const lido = lerResposta(corte.texto)
   const escolha: Escolha = {
     raiz,
     base,
@@ -118,6 +120,7 @@ async function escolher(
     excluidos,
     naoCodigo,
     avisoNovos: avisoNovos(fonte.map(b => b.arquivo), novos),
+    ...(corte.aviso ? { avisoCorte: corte.aviso } : {}),
     mutantes: lido.mutantes,
     linhasDoDiff: fonte.reduce((t, b) => t + linhasDoDiff(b.texto), 0),
     naoAplicaveis: lido.naoAplicaveis,
@@ -129,6 +132,7 @@ async function escolher(
       `Escolha: R2.1 às cegas por ${modelo} via $.model.complete (sem ferramentas, sem histórico).`,
       `Enviado: diff de ${escolha.enviados.join(', ')} contra ${base}. Testes retirados antes do envio: ${excluidos.join(', ') || 'nenhum'}.${naoCodigo.length ? ` Não-código fora do envio: ${naoCodigo.join(', ')}.` : ''}`,
       escolha.avisoNovos ?? '',
+      escolha.avisoCorte ?? '',
       `Mutantes (${lido.mutantes.length}):`,
       tabela(lido.mutantes) || '  nenhum',
       lido.naoAplicaveis.length ? `Não aplicáveis: ${lido.naoAplicaveis.join('; ')}` : '',
@@ -157,6 +161,16 @@ async function versaoDoMod($: EngineInterface): Promise<string> {
   return versaoDe(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`).catch(() => ''))
 }
 
+/** O placar do EXP-001 vai a ~/.claude/indicadores/prova-de-teste.json, que o painel do contexto-bar mostra. */
+async function publicarPlacar($: EngineInterface): Promise<void> {
+  const home = await $.env.get('HOME').catch(() => undefined)
+  const caminho = await caminhoDoLog($)
+  if (!home || !caminho || !(await $.fs.exists(caminho))) return
+  const texto = indicadorDoPlacar(placar(await $.fs.read(caminho)))
+  const destino = `${home}/.claude/indicadores/prova-de-teste.json`
+  if ((await $.fs.read(destino).catch(() => '')) !== texto) await $.fs.write(destino, texto)
+}
+
 async function registrar($: EngineInterface, r: Partial<Registro> & { defeitoInstrumento?: string }): Promise<{ texto: string; erro: boolean }> {
   const data = new Date().toISOString().slice(0, 10)
   const feita = await read($, execucao)
@@ -183,7 +197,8 @@ async function registrar($: EngineInterface, r: Partial<Registro> & { defeitoIns
   const c = await git($, ['commit', '-q', '-m', `EXP-001 log: ${r.tarefa!.trim().slice(0, 60)}`, '--', log], dir)
   // Uma execução vale para um registro só.
   if (feita) await update($, execucao, () => null)
-  return { texto: `Gravado em ${caminho}${log !== caminho ? ` (→ ${log})` : ''}:\n${linha}${c.exitCode === 0 ? '\n(commit no git do harness)' : `\n(sem commit: ${c.stderr.trim() || c.stdout.trim()})`}`, erro: false }
+  await publicarPlacar($).catch(() => undefined)
+  return { texto: `Gravado em ${caminho}${log !== caminho ? ` (→ ${log})` : ''}:\n${linha}${c.exitCode === 0 ? '\n(commit no repositório do log)' : `\n(sem commit: ${c.stderr.trim() || c.stdout.trim()})`}`, erro: false }
 }
 
 const SPEC_EXECUTAR = {
@@ -365,6 +380,7 @@ async function executar(
       excluidos: e.excluidos,
       naoCodigo: e.naoCodigo,
       avisoNovos: e.avisoNovos,
+      avisoCorte: e.avisoCorte,
       naoAplicaveis: e.naoAplicaveis,
       linhaDeBase: { passou: base.exitCode === 0, segundos: base.segundos, saida: base.exitCode === 0 ? undefined : (base.stdout + base.stderr).slice(-1500) },
       resultados: [],
@@ -495,6 +511,7 @@ export const register: Register = on => {
       description: 'EXP-001: mutantes escolhidos às cegas para o diff de um repositório (pasta padrão: a da sessão; base padrão: HEAD)',
       argumentHint: '[pasta] [base]',
     })
+    await publicarPlacar($).catch(() => undefined)
     return next(e)
   })
 

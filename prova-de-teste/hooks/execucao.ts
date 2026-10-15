@@ -27,13 +27,22 @@ export function lerMutacoes(mutacao: string): { de: string; para: string }[] {
 }
 
 /**
- * O escolhedor escapa a crase de dentro do trecho (`` `\`${a}\`` ``): cada leitura com \` ganha a versão sem a barra.
- * As duas ficam; quem aplica fica com a que existe no arquivo (código com \` de verdade continua achando a literal).
- * Recusados como "não encontrado" 4 vezes num dia (0.8.3).
+ * O escolhedor escapa a crase de dentro do trecho (`` `\`${a}\`` ``) e a barra vertical, que separa os campos da
+ * linha (`a \|\| b`): cada leitura com \` ou \| ganha a versão sem a barra. As duas ficam; quem aplica fica com a que
+ * existe no arquivo (código com \` ou \| de verdade, como numa regex, continua achando a literal).
+ * Recusados como "não encontrado" 4 vezes num dia pela crase (0.8.3) e 3 vezes numa rodada pela barra (0.9.0).
  */
+// Sem a flag g no teste: uma regex global guarda a posição entre chamadas e erraria a segunda leitura.
+const TEM_ESCAPE = /\\[`|]/
 function comEscapes(leituras: { de: string; para: string }[]): { de: string; para: string }[] {
-  const tira = (s: string) => s.replaceAll('\\`', '`')
-  return leituras.flatMap(l => (l.de.includes('\\`') || l.para.includes('\\`') ? [l, { de: tira(l.de), para: tira(l.para) }] : [l]))
+  const tira = (s: string) => s.replace(/\\([`|])/g, '$1')
+  return leituras.flatMap(l => {
+    if (!TEM_ESCAPE.test(l.de) && !TEM_ESCAPE.test(l.para)) return [l]
+    const sem = { de: tira(l.de), para: tira(l.para) }
+    // Com o original sem escape, as duas leituras acham o mesmo trecho e vale a primeira: a barra do mutado era só
+    // do formato da linha, então a versão sem ela vem antes.
+    return TEM_ESCAPE.test(l.de) ? [l, sem] : [sem, l]
+  })
 }
 
 export type Aplicacao = { texto: string; linhaReal: number; ocorrencias: number }
@@ -306,6 +315,7 @@ export type Execucao = {
   excluidos: string[]
   naoCodigo?: string[]
   avisoNovos?: string
+  avisoCorte?: string
   naoAplicaveis: string[]
   linhaDeBase: { passou: boolean; segundos: number; saida?: string }
   resultados: Resultado[]
@@ -402,6 +412,7 @@ export function relatorio(e: Execucao, data: string): string {
     `Red first:  a cargo do agente (o mod não sabe qual é a linha central)`,
     `Escolha:    R2.1 às cegas por ${e.modelo} via $.model.complete; enviados: ${e.enviados.join(', ')}; testes retirados: ${e.excluidos.join(', ') || 'nenhum'}${e.naoCodigo?.length ? `; não-código fora do envio: ${e.naoCodigo.join(', ')}` : ''}`,
     e.avisoNovos ?? '',
+    e.avisoCorte ?? '',
     `Comando:    ${e.comando.join(' ; ')} — linha de base ${e.linhaDeBase.passou ? 'passou' : 'FALHOU'} (${e.linhaDeBase.segundos.toFixed(1)} s)`,
     `Mutantes:   ${c.aplicados} aplicados | ${c.mortos} mortos | ${c.sobreviventes} sobreviventes${e.resultados.length > c.aplicados ? ` | ${e.resultados.length - c.aplicados} não aplicados` : ''}`,
     ...linhas,

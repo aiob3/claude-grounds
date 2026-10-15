@@ -16,6 +16,8 @@ export type Escolha = {
   naoCodigo?: string[]
   /** Aviso de envio dominado por arquivos fora do git. */
   avisoNovos?: string
+  /** 0.9.0: a resposta bateu no teto de tokens e a última linha saiu. */
+  avisoCorte?: string
   mutantes: Mutante[]
   /** 0.7.0: linhas adicionadas ou removidas no diff do código-fonte enviado. */
   linhasDoDiff?: number

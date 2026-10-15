@@ -121,7 +121,7 @@ test('registrar acrescenta a linha ao log sem tocar nas anteriores e faz commit'
   const cal = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'rodada 3', aplicados: 1, mortos: 1, sobreviventes: 0, reais: 0, estado: 'PROVADO', tempo: 1, defeitoInstrumento: 'morte falsa' } as never))
   expect(cal).toContain('| instrumento: manual v1.2 | calibração: morte falsa')
   expect(chamados.some(a => a[1] === 'commit')).toBe(true)
-  expect(r).toContain('commit no git do harness')
+  expect(r).toContain('commit no repositório do log')
   // Registro incoerente não grava nada.
   escrito = ''
   const ruim = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'x', aplicados: 3, mortos: 1, sobreviventes: 1, reais: 0, estado: 'FRACO', tempo: 1 } as never))
@@ -617,4 +617,63 @@ test('registrar 0.6.0: estado acima do executado exige justificar cada sobrevive
   const com = JSON.stringify(await $.tool.call({ ...base, estado: 'PROVADO', equivalentes: [{ n: 2, motivo: 'soma comuta' }] } as never))
   expect(com).toContain('equivalentes: #2 soma comuta')
   expect(m.fs.get(LOG_PATH)).toContain('| PROVADO | 5 | instrumento: mod ')
+})
+
+test('resposta do escolhedor no teto de tokens: a última linha sai e o aviso diz que pode faltar categoria (defeito da 0.8.4)', async ($, on) => {
+  gitFalso(on)
+  on('session.cwd', () => ({ value: '/repo' }) as never)
+  on('session.model', () => ({ value: 'opus' }) as never)
+  let pedido = 0
+  let saida = 16000
+  let resposta = 'src/a.ts:1 | borda/vazio | `a + b` → `a - b`\nsrc/a.ts:1 | empate/ordem | `.map(f'
+  on('model.complete', (_$, e) => {
+    pedido = (e as { maxTokens: number }).maxTokens
+    return { value: { isAnswered: true, text: resposta, usage: { output_tokens: saida } } } as never
+  })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__mutantes' } as never))
+  expect(pedido).toBe(16000)
+  expect(r).toContain('Resposta do escolhedor cortada no teto de 16000 tokens')
+  expect(r).toContain('Mutantes (1)')
+  expect(r).not.toContain('.map(f')
+  // Resposta cortada que termina em quebra de linha: sai a linha pela metade, não a linha vazia (sobrevivente #21 da 0.9.0).
+  resposta += '\n'
+  const comQuebra = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__mutantes' } as never))
+  expect(comQuebra).toContain('Mutantes (1)')
+  expect(comQuebra).not.toContain('.map(f')
+  // Abaixo do teto, nada sai e não há aviso.
+  resposta = resposta.trimEnd()
+  saida = 15999
+  const ok = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__mutantes' } as never))
+  expect(ok).not.toContain('cortada')
+  expect(ok).toContain('Mutantes (2)')
+})
+
+test('o placar do EXP-001 vai ao arquivo de indicadores a cada registro, com a contagem do log já gravado', async ($, on) => {
+  mock.env(on, { HOME: '/home/u', PROVA_DE_TESTE_LOG: LOG_PATH })
+  gitFalso(on)
+  let log = '# log\n2026-10-15 | a | v1.2 | mutantes: 5/5/0 | reais: 1 | PROVADO | 30 | instrumento: mod 0.9.0 | medição\n'
+  const escritas: Record<string, string[]> = {}
+  const destino = '/home/u/.claude/indicadores/prova-de-teste.json'
+  on('fs.exists', () => ({ value: true }) as never)
+  on('fs.stat', () => {
+    throw new Error('sem link')
+  })
+  on('fs.read', (_$, e) => {
+    const p = (e as { path: string }).path
+    if (p === LOG_PATH) return { value: log } as never
+    if (p === destino && escritas[destino]?.length) return { value: escritas[destino]!.at(-1) } as never
+    throw new Error('ENOENT')
+  })
+  on('fs.write', (_$, e) => {
+    const { path, text } = e as { path: string; text: string }
+    ;(escritas[path] ??= []).push(text)
+    if (path === LOG_PATH) log = text
+    return { value: undefined } as never
+  })
+  const registra = (t: string) => $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: t, aplicados: 3, mortos: 3, sobreviventes: 0, reais: 0, estado: 'PROVADO', tempo: 10 } as never)
+  await registra('b')
+  expect(JSON.parse(escritas[destino]![0]!).itens[0]).toMatchObject({ id: 'exp-001', valor: 2, meta: 10, estado: 'atencao' })
+  await registra('c')
+  expect(escritas[destino]!.length).toBe(2)
+  expect(JSON.parse(escritas[destino]![1]!).itens[0].valor).toBe(3)
 })

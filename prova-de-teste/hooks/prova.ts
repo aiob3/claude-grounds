@@ -229,3 +229,20 @@ export function linhaLog(r: Partial<Registro>, data: string): { linha?: string; 
       (r.custo ? ` | custo: ${r.custo.replace(/\s*\|\s*/g, ' / ')}` : ''),
   }
 }
+
+/** Teto de tokens da resposta do escolhedor. Com 4000, a resposta era cortada antes da segunda categoria (0.8.4). */
+export const LIMITE_ESCOLHA = 16000
+
+/**
+ * Resposta que bateu no teto: a última linha pode estar pela metade e sai (não vira mutante malformado),
+ * e o aviso diz que pode faltar categoria.
+ */
+export function cortarResposta(texto: string, saida: number, limite: number): { texto: string; aviso?: string } {
+  if (saida < limite) return { texto }
+  const linhas = texto.replace(/\s+$/, '').split('\n')
+  linhas.pop()
+  return {
+    texto: linhas.join('\n'),
+    aviso: `⚠ Resposta do escolhedor cortada no teto de ${limite} tokens: a última linha saiu (podia estar pela metade) e pode faltar categoria. Acrescente mutantes nas categorias que faltarem.`,
+  }
+}
