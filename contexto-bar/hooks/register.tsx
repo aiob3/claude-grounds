@@ -1,14 +1,16 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { Atividade, Decisao, Goal, GoalItem, GroupKey, Indicador, Nota, Segment, Snapshot, TipoNota } from '../types'
+import type { Atividade, Decisao, Executores, Goal, GoalItem, GroupKey, Indicador, Nota, Segment, Snapshot, TipoNota } from '../types'
 import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
 import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
 import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
 import type { SegundoPlano } from './segundo-plano'
-import { DECISOES, entrega, GLIFO_DECISAO, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
-import { COR_INDICADOR, encurtar, ESTADOS, medidor, sufixoIndicador, textoAtividade, validarIndicadores } from './painel'
+import { DECISOES, entrega, GLIFO_DECISAO, idade, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
+import { centralizar, centroIndicador, COR_INDICADOR, encurtar, ESTADOS, nomeModelo, textoAtividade, validarIndicadores } from './painel'
+import { estiloDoTerminal, gauge, LARGURA_GAUGE, LINHAS_GAUGE, pedacos } from './gauge'
+import type { EstiloGauge } from './gauge'
 
 const snapshot = atom({ plugin: 'contexto-bar', key: 'snapshot' } as const, null)
 const objetivo = atom({ plugin: 'contexto-bar', key: 'objetivo' } as const, null)
@@ -24,6 +26,7 @@ const caderno = atom({ plugin: 'contexto-bar', key: 'caderno' } as const, [])
 const entregues = atom({ plugin: 'contexto-bar', key: 'entregues' } as const, [])
 const tipoNota = atom({ plugin: 'contexto-bar', key: 'tipoNota' } as const, 'nota')
 const envios = atom({ plugin: 'contexto-bar', key: 'envios' } as const, 0)
+const executores = atom({ plugin: 'contexto-bar', key: 'executores' } as const, { subagentes: [] })
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
@@ -229,6 +232,29 @@ async function notasParaEntregar($: EngineInterface): Promise<string> {
   if (!novas.length) return ''
   await update($, entregues, l => [...l, ...novas.map(n => n.id)])
   return entrega(novas, ja.size === 0, await $.clock.now().catch(() => Date.now()))
+}
+
+// O desenho dos gauges depende do terminal, que não muda durante a sessão: lido uma vez.
+let estiloLido: EstiloGauge | undefined
+async function estiloGauge($: EngineInterface): Promise<EstiloGauge> {
+  if (estiloLido) return estiloLido
+  // Nomes literais: o motor lista as variáveis que um mod lê.
+  const forcado = (await $.env.get('CONTEXTO_BAR_GAUGE').catch(() => undefined)) ?? undefined
+  const kitty = (await $.env.get('KITTY_WINDOW_ID').catch(() => undefined)) ?? undefined
+  const term = (await $.env.get('TERM').catch(() => undefined)) ?? undefined
+  const termProgram = (await $.env.get('TERM_PROGRAM').catch(() => undefined)) ?? undefined
+  estiloLido = estiloDoTerminal({ forcado, kitty, term, termProgram })
+  return estiloLido
+}
+
+// Quem executa: o modelo e o effort de cada requisição (turn.step), a conversa principal e cada subagente
+// (agent.spawn dá o id, o tipo e a descrição; o fim do turno do subagente o tira).
+async function registrarPasso($: EngineInterface, e: { model: string; effort?: string | number; agentId?: string }): Promise<void> {
+  const effort = e.effort === undefined ? undefined : String(e.effort)
+  await update($, executores, ex => {
+    if (!e.agentId) return { ...ex, principal: { modelo: e.model, ...(effort ? { effort } : {}) } }
+    return { ...ex, subagentes: ex.subagentes.map(s => (s.id === e.agentId ? { ...s, modelo: e.model, ...(effort ? { effort } : {}) } : s)) }
+  })
 }
 
 /** Estado do agente para o cartão Agora; nunca derruba o evento observado. */
@@ -543,8 +569,25 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // Evento de stream: o hook é um gerador; observa o modelo e o effort e repassa a resposta inteira.
+  on('turn.step', async function* ($, e, next) {
+    await registrarPasso($, e).catch(() => undefined)
+    return yield* next(e)
+  })
+
+  on('agent.spawn', async ($, e, next) => {
+    const r = await next(e)
+    if (r?.agentId) {
+      const desde = await $.clock.now().catch(() => Date.now())
+      const sub = { id: r.agentId, tipo: e.subagentType, descricao: e.description, modelo: r.model, desde }
+      await update($, executores, ex => ({ ...ex, subagentes: [...ex.subagentes.filter(s => s.id !== sub.id), sub] })).catch(() => undefined)
+    }
+    return r
+  })
+
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
+    if (e.agentId) await update($, executores, ex => ({ ...ex, subagentes: ex.subagentes.filter(s => s.id !== e.agentId) })).catch(() => undefined)
     await update($, turno, n => n + 1)
     if (!e.agentId) await marcar($, { estado: 'concluido' })
     if (!e.agentId) {
@@ -665,56 +708,44 @@ export const register: Register = on => {
     const auto = await painelAuto($)
     const p = goal ? projetar(goal, snap) : null
 
-    // Todas as barras terminam na mesma coluna: o sufixo de cada uma ocupa a largura do maior.
-    const sufixos = [
-      p && p.total ? `${p.feitas}/${p.total}` : '',
-      snap ? `${snap.percent}%${p ? ` · ${CURTO[p.estado]}` : ''}` : '',
-      pc !== null ? `${pc}%` : '',
-      ...inds.map(sufixoIndicador),
-    ]
-    const colSufixo = Math.max(0, ...sufixos.map(s => s.length))
-    const linhaMedidor = (id: string, rotulo: string, valor: number, total: number, sufixo: string, cor: string) => {
-      const b = medidor(valor, total, largura - ROTULO - colSufixo - 1)
-      return (
-        <Text key={id}>
-          <Text dimColor>{rotulo.slice(0, ROTULO - 1).padEnd(ROTULO)}</Text>
-          <Text color={cor}>{b.cheio}</Text>
-          <Text dimColor>{b.vazio}</Text>
-          <Text color={cor}> {sufixo}</Text>
-        </Text>
-      )
-    }
-    const medidores = [
-      p && p.total ? linhaMedidor('m-pend', 'pendências', p.feitas, p.total, `${p.feitas}/${p.total}`, 'claude') : null,
-      snap
-        ? linhaMedidor('m-jan', 'janela', snap.percent, 100, `${snap.percent}%${p ? ` · ${CURTO[p.estado]}` : ''}`, snap.percent >= 80 ? 'error' : snap.percent >= 60 ? 'warning' : 'success')
-        : null,
-      pc !== null ? linhaMedidor('m-cache', 'cache', pc, 100, `${pc}%`, 'subtle') : null,
-      ...inds.map(i => {
-        const cor = i.estado ? COR_INDICADOR[i.estado] : 'claude'
-        const linha =
-          i.meta !== undefined ? (
-            linhaMedidor(`m-${i.fonte}-${i.id}`, i.rotulo, i.valor, i.meta, sufixoIndicador(i), cor)
-          ) : (
-            <Text key={`m-${i.fonte}-${i.id}`}>
-              <Text dimColor>{i.rotulo.slice(0, ROTULO - 1).padEnd(ROTULO)}</Text>
-              <Text color={cor}>{sufixoIndicador(i)}</Text>
-            </Text>
-          )
-        return i.detalhe ? (
-          <Box key={`ind-${i.fonte}-${i.id}`} flexDirection="column">
-            {linha}
-            <Box display="none" hover={{ display: 'flex' }} paddingLeft={ROTULO}>
-              <Text dimColor wrap="wrap">
-                {i.detalhe}
+    // Gauges em arco, lado a lado (braille no Kitty, Ghostty e foot; caixa nos outros): o número no meio, o rótulo
+    // embaixo, o detalhe com o ponteiro em cima. Quebram para a linha de baixo quando o painel é estreito.
+    const estilo = e.surface === 'terminal' ? await estiloGauge($) : 'caixa'
+    const desenharGauge = (id: string, rotulo: string, frac: number, centro: string, cor: string, detalhe?: string) => (
+      <Box key={`g-${id}`} flexDirection="column" width={LARGURA_GAUGE}>
+        {gauge(frac, centro, estilo).map((linha, l) => (
+          <Text key={`g-${id}-${l}`}>
+            {pedacos(linha).map((pd, k) => (
+              <Text key={`g-${id}-${l}-${k}`} color={pd.cheio === true ? cor : pd.cheio === false ? 'inactive' : l === LINHAS_GAUGE - 1 ? cor : undefined} weight={pd.cheio === null && l === LINHAS_GAUGE - 1 && pd.texto.trim() ? 'bold' : undefined}>
+                {pd.texto}
               </Text>
-            </Box>
+            ))}
+          </Text>
+        ))}
+        <Text dimColor>{centralizar(rotulo, LARGURA_GAUGE)}</Text>
+        {detalhe ? (
+          <Box display="none" hover={{ display: 'flex' }}>
+            <Text dimColor wrap="wrap">
+              {detalhe}
+            </Text>
           </Box>
-        ) : (
-          linha
-        )
-      }),
+        ) : null}
+      </Box>
+    )
+    const gauges = [
+      p && p.total ? desenharGauge('pend', 'pendências', p.feitas / p.total, `${p.feitas}/${p.total}`, 'claude', `Claude ${p.abertasClaude} · você ${p.abertasOperador}`) : null,
+      snap
+        ? desenharGauge('jan', 'janela', snap.percent / 100, `${snap.percent}%`, snap.percent >= 80 ? 'error' : snap.percent >= 60 ? 'warning' : 'success', p ? `${ESTADO[p.estado]} · precisa ~${fmtTokens(p.necessario)} de ${fmtTokens(p.livre)}` : undefined)
+        : null,
+      ...inds.map(i =>
+        desenharGauge(`${i.fonte}-${i.id}`, i.rotulo, i.meta ? i.valor / i.meta : 0, centroIndicador(i), i.estado ? COR_INDICADOR[i.estado] : 'claude', i.detalhe),
+      ),
     ].filter(Boolean)
+    const medidores = gauges.length ? (
+      <Box flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1}>
+        {gauges}
+      </Box>
+    ) : null
 
     // Uma pendência numa linha; o resto do texto aparece embaixo com o ponteiro em cima.
     const linhaItem = (i: GoalItem, glifo: string, cor: string | undefined, reserva: number, botao?: RenderChildren) => {
@@ -740,6 +771,9 @@ export const register: Register = on => {
     }
 
     const est = ativ?.estado ?? 'ocioso'
+    const ex = await read($, executores)
+    const quem = ex.principal ? `${nomeModelo(ex.principal.modelo)}${ex.principal.effort ? ` · effort ${ex.principal.effort}` : ''}` : ''
+    const subs = ex.subagentes
     const agoraCard = (
       <Box flexDirection="column" marginTop={1}>
         <Text>
@@ -748,6 +782,23 @@ export const register: Register = on => {
             {ESTADOS[est].glifo} {textoAtividade(ativ)}
           </Text>
         </Text>
+        {quem || subs.length ? (
+          <Box key="quem" flexDirection="column">
+            <Text dimColor>
+              {quem}
+              {subs.length ? `${quem ? ' · ' : ''}${subs.length} ${subs.length === 1 ? 'subagente' : 'subagentes'}` : ''}
+            </Text>
+            {subs.length ? (
+              <Box display="none" hover={{ display: 'flex' }} flexDirection="column" paddingLeft={2}>
+                {subs.map(s => (
+                  <Text key={`sub-${s.id}`} wrap="wrap">
+                    <Text color="claude">●</Text> {s.tipo} <Text dimColor>({nomeModelo(s.modelo)}{s.effort ? `, ${s.effort}` : ''})</Text> {s.descricao}
+                  </Text>
+                ))}
+              </Box>
+            ) : null}
+          </Box>
+        ) : null}
         {goal ? (
           (() => {
             const prox = proxima(goal)
@@ -802,6 +853,8 @@ export const register: Register = on => {
       )
     }
     const abertasCaderno = semResposta(notas).length
+    const ultimaNota = notas[notas.length - 1]
+    const agoraMs = await $.clock.now().catch(() => Date.now())
     const cadernoBloco = (
       <Box flexDirection="column" marginTop={1}>
         <Box key="caderno-titulo" flexDirection="column">
@@ -817,21 +870,36 @@ export const register: Register = on => {
             </Text>
           </Box>
         </Box>
-        <Box flexDirection="row" gap={1}>
-          {TIPOS.map(t =>
-            t.tipo === tipo ? (
-              <Button key={`tipo-${t.tipo}`} variant="primary" label={t.rotulo} onPress={() => void update($, tipoNota, () => t.tipo)} />
-            ) : (
-              <Button key={`tipo-${t.tipo}`} plain label={t.rotulo} onPress={() => void update($, tipoNota, () => t.tipo)} />
-            ),
+        <Box flexDirection="column" borderStyle="round" borderColor="claude" borderDimColor paddingX={1}>
+          <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
+            <Text dimColor>tipo</Text>
+            {TIPOS.map((t, i) => (
+              <Button
+                key={`tipo-${t.tipo}`}
+                hotkey={String(i + 1)}
+                variant={t.tipo === tipo ? 'primary' : 'secondary'}
+                label={t.tipo === tipo ? `● ${t.rotulo}` : t.rotulo}
+                onPress={() => void update($, tipoNota, () => t.tipo)}
+              />
+            ))}
+          </Box>
+          <Text dimColor wrap="wrap">
+            {regra.regra}
+          </Text>
+          {Input ? (
+            <Input key={`nota-${await read($, envios)}`} label="✎ " placeholder="escreva aqui; #id liga a uma pendência" submitLabel="enviar ao Claude" onSubmit={(v: string) => void escreverNota($, v)} />
+          ) : (
+            <Text dimColor>/objetivo nota [tipo] [#id] texto</Text>
           )}
+          <Text dimColor wrap="wrap">
+            {Input ? 'clique no campo (ou ctrl+x tab) · Enter envia · Esc volta ao prompt' : 'o celular não tem campo: use o comando acima'}
+          </Text>
+          {ultimaNota ? (
+            <Text color={ultimaNota.triagem ? 'success' : 'warning'} wrap="wrap">
+              {ultimaNota.triagem ? `✔ última nota respondida: ${GLIFO_DECISAO[ultimaNota.triagem.decisao].rotulo}` : `◌ última nota enviada ${idade(ultimaNota.em, agoraMs)}: chega ao Claude na próxima ferramenta`}
+            </Text>
+          ) : null}
         </Box>
-        <Text dimColor wrap="wrap">{regra.regra}</Text>
-        {Input ? (
-          <Input key={`nota-${await read($, envios)}`} placeholder="#id (opcional) e a nota; Enter envia" submitLabel="enviar" onSubmit={(v: string) => void escreverNota($, v)} />
-        ) : (
-          <Text dimColor>/objetivo nota [#id] texto</Text>
-        )}
         {notas
           .slice(-NOTAS_NO_PAINEL)
           .reverse()
@@ -940,8 +1008,7 @@ const PROPOSITO_OPERADOR =
   'cada nota: aceita, recusa com motivo, muda o plano ou registra.'
 const NOTAS_NO_PAINEL = 4
 
-// Colunas do rótulo dos medidores e do botão "[ Feito ]" ao lado das pendências do operador.
-const ROTULO = 11
+// Colunas do botão "[ Feito ]" ao lado das pendências do operador.
 const BOTAO = 10
 const CURTO = { cabe: 'cabe', apertado: 'apertado', 'nao-cabe': 'não cabe', 'sem-dados': 'sem dados' } as const
 const COR_NIVEL = { bloqueante: 'error', requisito: 'text', melhoria: 'subtle' } as const

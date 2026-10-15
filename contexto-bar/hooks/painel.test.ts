@@ -1,21 +1,27 @@
 import { expect, test } from 'claude-code/testing'
 
-import { encurtar, medidor, nomeFerramenta, sufixoIndicador, textoAtividade, validarIndicadores } from './painel'
+import { centralizar, centroIndicador, encurtar, nomeFerramenta, nomeModelo, textoAtividade, validarIndicadores } from './painel'
 
-test('medidor: largura exata; progresso acima de zero aparece, abaixo do total não enche', () => {
-  for (const l of [1, 5, 20, 33]) {
-    for (const [v, t] of [[0, 10], [1, 1000], [5, 10], [999, 1000], [10, 10], [28, 10], [-3, 10], [NaN, 10], [3, 0]] as const) {
-      const b = medidor(v, t, l)
-      expect(b.cheio.length + b.vazio.length).toBe(l)
-    }
-  }
-  expect(medidor(0, 10, 10).cheio).toBe('')
-  expect(medidor(1, 1000, 10).cheio).toBe('█')
-  expect(medidor(999, 1000, 10).vazio).toBe('░')
-  expect(medidor(10, 10, 10).vazio).toBe('')
-  expect(medidor(28, 10, 10).cheio).toBe('█'.repeat(10))
-  expect(medidor(5, 10, 10).cheio).toBe('█'.repeat(5))
-  expect(medidor(3, 0, 4).cheio).toBe('')
+test('centralizar: largura exata, sobra à direita quando ímpar, corte com reticências', () => {
+  expect(centralizar('ab', 6)).toBe('  ab  ')
+  expect(centralizar('abc', 6)).toBe(' abc  ')
+  expect(centralizar('pendências', 11)).toBe('pendências ')
+  expect(centralizar('uma etiqueta longa', 11)).toBe('uma etique…')
+  expect(centralizar('x', 11).length).toBe(11)
+  // Na largura exata, inteiro (sobrevivente #4 da 0.13.0).
+  expect(centralizar('abcdef', 6)).toBe('abcdef')
+})
+
+test('nome do modelo: id completo vira nome curto; data, contexto longo e alias ficam de fora ou como vieram', () => {
+  expect(nomeModelo('claude-opus-5-5')).toBe('Opus 5.5')
+  expect(nomeModelo('claude-fable-5-1')).toBe('Fable 5.1')
+  expect(nomeModelo('claude-haiku-4-5-20251001')).toBe('Haiku 4.5')
+  expect(nomeModelo('claude-sonnet-5-5[1m]')).toBe('Sonnet 5.5')
+  expect(nomeModelo('claude-opus-4')).toBe('Opus 4')
+  // Data logo depois da versão, sem a menor (sobrevivente #13 da 0.13.0).
+  expect(nomeModelo('claude-opus-4-20250514')).toBe('Opus 4')
+  expect(nomeModelo('opus')).toBe('opus')
+  expect(nomeModelo('gpt-5-codex')).toBe('gpt-5-codex')
 })
 
 test('encurtar: cabe inteiro sem reticências; o corte guarda o resto para o hover e junta os espaços', () => {
@@ -61,10 +67,12 @@ test('indicadores: só o que segue o contrato entra; um item ruim não derruba o
   ])
 })
 
-test('sufixo do indicador: meta atingida leva ✓, abaixo não; sem meta, valor e unidade', () => {
-  expect(sufixoIndicador({ fonte: 'f', id: 'i', rotulo: 'r', valor: 28, meta: 10 })).toBe('28/10 ✓')
-  expect(sufixoIndicador({ fonte: 'f', id: 'i', rotulo: 'r', valor: 10, meta: 10 })).toBe('10/10 ✓')
-  expect(sufixoIndicador({ fonte: 'f', id: 'i', rotulo: 'r', valor: 9, meta: 10 })).toBe('9/10')
-  expect(sufixoIndicador({ fonte: 'f', id: 'i', rotulo: 'r', valor: 3, unidade: 'rodadas' })).toBe('3 rodadas')
-  expect(sufixoIndicador({ fonte: 'f', id: 'i', rotulo: 'r', valor: 3 })).toBe('3')
+test('indicador com texto: vai ao centro do gauge; sem ele, valor/meta ou o valor; texto vazio é ignorado', () => {
+  const [i] = validarIndicadores({ versao: 1, fonte: 'p', itens: [{ id: 'a', rotulo: 'até provar', valor: 291, meta: 160, texto: ' 4,8 min ' }] })
+  expect(i!.texto).toBe('4,8 min')
+  expect(centroIndicador(i!)).toBe('4,8 min')
+  expect(centroIndicador({ fonte: 'f', id: 'i', rotulo: 'r', valor: 28, meta: 10 })).toBe('28/10')
+  expect(centroIndicador({ fonte: 'f', id: 'i', rotulo: 'r', valor: 3 })).toBe('3')
+  const [v] = validarIndicadores({ versao: 1, fonte: 'p', itens: [{ id: 'a', rotulo: 'r', valor: 1, texto: '   ' }] })
+  expect(v).not.toHaveProperty('texto')
 })

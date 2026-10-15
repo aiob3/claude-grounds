@@ -4,7 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Escolha, ExecucaoFeita } from '../types'
 import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
-import { indicadorDoPlacar, placar } from './placar'
+import { efetividade, indicadoresDeEfetividade } from './placar'
 import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
 import type { Alias } from './alcance'
@@ -161,12 +161,12 @@ async function versaoDoMod($: EngineInterface): Promise<string> {
   return versaoDe(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`).catch(() => ''))
 }
 
-/** O placar do EXP-001 vai a ~/.claude/indicadores/prova-de-teste.json, que o painel do contexto-bar mostra. */
+/** A efetividade do ciclo vai a ~/.claude/indicadores/prova-de-teste.json, que o painel do contexto-bar mostra. */
 async function publicarPlacar($: EngineInterface): Promise<void> {
   const home = await $.env.get('HOME').catch(() => undefined)
   const caminho = await caminhoDoLog($)
   if (!home || !caminho || !(await $.fs.exists(caminho))) return
-  const texto = indicadorDoPlacar(placar(await $.fs.read(caminho)))
+  const texto = indicadoresDeEfetividade(efetividade(await $.fs.read(caminho)))
   const destino = `${home}/.claude/indicadores/prova-de-teste.json`
   if ((await $.fs.read(destino).catch(() => '')) !== texto) await $.fs.write(destino, texto)
 }

@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { classe, criterios, indicadorDoPlacar, placar, vigentes } from './placar'
+import { classe, efetividade, indicadoresDeEfetividade, tarefas, vigentes } from './placar'
 
 const med = (t: number, reais = 0, inst = 'mod 0.8.4') => `2026-10-15 | tarefa | v1.2 | mutantes: 5/5/0 | reais: ${reais} | PROVADO | ${t} | instrumento: ${inst} | medição`
 const cal = (inst = 'mod 0.8.4') => `2026-10-15 | tarefa | v1.2 | mutantes: 5/4/1 | reais: 1 | FRACO | 30 | instrumento: ${inst} | calibração: defeito`
@@ -17,58 +17,73 @@ test('a CORREÇÃO tira a última linha classificada antes dela, não a anterior
   expect(v[0]).toBe('2026-10-14 | sem classe')
 })
 
-test('placar: conta medições, calibrações, reais, tempo médio e estabilidade como o gerador', () => {
-  const log = ['# cabeçalho', 'v1.2: `<data> | ...`', med(100, 2), med(50), cal(), med(30, 1, 'mod 0.8.5'), med(60, 0, 'mod 0.8.5'), med(90, 1, 'mod 0.8.5'), ''].join('\n')
-  const p = placar(log)
-  expect(p).toEqual({ medicoes: 5, calibracoes: 1, comReais: 3, tempoMedio: 66, estavel: true, seguidas: 3, versao: 'mod 0.8.5' })
-  expect(criterios(p).atendidos).toBe(3)
-  // Calibração depois zera a sequência; duas seguidas não bastam.
-  expect(placar([log, cal('mod 0.8.5'), med(10, 0, 'mod 0.8.5'), med(10, 0, 'mod 0.8.5')].join('\n')).estavel).toBe(false)
-  // Linha de reclassificação sem tempo não entra na média.
-  expect(placar(`2026-10-14 | RECLASSIFICAÇÃO | v1.2 | — | — | — | — | instrumento: manual v1.1 | medição\n${med(40)}`).tempoMedio).toBe(40)
+const linha = (nome: string, a: number, m: number, estado: string, t: number | string, tipo = 'medição') =>
+  `2026-10-15 | ${nome}: detalhe | v1.2 | mutantes: ${a}/${m}/${a - m} | reais: ${a - m} | ${estado} | ${t} | instrumento: mod 0.9.1 | ${tipo}`
+
+test('tarefas: rodadas do mesmo nome até o PROVADO, mesmo intercaladas com outra sessão; a 1ª lista é a da primeira rodada', () => {
+  const log = [
+    '# cabeçalho',
+    linha('contexto-bar 0.12.0', 15, 14, 'FRACO', 85, 'calibração: x'),
+    linha('legibility', 12, 7, 'FRACO', 477),
+    linha('contexto-bar 0.12.0', 20, 18, 'FRACO', 112.6),
+    linha('legibility', 12, 12, 'PROVADO', 346),
+    linha('contexto-bar 0.12.0', 20, 20, 'PROVADO', 74.6),
+    linha('contexto-bar 0.12.0', 23, 19, 'FRACO', 145.8),
+    '2026-10-14 | antiga | v1.1 | 5/5/0 | 0 | PROVADO | 20',
+    linha('contexto-bar 0.12.0', 23, 22, 'PROVADO', '—'),
+  ].join('\n')
+  expect(tarefas(log)).toEqual([
+    { nome: 'contexto-bar 0.12.0', rodadas: 3, aplicados1: 15, mortos1: 14, tempo: 85 + 112.6 + 74.6, provada: true },
+    { nome: 'legibility', rodadas: 2, aplicados1: 12, mortos1: 7, tempo: 823, provada: true },
+    { nome: 'contexto-bar 0.12.0', rodadas: 2, aplicados1: 23, mortos1: 19, tempo: 145.8, provada: true },
+  ])
+  // A CORREÇÃO tira a linha anterior e não vira rodada.
+  const corr = [linha('a', 10, 5, 'FRACO', 10), `2026-10-15 | CORREÇÃO da linha anterior | v1.2 | mutantes: 10/5/5 | reais: 5 | FRACO | 10 | instrumento: mod 0.9.1 | medição`, linha('a', 10, 10, 'PROVADO', 5)].join('\n')
+  expect(tarefas(corr)).toEqual([{ nome: 'a', rodadas: 1, aplicados1: 10, mortos1: 10, tempo: 5, provada: true }])
 })
 
-test('critérios: tempo de 2 min exatos e só 2 medições com reais não promovem', () => {
-  const base = { medicoes: 12, calibracoes: 0, comReais: 3, tempoMedio: 119, estavel: true, seguidas: 3, versao: 'v' }
-  expect(criterios(base).atendidos).toBe(3)
-  expect(criterios({ ...base, tempoMedio: 120 }).atendidos).toBe(2)
-  expect(criterios({ ...base, tempoMedio: null }).atendidos).toBe(2)
-  expect(criterios({ ...base, comReais: 2 }).atendidos).toBe(2)
-  expect(criterios({ ...base, estavel: false }).atendidos).toBe(2)
+test('efetividade: últimas 5 provadas contra as 5 anteriores; a aberta não conta; sem anteriores, sem comparação', () => {
+  const t = (n: number, m: number, tempo: number) => [linha(`t${n}`, 10, m, 'FRACO', tempo), linha(`t${n}`, 10, 10, 'PROVADO', tempo)].join('\n')
+  const antigas = [1, 2, 3, 4, 5].map(n => t(n, 5, 100))
+  const novas = [6, 7, 8, 9, 10].map(n => t(n, 8, 50))
+  const aberta = linha('t11', 10, 0, 'FRACO', 999)
+  const e = efetividade([...antigas, ...novas, aberta].join('\n'))
+  expect(e).toEqual({ n: 5, primeira: 0.8, primeiraAntes: 0.5, tempo: 100, tempoAntes: 200, rodadas: 2, rodadasAntes: 2 })
+  const so = efetividade(novas.slice(0, 3).join('\n'))
+  expect(so).toMatchObject({ n: 3, primeira: 0.8, primeiraAntes: null, tempoAntes: null })
+  expect(efetividade('# vazio\n')).toEqual({ n: 0, primeira: null, primeiraAntes: null, tempo: null, tempoAntes: null, rodadas: null, rodadasAntes: null })
+  // Uma tarefa só já conta (sobrevivente #1 da 0.10.0).
+  expect(efetividade(t(1, 7, 30))).toMatchObject({ n: 1, primeira: 0.7, tempo: 60, rodadas: 2 })
+  // 1ª lista sem nenhum mutante aplicado: sem fração, nunca NaN (sobrevivente #2).
+  expect(efetividade([linha('z', 0, 0, 'PROVADO', 5)].join('\n')).primeira).toBeNull()
+  // Linha classificada sem contagem de mutantes (reclassificação) não derruba nem vira rodada (sobrevivente #11).
+  const recl = '2026-10-14 | t1: RECLASSIFICAÇÃO | v1.2 | — | — | — | — | instrumento: manual v1.1 | medição'
+  expect(tarefas([recl, t(1, 7, 30)].join('\n'))).toEqual([{ nome: 't1', rodadas: 2, aplicados1: 10, mortos1: 7, tempo: 60, provada: true }])
 })
 
-test('indicador: segue o contrato do contexto-bar; ok só com a meta e os 3 critérios', () => {
-  const p = { medicoes: 28, calibracoes: 27, comReais: 19, tempoMedio: 117.5, estavel: true, seguidas: 8, versao: 'mod 0.8.4' }
-  const j = JSON.parse(indicadorDoPlacar(p))
-  expect(j).toEqual({
-    versao: 1,
-    fonte: 'prova-de-teste',
-    itens: [{ id: 'exp-001', rotulo: 'EXP-001', valor: 28, meta: 10, unidade: 'medições', estado: 'ok', detalhe: 'promoção: 3/3 critérios (reais em 19 medições, tempo médio 118 s, estável em mod 0.8.4) · 27 calibrações' }],
+test('indicadores: 1ª passada e até provar no contrato do contexto-bar; estado pela comparação com as anteriores', () => {
+  const e = { n: 5, primeira: 0.83, primeiraAntes: 0.9, tempo: 291, tempoAntes: 160, rodadas: 2, rodadasAntes: 1.6 }
+  const j = JSON.parse(indicadoresDeEfetividade(e))
+  expect(j.versao).toBe(1)
+  expect(j.fonte).toBe('prova-de-teste')
+  expect(j.itens[0]).toEqual({
+    id: 'primeira-passada', rotulo: '1ª passada', valor: 83, meta: 100, unidade: '%', texto: '83%', estado: 'atencao',
+    detalhe: 'mutantes que os testes já matam na 1ª lista às cegas, últimas 5 tarefas: 83% (antes 90%) · rodadas até provar 2,0 (antes 1,6)',
   })
-  expect(JSON.parse(indicadorDoPlacar({ ...p, medicoes: 9 })).itens[0].estado).toBe('atencao')
-  expect(JSON.parse(indicadorDoPlacar({ ...p, estavel: false, seguidas: 1 })).itens[0].detalhe).toContain('2/3 critérios')
-  expect(JSON.parse(indicadorDoPlacar({ ...p, estavel: false, seguidas: 1 })).itens[0].detalhe).toContain('instável (1 de 3 seguidas)')
-  expect(JSON.parse(indicadorDoPlacar({ ...p, tempoMedio: null })).itens[0].detalhe).toContain('sem tempo')
-})
-
-test('placar: as bordas do gerador (sobreviventes da rodada da 0.9.0)', () => {
-  // #3: tempo 0 entra na média, como no float() do gerador; "—" não.
-  expect(placar([med(0), med(30)].join('\n')).tempoMedio).toBe(15)
-  // #6: sem nenhuma medição com tempo, a média é null (não NaN).
-  expect(placar('# só cabeçalho\n').tempoMedio).toBeNull()
-  expect(placar(cal()).tempoMedio).toBeNull()
-  // #12: linha de medição sem o campo reais não conta como achado.
-  expect(placar('2026-10-14 | RECLASSIFICAÇÃO | v1.2 | — | — | — | — | instrumento: manual v1.1 | medição').comReais).toBe(0)
-  // #13: linha sem classe (v1.1) no meio não quebra a sequência da mesma versão.
-  expect(placar([med(1), '2026-10-14 | antiga | v1.1 | 5/5/0 | 0 | PROVADO | 20', med(1), med(1)].join('\n')).estavel).toBe(true)
-})
-
-test('vigentes: com duas classificadas antes, a CORREÇÃO tira a mais recente (sobrevivente #7 da rodada da 0.9.0)', () => {
-  const v = vigentes([med(1), med(2), '2026-10-15 | CORREÇÃO da linha anterior | v1.2 | mutantes: 5/5/0 | reais: 0 | PROVADO | 3 | instrumento: mod 0.8.4 | calibração: x'])
-  expect(v.map(l => l.split('|')[6]!.trim())).toEqual(['1', '3'])
-})
-
-test('indicador: a meta exata já é ok (sobrevivente #5 da rodada da 0.9.0)', () => {
-  const p = { medicoes: 10, calibracoes: 0, comReais: 3, tempoMedio: 60, estavel: true, seguidas: 3, versao: 'v' }
-  expect(JSON.parse(indicadorDoPlacar(p)).itens[0].estado).toBe('ok')
+  expect(j.itens[1]).toEqual({
+    id: 'ate-provar', rotulo: 'até provar', valor: 291, meta: 160, unidade: 's', texto: '4,8 min', estado: 'atencao',
+    detalhe: 'tempo das rodadas até o PROVADO, média das últimas 5 tarefas: 4,8 min (antes 2,7 min, +82%)',
+  })
+  // Melhorou: ok; empate na 1ª passada também é ok; tempo igual é ok.
+  const melhor = JSON.parse(indicadoresDeEfetividade({ ...e, primeira: 0.9, tempo: 160 }))
+  expect(melhor.itens.map((i: { estado: string }) => i.estado)).toEqual(['ok', 'ok'])
+  expect(melhor.itens[1].detalhe).toContain('(antes 2,7 min, 0%)')
+  const caiu = JSON.parse(indicadoresDeEfetividade({ ...e, tempo: 120 }))
+  expect(caiu.itens[1].detalhe).toContain('-25%')
+  // Sem anteriores: sem meta no tempo e sem comparação; sem dados: nenhum item.
+  const so = JSON.parse(indicadoresDeEfetividade({ ...e, primeiraAntes: null, tempoAntes: null, rodadasAntes: null }))
+  expect(so.itens[1]).not.toHaveProperty('meta')
+  expect(so.itens.map((i: { estado: string }) => i.estado)).toEqual(['ok', 'ok'])
+  expect(so.itens[0].detalhe).not.toContain('(antes')
+  expect(JSON.parse(indicadoresDeEfetividade({ n: 0, primeira: null, primeiraAntes: null, tempo: null, tempoAntes: null, rodadas: null, rodadasAntes: null })).itens).toEqual([])
 })

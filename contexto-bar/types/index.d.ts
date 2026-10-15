@@ -70,6 +70,8 @@ export type Indicador = {
   unidade?: string
   estado?: 'ok' | 'atencao' | 'alerta'
   detalhe?: string
+  /** O que vai no centro do gauge ("83%", "4,8 min"); ausente, valor/meta ou o valor. */
+  texto?: string
 }
 
 /** Caderno do operador (contrato em hooks/caderno.ts): nota sem compromisso, agora (deste ciclo), depois (roadmap), referência. */
@@ -78,6 +80,10 @@ export type Decisao = 'aceita' | 'recusada' | 'muda-plano' | 'registrada'
 export type EventoNota = { v: number; ev: 'nota'; id: string; em: string; autor: 'operador'; tipo: TipoNota; texto: string; /** `#12` ou a próxima pendência quando a nota foi escrita. */ ref?: string }
 export type EventoTriagem = { v: number; ev: 'triagem'; id: string; em: string; autor: 'claude'; decisao: Decisao; motivo: string; /** Para onde foi: `#12`, `roadmap`... */ destino?: string; /** O melhor argumento contra a própria decisão. */ contraponto?: string }
 export type Nota = EventoNota & { triagem?: EventoTriagem }
+
+/** Quem executa: o modelo e o effort da conversa principal e os subagentes vivos. */
+export type Subagente = { id: string; tipo: string; descricao: string; modelo: string; effort?: string; desde: number }
+export type Executores = { principal?: { modelo: string; effort?: string }; subagentes: Subagente[] }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -102,6 +108,7 @@ declare module 'claude-code' {
       tipoNota: TipoNota
       /** Conta os envios: muda a chave do campo, que volta vazio depois de cada nota. */
       envios: number
+      executores: Executores
     }
   }
 }

@@ -1,17 +1,6 @@
 // Peças puras do painel: medidores, texto que cabe na largura, o estado do agente e os indicadores de outros mods.
 import type { Atividade, Estado, Indicador } from '../types'
 
-/** Barra de medidor com a largura exata: cheio proporcional a valor/total, nunca fora de 0..largura. */
-export function medidor(valor: number, total: number, largura: number): { cheio: string; vazio: string } {
-  const l = Math.max(1, Math.floor(largura))
-  const frac = total > 0 && Number.isFinite(valor) ? Math.min(1, Math.max(0, valor / total)) : 0
-  // Algum progresso nunca some: acima de zero mostra ao menos uma célula; abaixo do total, ao menos uma vazia.
-  let n = Math.round(frac * l)
-  if (frac > 0 && n === 0) n = 1
-  if (frac < 1 && n === l) n = l - 1
-  return { cheio: '█'.repeat(n), vazio: '░'.repeat(l - n) }
-}
-
 /** Corta o texto em `max` colunas com reticências; devolve o pedaço que coube e o resto (para o hover). */
 export function encurtar(texto: string, max: number): { curto: string; resto: string } {
   const t = texto.replace(/\s+/g, ' ').trim()
@@ -33,6 +22,20 @@ export function textoAtividade(a: Atividade | null): string {
   if (!a) return ESTADOS.ocioso.rotulo
   const base = ESTADOS[a.estado].rotulo
   return a.estado === 'trabalhando' && a.ferramenta ? `${base} · ${nomeFerramenta(a.ferramenta)}` : base
+}
+
+/** Centraliza o texto em `largura` colunas, cortando com reticências quando não cabe. */
+export function centralizar(texto: string, largura: number): string {
+  const t = texto.length > largura ? `${texto.slice(0, largura - 1)}…` : texto
+  const esq = Math.floor((largura - t.length) / 2)
+  return ' '.repeat(esq) + t + ' '.repeat(largura - t.length - esq)
+}
+
+/** `claude-opus-5-5` vira `Opus 5.5`; `claude-haiku-4-5-20251001`, `Haiku 4.5`; alias e outros nomes ficam como vieram. */
+export function nomeModelo(id: string): string {
+  const m = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(?:\[.*\])?$/.exec(id)
+  if (!m) return id
+  return `${m[1]![0]!.toUpperCase()}${m[1]!.slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
 }
 
 /** `mcp__servidor__ferramenta` vira `servidor·ferramenta`; o resto fica como veio. */
@@ -68,6 +71,7 @@ export function validarIndicadores(json: unknown): Indicador[] {
       ...(typeof i.unidade === 'string' ? { unidade: i.unidade } : {}),
       ...(ESTADOS_INDICADOR.includes(i.estado as never) ? { estado: i.estado as Indicador['estado'] } : {}),
       ...(typeof i.detalhe === 'string' ? { detalhe: i.detalhe } : {}),
+      ...(typeof i.texto === 'string' && i.texto.trim() ? { texto: i.texto.trim() } : {}),
     })
   }
   return r
@@ -75,8 +79,7 @@ export function validarIndicadores(json: unknown): Indicador[] {
 
 export const COR_INDICADOR = { ok: 'success', atencao: 'warning', alerta: 'error' } as const
 
-/** O sufixo de um indicador: `28/10 ✓` com meta atingida, `3/10` abaixo dela, o valor e a unidade sem meta. */
-export function sufixoIndicador(i: Indicador): string {
-  if (i.meta === undefined) return `${i.valor}${i.unidade ? ` ${i.unidade}` : ''}`
-  return `${i.valor}/${i.meta}${i.valor >= i.meta ? ' ✓' : ''}`
+/** O centro do gauge de um indicador: o texto que a fonte mandou; sem ele, valor/meta, ou o valor. */
+export function centroIndicador(i: Indicador): string {
+  return i.texto ?? (i.meta !== undefined ? `${i.valor}/${i.meta}` : `${i.valor}`)
 }

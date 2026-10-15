@@ -648,7 +648,7 @@ test('resposta do escolhedor no teto de tokens: a última linha sai e o aviso di
   expect(ok).toContain('Mutantes (2)')
 })
 
-test('o placar do EXP-001 vai ao arquivo de indicadores a cada registro, com a contagem do log já gravado', async ($, on) => {
+test('a efetividade do ciclo vai ao arquivo de indicadores a cada registro, com o log já gravado', async ($, on) => {
   mock.env(on, { HOME: '/home/u', PROVA_DE_TESTE_LOG: LOG_PATH })
   gitFalso(on)
   let log = '# log\n2026-10-15 | a | v1.2 | mutantes: 5/5/0 | reais: 1 | PROVADO | 30 | instrumento: mod 0.9.0 | medição\n'
@@ -672,8 +672,9 @@ test('o placar do EXP-001 vai ao arquivo de indicadores a cada registro, com a c
   })
   const registra = (t: string) => $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: t, aplicados: 3, mortos: 3, sobreviventes: 0, reais: 0, estado: 'PROVADO', tempo: 10 } as never)
   await registra('b')
-  expect(JSON.parse(escritas[destino]![0]!).itens[0]).toMatchObject({ id: 'exp-001', valor: 2, meta: 10, estado: 'atencao' })
+  expect(JSON.parse(escritas[destino]![0]!).itens[0]).toMatchObject({ id: 'primeira-passada', valor: 100, texto: '100%' })
+  expect(JSON.parse(escritas[destino]![0]!).itens[0].detalhe).toContain('últimas 2 tarefas')
   await registra('c')
   expect(escritas[destino]!.length).toBe(2)
-  expect(JSON.parse(escritas[destino]![1]!).itens[0].valor).toBe(3)
+  expect(JSON.parse(escritas[destino]![1]!).itens[0].detalhe).toContain('últimas 3 tarefas')
 })

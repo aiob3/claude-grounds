@@ -730,16 +730,19 @@ test('painel: indicadores de outros mods viram medidores; arquivo quebrado não 
   await $.tool.call({ tool: 'Bash', command: 'true' } as never)
   const pane = await painel($)
   // Ordem estável pelo nome do arquivo, qualquer que seja a ordem da pasta (sobrevivente M5 da 0.11.0).
-  expect(pane.indexOf('"rodadas    "') < pane.indexOf('"EXP-001    "')).toBe(true)
-  expect(pane).toContain('"EXP-001    "')
-  expect(pane).toContain('"28/10 ✓"')
+  expect(pane.indexOf('" rodadas   "') < pane.indexOf('"  EXP-001  "')).toBe(true)
+  expect(pane).toContain('"  28/10  "')
   expect(pane).toContain('promoção: 3/3 critérios')
-  expect(pane).toContain('"3 hoje"')
+  expect(pane).toContain('"    3    "')
+  // Sem meta, o arco fica todo na trilha: nada aceso (sobrevivente #28 da 0.13.0).
+  const semMeta = pane.slice(pane.indexOf('"key":"g-outro-n"'), pane.indexOf('"key":"g-prova-de-teste-exp-001"'))
+  expect(semMeta).toContain('"color":"inactive"')
+  expect(/"color":"claude"\},"children":\["[╭─╮╱╲│]/.test(semMeta)).toBe(false)
   expect(pane).not.toContain('ignorado')
   // O arquivo some: o medidor sai no próximo refresh.
   delete arquivos['prova-de-teste.json']
   await $.tool.call({ tool: 'Bash', command: 'true' } as never)
-  expect(await painel($)).not.toContain('EXP-001')
+  expect(await painel($)).not.toContain('"  EXP-001  "')
 })
 
 test('painel: com o store fora, o botão auto ainda mostra e vale o que o operador escolheu (sobrevivente M9 da 0.11.0)', async ($, on) => {
@@ -775,43 +778,6 @@ test('painel: a vez do operador vem na ordem da prioridade, bloqueante primeiro 
   const pane = await painel($)
   const sua = pane.slice(pane.indexOf('SUA VEZ'))
   expect(sua.indexOf('aprovar o deploy') < sua.indexOf('revisar o texto')).toBe(true)
-})
-
-test('painel: a cor do medidor da janela muda em 60% e em 80% exatos (sobrevivente #7 da 0.11.0)', async ($, on) => {
-  let pct = 0
-  on('session.usage', () => ({ value: { context: { breakdown: { categories: [
-    { name: 'Messages', tokens: pct * 1000, kind: 'used' },
-    { name: 'Free space', tokens: (100 - pct) * 1000, kind: 'free' },
-  ] } } } }) as never)
-  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
-  const cor = async (p: number) => {
-    pct = p
-    await $.tool.call({ tool: 'Bash', command: 'true' } as never)
-    const m = /"janela     "\]\},\{"type":"Text","props":\{"color":"(\w+)"\}.*?"(\d+)%/.exec(await painel($))
-    expect(m?.[2]).toBe(String(p))
-    return m?.[1]
-  }
-  expect(await cor(59)).toBe('success')
-  expect(await cor(60)).toBe('warning')
-  expect(await cor(79)).toBe('warning')
-  expect(await cor(80)).toBe('error')
-})
-
-test('painel: as barras dos medidores terminam todas na mesma coluna', async ($, on) => {
-  on('session.usage', () => usageWith(50000))
-  mock.env(on, { HOME: '/home/u' })
-  const pasta = '/home/u/.claude/indicadores'
-  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path === pasta }) as never)
-  on('fs.list', () => ({ value: [{ name: 'p.json', kind: 'file' }] }) as never)
-  on('fs.read', () => ({ value: JSON.stringify({ versao: 1, fonte: 'p', itens: [{ id: 'e', rotulo: 'EXP-001', valor: 29, meta: 10 }] }) }) as never)
-  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
-  await comObjetivo($)
-  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
-  // Pares cheio + vazio de cada medidor (pendências, janela, EXP-001): a soma é a mesma em todos.
-  const pane = await painel($)
-  const somas = [...pane.matchAll(/"children":\["(█*)"\]\},\{"type":"Text","props":\{"dimColor":true\},"children":\["(░*)"\]/g)].map(m => m[1]!.length + m[2]!.length)
-  expect(somas.length).toBe(3)
-  expect(new Set(somas).size).toBe(1)
 })
 
 test('painel: a fila do Claude vem na ordem da prioridade, melhoria por último (sobrevivente #7 da lista final da 0.11.0)', async ($, on) => {
@@ -920,7 +886,7 @@ test('caderno: os tipos são botões, a regra do escolhido aparece, e a nota sai
   await ui2.unmount()
   expect(c.texto().trim().split('\n').length).toBe(1)
   const cel = JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'mobile', props: { bodyColumns: 48 } } as never))
-  expect(cel).toContain('/objetivo nota [#id] texto')
+  expect(cel).toContain('/objetivo nota [tipo] [#id] texto')
   expect(cel).not.toContain('"Input"')
 })
 
@@ -938,4 +904,103 @@ test('caderno: sem ferramenta no meio, a nota chega no próximo pedido; o painel
   expect(ctx).toContain('primeira observação')
   const pane = await painel($)
   expect(pane.indexOf('https://ratatui.rs gauges') < pane.indexOf('primeira observação')).toBe(true)
+})
+
+test('painel: gauges lado a lado com a cor da janela em 60% e 80% exatos; braille no Kitty, caixa sem ele (sobrevivente #7 da 0.11.0)', async ($, on) => {
+  let pct = 0
+  on('session.usage', () => ({ value: { context: { breakdown: { categories: [
+    { name: 'Messages', tokens: pct * 1000, kind: 'used' },
+    { name: 'Free space', tokens: (100 - pct) * 1000, kind: 'free' },
+  ] } } } }) as never)
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  mock.env(on, { KITTY_WINDOW_ID: '1' })
+  const cor = async (p: number) => {
+    pct = p
+    await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+    const m = new RegExp(`"color":"(\\w+)","weight":"bold"\\},"children":\\[" *${p}% *"\\]`).exec(await painel($))
+    return m?.[1]
+  }
+  expect(await cor(59)).toBe('success')
+  expect(await cor(60)).toBe('warning')
+  expect(await cor(79)).toBe('warning')
+  expect(await cor(80)).toBe('error')
+  const pane = await painel($)
+  expect(pane).toContain('"  janela   "')
+  expect(/[\u2801-\u28ff]/.test(pane)).toBe(true)
+  expect(pane).not.toContain('╭')
+  // Cache não é gauge: fica no rodapé.
+  expect(pane).not.toContain('"   cache   "')
+})
+
+test('painel: sem Kitty, os gauges saem em caixa; no desktop também', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  mock.env(on, { TERM: 'alacritty' })
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  expect(await painel($)).toContain('╭')
+  const desk = JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'desktop', props: { bodyColumns: 48 } } as never))
+  expect(desk).toContain('╭')
+  expect(desk).not.toMatch(/[\u2801-\u28ff]/)
+})
+
+test('painel: quem executa — modelo e effort da conversa principal, subagentes vivos com tipo e tarefa no hover', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('turn.step', async function* (_$, e) {
+    yield { kind: 'input', index: 0, json: '' } as never
+    return { turnId: e.turnId, index: e.index, answer: 'ok', toolUses: [], stopReason: 'end_turn', usage: null } as never
+  })
+  let proximo = 'ag1'
+  on('agent.spawn', () => ({ model: 'claude-sonnet-5-5', agentId: proximo }) as never)
+  on('turn.start', (_$, e) => ({ turnId: (e as { turnId: string }).turnId }) as never)
+  on('turn.complete', () => usoDoTurno(0, 0))
+  const passo = async (a: object) => {
+    const st = $.turn.step({ turnId: 't', index: 0, messageCount: 1, ...a } as never) as unknown as AsyncIterable<unknown>
+    for await (const _ of st) void _
+  }
+  await passo({ model: 'claude-opus-5-5', effort: 'high' })
+  expect(await painel($)).toContain('Opus 5.5 · effort high')
+  await $.agent.spawn({ tool_use_id: 'tu', prompt: 'p', description: 'varrer os testes', subagentType: 'Explore', provider: { kind: 'engine' } } as never)
+  await passo({ model: 'claude-sonnet-5-5', effort: 'low', agentId: 'ag1' })
+  let pane = await painel($)
+  expect(pane).toContain('"Opus 5.5 · effort high"," · 1 subagente"')
+  expect(pane).toContain('"Explore"')
+  expect(pane).toContain('Sonnet 5.5')
+  expect(pane).toContain(', low')
+  expect(pane).toContain('varrer os testes')
+  // O mesmo id duas vezes não duplica; um segundo subagente entra depois do primeiro (sobreviventes #8 e #9 da 0.13.0).
+  await $.agent.spawn({ tool_use_id: 'tu', prompt: 'p', description: 'varrer os testes', subagentType: 'Explore', provider: { kind: 'engine' } } as never)
+  expect(await painel($)).toContain('" · 1 subagente"')
+  proximo = 'ag2'
+  await $.agent.spawn({ tool_use_id: 'tu2', prompt: 'p', description: 'rever o diff', subagentType: 'Plan', provider: { kind: 'engine' } } as never)
+  pane = await painel($)
+  expect(pane).toContain('" · 2 subagentes"')
+  expect(pane.indexOf('varrer os testes') < pane.indexOf('rever o diff')).toBe(true)
+  await umTurno($, 'ts2', 'ag2')
+  // O subagente termina: sai da lista; a conversa principal fica.
+  await umTurno($, 'ts', 'ag1')
+  pane = await painel($)
+  expect(pane).not.toContain('subagente')
+  expect(pane).toContain('Opus 5.5 · effort high')
+  // Passo sem effort (modelo que não aceita): só o modelo (sobrevivente #16 da 0.13.0).
+  await passo({ model: 'claude-haiku-4-5' })
+  pane = await painel($)
+  expect(pane).toContain('"Haiku 4.5"')
+  expect(pane).not.toContain('undefined')
+})
+
+test('caderno: tipos com atalho 1 a 4 e o escolhido marcado; a última nota mostra se já foi respondida', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  const c = comCaderno(on)
+  await comObjetivo($)
+  let pane = await painel($)
+  expect(pane).toContain('"key":"tipo-nota","label":"● nota","hotkey":"1","variant":"primary"')
+  expect(pane).toContain('"key":"tipo-referencia","label":"referência","hotkey":"4","variant":"secondary"')
+  expect(pane).toContain('clique no campo (ou ctrl+x tab) · Enter envia')
+  await $.command.run({ command: 'objetivo', args: 'nota olhar o contraste' } as never)
+  pane = await painel($)
+  expect(pane).toContain('◌ última nota enviada agora há pouco: chega ao Claude na próxima ferramenta')
+  const id = JSON.parse(c.texto().trim()).id
+  await $.tool.call({ tool: TOOL, acao: 'triar', nota: id, decisao: 'registrada', motivo: 'ok' } as never)
+  expect(await painel($)).toContain('✔ última nota respondida: registrada')
 })
