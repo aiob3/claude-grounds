@@ -215,6 +215,17 @@ Diário de um experimento operacional: usar mods (plugins locais do Claude Code)
 - **O instrumento:** o escolhedor descreve em prosa os mutantes de ordem ("mover a linha para depois"), que o formato não expressa; a categoria fica descoberta e o registrar não aceita PROVADO mesmo com os manuais mortos. Pendência: o registrar aceitar mutantes manuais declarados.
 - **Rodadas:** 12/7/5 (2 reais), lista nova 14/11/3 (os 3 equivalentes, empate/ordem coberta à mão), FRACO pela regra do instrumento.
 
+### publico: publicar o commit, e anonimizar por padrão (2026-10-15, noite)
+- **O commit, não a pasta:** a sincronização tira uma foto do HEAD (`git archive`) e gera dali; um commit só do log não publica mais mods sem commit. No caminho, a cópia que passou a ser worktree (`.git` como arquivo) e a foto que ficava em /tmp viraram testes.
+- **Um vazamento achado por acaso:** lendo o gerador, a regra de anonimizar procurava três nomes de projetos alheios. A sessão do motor passou a registrar rodadas com o nome "legibility", e 5 delas foram a público com o texto da tarefa. Invertido: há uma lista do que é nosso e sai com texto; o resto sai anonimizado por padrão. O log público voltou a zero linhas com o texto; o histórico público ainda as tem, e reescrevê-lo é decisão do operador.
+- **Mais um defeito do instrumento:** no pytest, um mutante que quebra a sintaxe (regex com parêntese sem par) para a coleta com código 2, e o mod contou como morto. Deveria ser inválido, como no JS/TS. Pendência.
+
+### prova-de-teste 0.11.0: o que um projeto testa não sai dele (2026-10-15, noite)
+- **O problema, nas palavras do operador:** dados sensíveis são tratados em outra sessão (a do motor); se as rodadas dela entram no mesmo registro dos mods, há um problema. Confirmado: a sessão chamava o `registrar` e gravava no log do EXP-001, que mora no repositório dos mods (privado no GitHub) e é sincronizado ao público (anonimizado). 31 linhas vieram de lá.
+- **A correção:** isolar por padrão. Um log compartilhado que mora num repositório git só recebe as rodadas desse mesmo repositório (de qualquer worktree dele, pelo diretório comum do git). A rodada de outro projeto vai a `~/.claude/prova-de-teste/projetos/<repositório>.md`, fora de qualquer git, sem commit. A efetividade soma os números de todos os logs na própria máquina; nenhum texto sai. Log compartilhado fora de git (quem instala os mods do público) continua valendo para todos.
+- **O caderno na sessão paralela:** o operador escreveu 6 notas lá; as 6 foram entregues (cada id está no transcript, e a linha de cada pedido repetiu "6 sem resposta" 9 vezes), e o agente não triou nenhuma. Entregar não é o mesmo que ser lido: vem aí a reentrega com o texto inteiro.
+- **Rodadas:** 18/10/8 (6 reais), reforço 18/16/2 (2 equivalentes, PROVADO; calibração por mexer no instrumento).
+
 ## Próximas observações
 - [ ] prova-de-teste: o `repetir` roda só os sobreviventes da execução anterior e herda os mortos (o reforço cairia de ~50 s para ~5 s). Fazer quando a próxima rodada com testes pedir.
 - [x] Confirmar numa sessão nova que o objetivo de `~/Work` volta sozinho. **Validado pelo operador em 2026-10-14:** a sessão nova recebeu o objetivo da F1 inteiro (título, conclusão, 8 itens), sem restauração manual; ali o objetivo foi fechado em 8/8.

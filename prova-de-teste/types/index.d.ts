@@ -28,6 +28,8 @@ export type Escolha = {
 /** Os números da última rodada que o próprio mod executou: o registrar só aceita estes. */
 export type ExecucaoFeita = {
   tarefa: string
+  /** 0.11.0: a raiz do repositório da rodada, que decide se a linha vai ao log compartilhado ou ao do projeto. */
+  raiz?: string
   aplicados: number
   mortos: number
   sobreviventes: number

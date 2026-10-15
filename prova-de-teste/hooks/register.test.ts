@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
+import { logDoProjeto } from './prova'
 
 type On = Parameters<TestBody>[1]
 
@@ -196,7 +197,7 @@ test('sem HOME, /prova ~/pasta não inventa uma pasta', async ($, on) => {
 })
 
 /** Um repositório em memória: git, cópia, comando de teste e sistema de arquivos. */
-function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean; nomeDoPlugin?: string; venvEditavel?: boolean; sobrescreverFalha?: boolean } = {}) {
+function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean; nomeDoPlugin?: string; venvEditavel?: boolean; sobrescreverFalha?: boolean; cwdSessao?: string } = {}) {
   const fs = new Map<string, string>(o.python ? [
     ['/repo/pyproject.toml', '[tool.pytest.ini_options]\n'],
     ['/repo/src/calc.py', 'def dobro(x):\n    return x * 2\n'],
@@ -233,13 +234,16 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
   const sobrescritos = new Map<string, string>()
   const modelo = { chamadas: 0 }
   const TMP = '/tmp/prova-de-teste-abc'
-  mock.env(on, { PROVA_DE_TESTE_LOG: LOG_PATH })
+  // Com a pasta da sessão em outro lugar, sem log fixo: o destino sai da raiz da execução (isolamento, 0.11.0).
+  mock.env(on, o.cwdSessao ? { HOME: '/h' } : { PROVA_DE_TESTE_LOG: LOG_PATH })
   on('process.run', (_$, e) => {
     const { argv, init } = e as { argv: string[]; init?: { cwd?: string; env?: Record<string, string> } }
     const r = (stdout: string, exitCode = 0) => ({ value: { exitCode, stdout, stderr: '' } }) as never
     const a = argv.slice(1).filter(x => !FORMATO.includes(x)).join(' ')
     if (argv[0] === 'git') {
       if (a === 'rev-parse --show-toplevel') return r('/repo\n')
+      // O log padrão mora no mesmo repositório da rodada (/repo): isolamento por projeto (0.11.0).
+      if (a === 'rev-parse --path-format=absolute --git-common-dir') return ['/repo', '/h/.claude/prova-de-teste'].includes(init?.cwd ?? '') ? r('/repo/.git\n') : r('', 128)
       if (a === 'diff HEAD') return r(o.python ? DIFF_PY : DIFF)
       if (a === 'status --porcelain') return r(' M src/a.ts\n')
       if (a === 'ls-files --cached --others --exclude-standard' && o.python) return r('pyproject.toml\nsrc/calc.py\nsrc/test_calc.py\n')
@@ -331,7 +335,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
     fs.set(path, text)
     return { value: undefined } as never
   })
-  on('session.cwd', () => ({ value: '/repo' }) as never)
+  on('session.cwd', () => ({ value: o.cwdSessao ?? '/repo' }) as never)
   on('session.model', () => ({ value: 'opus' }) as never)
   on('model.complete', () =>
     (modelo.chamadas++, {
@@ -677,4 +681,117 @@ test('a efetividade do ciclo vai ao arquivo de indicadores a cada registro, com 
   await registra('c')
   expect(escritas[destino]!.length).toBe(2)
   expect(JSON.parse(escritas[destino]![1]!).itens[0].detalhe).toContain('últimas 3 tarefas')
+})
+
+// Isolamento por projeto (0.11.0): o log compartilhado mora num repositório git (que vai ao GitHub e ao público).
+const isolado = (on: On, o: { cwd: string; logEmGit?: boolean; listaInvertida?: boolean }) => {
+  mock.env(on, { HOME: '/h' })
+  const fs = new Map<string, string>([['/mods/publico/EXP-001-log.md', '# log\n']])
+  const gits: string[][] = []
+  const repos: Record<string, string> = { '/mods/publico': '/mods/.git', '/tmp/wt': '/mods/.git', '/data/sensivel': '/data/sensivel/.git', '/data/sensivel-wt': '/data/sensivel/.git' }
+  on('process.run', (_$, e) => {
+    const { argv, init } = e as { argv: string[]; init?: { cwd?: string } }
+    gits.push([...argv, init?.cwd ?? ''])
+    const r = (stdout: string, exitCode = 0) => ({ value: { exitCode, stdout, stderr: '' } }) as never
+    if (argv.includes('--git-common-dir')) {
+      const repo = o.logEmGit === false && init?.cwd === '/mods/publico' ? undefined : repos[init?.cwd ?? '']
+      return repo ? r(`${repo}\n`) : r('', 128)
+    }
+    return r('')
+  })
+  on('session.cwd', () => ({ value: o.cwd }) as never)
+  on('fs.stat', (_$, e) => {
+    const p = (e as { path: string }).path
+    if (p === '/h/.claude/prova-de-teste/EXP-001-log.md') return { value: { kind: 'file', size: 1, mtimeMs: 0, isLink: true, realPath: '/mods/publico/EXP-001-log.md' } } as never
+    throw new Error('ENOENT')
+  })
+  on('fs.exists', (_$, e) => ({ value: fs.has((e as { path: string }).path) }) as never)
+  on('fs.read', (_$, e) => {
+    const t = fs.get((e as { path: string }).path)
+    if (t === undefined) throw new Error('ENOENT')
+    return { value: t } as never
+  })
+  on('fs.write', (_$, e) => {
+    const { path, text } = e as { path: string; text: string }
+    fs.set(path, text)
+    return { value: undefined } as never
+  })
+  on('fs.list', (_$, e) => {
+    const pasta = `${(e as { path: string }).path}/`
+    const nomes = [...fs.keys()].filter(k => k.startsWith(pasta) && !k.slice(pasta.length).includes('/')).map(k => k.slice(pasta.length)).sort()
+    return { value: (o.listaInvertida ? nomes.reverse() : nomes).map(name => ({ name, kind: 'file' })) } as never
+  })
+  return { fs, gits }
+}
+const registro = { tool: 'mcp__prova-de-teste__registrar', tarefa: 'tarefa x: detalhe', aplicados: 2, mortos: 2, sobreviventes: 0, reais: 0, estado: 'PROVADO', tempo: 3 }
+
+test('isolamento: rodada de outro projeto vai ao log local dele, fora de qualquer git, e o log compartilhado não muda', async ($, on) => {
+  const m = isolado(on, { cwd: '/data/sensivel' })
+  const r = JSON.stringify(await $.tool.call(registro as never))
+  expect(r).toContain('log local do projeto, fora de qualquer git')
+  expect(m.fs.get('/h/.claude/prova-de-teste/projetos/%2Fdata%2Fsensivel.md')).toContain('| tarefa x: detalhe | v1.2 | mutantes: 2/2/0')
+  expect(m.fs.get('/mods/publico/EXP-001-log.md')).toBe('# log\n')
+  expect(m.gits.some(g => g[1] === 'add' || g[1] === 'commit')).toBe(false)
+})
+
+test('isolamento: rodada dos mods, mesmo numa worktree deles, vai ao log compartilhado com commit', async ($, on) => {
+  const m = isolado(on, { cwd: '/tmp/wt' })
+  const r = JSON.stringify(await $.tool.call(registro as never))
+  expect(r).toContain('commit no repositório do log')
+  expect(m.fs.get('/mods/publico/EXP-001-log.md')).toContain('| tarefa x: detalhe |')
+  expect(m.gits.some(g => g[1] === 'commit' && g.at(-1) === '/mods/publico')).toBe(true)
+  expect([...m.fs.keys()].some(k => k.includes('/projetos/'))).toBe(false)
+})
+
+test('isolamento: log compartilhado fora de git é local e vale para qualquer projeto; pasta sem git usa a própria pasta', async ($, on) => {
+  const m = isolado(on, { cwd: '/data/sensivel', logEmGit: false })
+  await $.tool.call(registro as never)
+  expect(m.fs.get('/mods/publico/EXP-001-log.md')).toContain('| tarefa x: detalhe |')
+})
+
+test('isolamento: a raiz que decide é a da execução, não a pasta da sessão (sobrevivente #15 da 0.11.0)', async ($, on) => {
+  const m = mundo(on, { cwdSessao: '/longe' })
+  await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma', cwd: '/repo' } as never)
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__registrar', tarefa: 'soma', aplicados: 2, mortos: 1, sobreviventes: 1, reais: 1, estado: 'FRACO', tempo: 1 } as never))
+  expect(r).toContain('Gravado em /h/.claude/prova-de-teste/EXP-001-log.md')
+  expect([...m.fs.keys()].some(k => k.includes('/projetos/'))).toBe(false)
+})
+
+test('isolamento: worktree de outro projeto vai ao log do repositório dele; pasta vazia vai a sem-projeto (sobreviventes #7 e #1)', async ($, on) => {
+  const m = isolado(on, { cwd: '/data/sensivel-wt' })
+  await $.tool.call(registro as never)
+  expect(m.fs.get('/h/.claude/prova-de-teste/projetos/%2Fdata%2Fsensivel.md')).toContain('| tarefa x: detalhe |')
+  expect(logDoProjeto('/h', '')).toBe('/h/.claude/prova-de-teste/projetos/sem-projeto.md')
+})
+
+test('isolamento: com o compartilhado vazio os locais contam; só .md entra; a ordem é a dos nomes, qualquer que seja a da pasta (sobreviventes #2, #4 e #5)', async ($, on) => {
+  const m = isolado(on, { cwd: '/data/sensivel', listaInvertida: true })
+  m.fs.delete('/mods/publico/EXP-001-log.md')
+  m.fs.set('/h/.claude/prova-de-teste/projetos', '')
+  const prov = (n: string, a: number, mo: number) => `2026-10-15 | ${n}: x | v1.2 | mutantes: ${a}/${mo}/${a - mo} | reais: 0 | PROVADO | 10 | instrumento: mod 0.10.0 | medição`
+  // a.md: uma tarefa com 0% na 1ª passada; b.md: cinco com 100%. Pela ordem dos nomes, as últimas 5 são as de b.
+  m.fs.set('/h/.claude/prova-de-teste/projetos/a.md', `${prov('a1', 4, 0)}\n`)
+  m.fs.set('/h/.claude/prova-de-teste/projetos/b.md', [1, 2, 3, 4, 5].map(i => prov(`b${i}`, 4, 4)).join('\n'))
+  m.fs.set('/h/.claude/prova-de-teste/projetos/c.bak', [6, 7, 8].map(i => prov(`c${i}`, 4, 0)).join('\n'))
+  await $.tool.call({ ...registro, tarefa: 'a0: y', aplicados: 4, mortos: 0, sobreviventes: 4, reais: 4, estado: 'FRACO' } as never)
+  const ind = JSON.parse(m.fs.get('/h/.claude/indicadores/prova-de-teste.json')!)
+  expect(ind.itens[0].detalhe).toContain('últimas 5 tarefas: 100%')
+})
+
+test('isolamento: pasta que não é repositório vai ao log local com o nome da pasta', async ($, on) => {
+  const m = isolado(on, { cwd: '/home/u/solta' })
+  await $.tool.call(registro as never)
+  expect(m.fs.get('/h/.claude/prova-de-teste/projetos/%2Fhome%2Fu%2Fsolta.md')).toContain('| tarefa x: detalhe |')
+})
+
+test('isolamento: a efetividade soma os números do log compartilhado e dos locais, sem levar texto a lugar nenhum', async ($, on) => {
+  const m = isolado(on, { cwd: '/data/sensivel' })
+  m.fs.set('/h/.claude/prova-de-teste/projetos', '')
+  m.fs.set('/h/.claude/prova-de-teste/projetos/outro.md', '2026-10-15 | outra: y | v1.2 | mutantes: 4/2/2 | reais: 2 | PROVADO | 10 | instrumento: mod 0.10.0 | medição\n')
+  m.fs.set('/mods/publico/EXP-001-log.md', '# log\n2026-10-15 | mods: z | v1.2 | mutantes: 4/4/0 | reais: 0 | PROVADO | 10 | instrumento: mod 0.10.0 | medição\n')
+  await $.tool.call(registro as never)
+  const ind = JSON.parse(m.fs.get('/h/.claude/indicadores/prova-de-teste.json')!)
+  // Três tarefas: a dos mods, a do outro projeto e a recém-registrada no log local; 1ª passada (4+2+2)/(4+4+2) = 80%.
+  expect(ind.itens[0].detalhe).toContain('últimas 3 tarefas: 80%')
+  expect(JSON.stringify(ind)).not.toContain('outra: y')
 })

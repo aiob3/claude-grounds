@@ -5,7 +5,7 @@ import type { Escolha, ExecucaoFeita } from '../types'
 import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Resultado } from './execucao'
 import { efetividade, indicadoresDeEfetividade } from './placar'
-import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
+import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, logDoProjeto, PASTA_PROJETOS, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
 import type { Alias } from './alcance'
 import { aliasesDe, cabeNoMapa, ehConfigDeAlias, ehEntradaDeTeste, ehMapeavel, grafo, SUFIXO_FORA, testesQueAlcancam } from './alcance'
@@ -156,6 +156,33 @@ async function caminhoDoLog($: EngineInterface): Promise<string | undefined> {
   return home ? logPadrao(home) : undefined
 }
 
+/** O repositório de uma pasta, o mesmo para todas as worktrees dele (o diretório comum do git, sem o /.git). */
+async function repositorioDe($: EngineInterface, pasta: string): Promise<string | undefined> {
+  const r = await git($, ['rev-parse', '--path-format=absolute', '--git-common-dir'], pasta).catch(() => undefined)
+  return r?.exitCode === 0 && r.stdout.trim() ? r.stdout.trim().replace(/\/\.git\/?$/, '') : undefined
+}
+
+/**
+ * Onde vai a linha. Um log compartilhado que mora num repositório git (que pode ir ao GitHub e ao público) recebe só
+ * as rodadas desse mesmo repositório, de qualquer worktree dele; a rodada de outro projeto vai a um log local dele,
+ * fora de qualquer git: o que um projeto sensível testa não sai da máquina (15/10/2026: as rodadas do motor iam ao
+ * log dos mods). Log compartilhado fora de git é local: vale para todos. PROVA_DE_TESTE_LOG fixa o destino.
+ */
+async function destinoDoLog($: EngineInterface, raizDaRodada?: string): Promise<{ caminho: string; compartilhado: boolean } | undefined> {
+  const doEnv = await $.env.get('PROVA_DE_TESTE_LOG').catch(() => undefined)
+  if (doEnv) return { caminho: doEnv, compartilhado: true }
+  const home = await $.env.get('HOME').catch(() => undefined)
+  if (!home) return undefined
+  const padrao = logPadrao(home)
+  const real = (await $.fs.stat(padrao, { resolve: true }).catch(() => undefined))?.realPath ?? padrao
+  const repoDoLog = await repositorioDe($, real.slice(0, real.lastIndexOf('/')))
+  if (!repoDoLog) return { caminho: padrao, compartilhado: true }
+  const raiz = raizDaRodada || (await $.session.cwd().catch(() => ''))
+  const repoDaRodada = raiz ? await repositorioDe($, raiz) : undefined
+  if (repoDaRodada === repoDoLog) return { caminho: padrao, compartilhado: true }
+  return { caminho: logDoProjeto(home, repoDaRodada ?? raiz), compartilhado: false }
+}
+
 /** A versão do mod em plugin.json; ilegível, '?'. */
 async function versaoDoMod($: EngineInterface): Promise<string> {
   return versaoDe(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`).catch(() => ''))
@@ -165,8 +192,18 @@ async function versaoDoMod($: EngineInterface): Promise<string> {
 async function publicarPlacar($: EngineInterface): Promise<void> {
   const home = await $.env.get('HOME').catch(() => undefined)
   const caminho = await caminhoDoLog($)
-  if (!home || !caminho || !(await $.fs.exists(caminho))) return
-  const texto = indicadoresDeEfetividade(efetividade(await $.fs.read(caminho)))
+  if (!home || !caminho) return
+  // Os números de todos os logs, o compartilhado e os locais de cada projeto, somados aqui: nenhum texto sai.
+  const real = (await $.fs.stat(caminho, { resolve: true }).catch(() => undefined))?.realPath ?? caminho
+  const logs = [(await $.fs.exists(real)) ? await $.fs.read(real) : '']
+  const pasta = PASTA_PROJETOS(home)
+  if (await $.fs.exists(pasta).catch(() => false)) {
+    for (const f of (await $.fs.list(pasta).catch(() => [])).filter(f => f.kind === 'file' && f.name.endsWith('.md')).map(f => f.name).sort()) {
+      logs.push(await $.fs.read(`${pasta}/${f}`).catch(() => ''))
+    }
+  }
+  if (!logs.some(Boolean)) return
+  const texto = indicadoresDeEfetividade(efetividade(logs.join('\n')))
   const destino = `${home}/.claude/indicadores/prova-de-teste.json`
   if ((await $.fs.read(destino).catch(() => '')) !== texto) await $.fs.write(destino, texto)
 }
@@ -186,17 +223,22 @@ async function registrar($: EngineInterface, r: Partial<Registro> & { defeitoIns
   if (erro || !linha) return { texto: `Erro: ${erro}`, erro: true }
   const divergente = feita && (conferir(feita, r) ?? conferirEstado(feita, r.estado!, r.equivalentes ?? []))
   if (divergente) return { texto: `Erro: ${divergente}`, erro: true }
-  const caminho = await caminhoDoLog($)
-  if (!caminho) return { texto: `Erro: sem ${LOG_ENV} nem HOME, não sei onde fica o log.`, erro: true }
+  const destino = await destinoDoLog($, feita?.raiz)
+  if (!destino) return { texto: `Erro: sem ${LOG_ENV} nem HOME, não sei onde fica o log.`, erro: true }
+  const caminho = destino.caminho
   // Num link, a linha vai ao arquivo real e o commit roda na pasta dele.
   const log = (await $.fs.stat(caminho, { resolve: true }).catch(() => undefined))?.realPath ?? caminho
   const atual = (await $.fs.exists(log)) ? await $.fs.read(log) : CABECALHO_LOG
   await $.fs.write(log, `${atual.endsWith('\n') ? atual : `${atual}\n`}${linha}\n`)
+  // Uma execução vale para um registro só.
+  if (feita) await update($, execucao, () => null)
+  if (!destino.compartilhado) {
+    await publicarPlacar($).catch(() => undefined)
+    return { texto: `Gravado no log local do projeto, fora de qualquer git (o log compartilhado só recebe as rodadas do repositório dele): ${caminho}\n${linha}`, erro: false }
+  }
   const dir = log.slice(0, log.lastIndexOf('/'))
   await git($, ['add', log], dir)
   const c = await git($, ['commit', '-q', '-m', `EXP-001 log: ${r.tarefa!.trim().slice(0, 60)}`, '--', log], dir)
-  // Uma execução vale para um registro só.
-  if (feita) await update($, execucao, () => null)
   await publicarPlacar($).catch(() => undefined)
   return { texto: `Gravado em ${caminho}${log !== caminho ? ` (→ ${log})` : ''}:\n${linha}${c.exitCode === 0 ? '\n(commit no repositório do log)' : `\n(sem commit: ${c.stderr.trim() || c.stdout.trim()})`}`, erro: false }
 }
@@ -475,6 +517,7 @@ async function executar(
     const c = contar(exec.resultados)
     const feita: ExecucaoFeita = {
       tarefa: exec.tarefa,
+      raiz,
       ...c,
       estado: estadoDe(exec),
       estadoSeEquivalentes: estadoSeEquivalentes(exec),

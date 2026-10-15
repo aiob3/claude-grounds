@@ -6,6 +6,9 @@ export const protocoloEm = (pastaDoMod: string) => `${pastaDoMod}/PROTOCOLO.md`
 /** O log: PROVA_DE_TESTE_LOG, ou este caminho padrão (que pode ser um link para onde o log já vive). */
 export const LOG_ENV = 'PROVA_DE_TESTE_LOG'
 export const logPadrao = (home: string) => `${home}/.claude/prova-de-teste/EXP-001-log.md`
+/** O log local de um projeto que não é o do log compartilhado: fora de qualquer git, sem commit (15/10/2026). */
+export const logDoProjeto = (home: string, projeto: string) => `${home}/.claude/prova-de-teste/projetos/${encodeURIComponent(projeto || 'sem-projeto')}.md`
+export const PASTA_PROJETOS = (home: string) => `${home}/.claude/prova-de-teste/projetos`
 export const CABECALHO_LOG =
   '# EXP-001 — log\n\n' +
   `v${VERSAO}: \`<data> | <tarefa> | versão do protocolo | mutantes: aplicados/mortos/sobreviventes | reais: <n> | estado | tempo (s) | instrumento: <mod x.y.z | manual> | <medição | calibração: defeito> [| custo: base, por mutante, repositório, diff]\`\n\n`
