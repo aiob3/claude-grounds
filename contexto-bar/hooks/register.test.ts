@@ -173,6 +173,36 @@ test('o objetivo é gravado por pasta de projeto e uma sessão nova da mesma pas
 })
 
 
+test('Home abre primeiro e termina antes das outras começarem; o /objetivo diz se ela não foi colocada e não engole o erro dela', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('session.root', () => ({ value: '/proj/p' }) as never)
+  mock.store(on)
+  const eventos: string[] = []
+  let home: 'ok' | 'fora' | 'erro' = 'ok'
+  on('ui.open', async (_$, e) => {
+    const id = (e as { id: string }).id
+    eventos.push(`inicio:${id}`)
+    // A Home demora: se as outras não esperassem por ela, terminariam antes.
+    if (id === 'objetivo') for (let i = 0; i < 5; i++) await Promise.resolve()
+    eventos.push(`fim:${id}`)
+    if (id === 'objetivo' && home === 'erro') throw new Error('sem superfície para a Home')
+    return { value: { isPlaced: id !== 'objetivo' || home === 'ok', ...(id === 'objetivo' && home === 'fora' ? { reason: 'too-narrow' } : {}) } } as never
+  })
+  await $.command.run({ command: 'objetivo', args: 'Entrega :: deploy' } as never)
+  const aberto = JSON.stringify(await $.command.run({ command: 'objetivo', args: '' } as never))
+  expect(aberto).toContain('Painel do objetivo aberto')
+  expect(eventos.slice(0, 3)).toEqual(['inicio:objetivo', 'fim:objetivo', 'inicio:caderno'])
+  // A Home não colocada: o comando devolve o resumo, mesmo com as outras colocadas.
+  home = 'fora'
+  expect(JSON.stringify(await $.command.run({ command: 'objetivo', args: '' } as never))).not.toContain('Painel do objetivo aberto')
+  // A Home que dá erro ao abrir não derruba o comando: volta o resumo.
+  home = 'erro'
+  const erro = await $.command.run({ command: 'objetivo', args: '' } as never).then(r => JSON.stringify(r), (x: unknown) => `falhou: ${String(x)}`)
+  expect(erro).not.toContain('falhou')
+  expect(erro).not.toContain('Painel do objetivo aberto')
+  expect(erro).toContain('Entrega')
+})
+
 test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objetivo auto off, não', async ($, on) => {
   on('session.usage', () => usageWith(50000))
   on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
@@ -190,9 +220,9 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   await $.command.run({ command: 'objetivo', args: 'Entrega :: deploy' } as never)
   const antes = abertos.length
   await $.prompt.submit({ text: 'segue' } as never)
-  // As quatro abas; a do objetivo por último, para ser a mostrada (a superfície mostra a última aberta).
-  expect(abertos.slice(antes)).toEqual(['caderno', 'prova', 'agentes', 'objetivo'])
-  expect(titulos.slice(antes)).toEqual(['Caderno', 'Prova', 'Agentes', 'Home'])
+  // As quatro abas; a Home primeiro, para ser a mostrada (aberto do zero, a superfície mostra a primeira; print de 16/10).
+  expect(abertos.slice(antes)).toEqual(['objetivo', 'caderno', 'prova', 'agentes'])
+  expect(titulos.slice(antes)).toEqual(['Home', 'Caderno', 'Prova', 'Agentes'])
   // Desligado, o pedido não abre; ligado de novo, volta a abrir.
   const off = JSON.stringify(await $.command.run({ command: 'objetivo', args: 'auto off' } as never))
   expect(off).toContain('não abre mais sozinho')

@@ -655,11 +655,12 @@ async function mudarAuto($: EngineInterface, ligado: boolean): Promise<void> {
 }
 
 async function abrirPainel($: EngineInterface) {
-  // A superfície mostra a última aba aberta, e reabrir não a traz para a frente (visto na sessão real, 16/10): as
-  // outras abrem antes e a do objetivo por último, para ser a que o operador vê. A barra de abas fica Caderno, Prova,
-  // Agentes, Objetivo.
+  // Aberto do zero, a superfície mostra a PRIMEIRA aba aberta; reabrir uma aba que já está aberta só a retitula e não
+  // a traz para a frente (print da sessão real, 16/10 02:25: na ordem antiga, Caderno primeiro, o Caderno ficou na
+  // frente). A Home abre primeiro: é a mostrada, e a barra fica Home, Caderno, Prova, Agentes.
+  const home = await $.ui.open({ id: PANE, title: ABAS[0].titulo, closeOnEscape: true, columns: 48 })
   for (const a of ABAS.slice(1)) await $.ui.open({ id: a.id, title: a.titulo, closeOnEscape: true, columns: 48 }).catch(() => undefined)
-  return $.ui.open({ id: PANE, title: ABAS[0].titulo, closeOnEscape: true, columns: 48 })
+  return home
 }
 
 /** Fecha as abas que vão junto com a que o operador fechou. */
@@ -851,7 +852,8 @@ export const register: Register = on => {
       }
     }
     if (c === 'painel') {
-      const r = await abrirPainel($)
+      // A Home que falha ao abrir não derruba o comando: o motor trocaria o erro por "no implementation".
+      const r = await abrirPainel($).catch(() => ({ isPlaced: false }))
       return { text: r.isPlaced ? 'Painel do objetivo aberto (Esc fecha).' : resumo(await read($, objetivo), await read($, snapshot)) }
     }
     const r = await mudarObjetivo($, c, 'operador')
