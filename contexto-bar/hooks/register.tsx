@@ -655,9 +655,20 @@ async function mudarAuto($: EngineInterface, ligado: boolean): Promise<void> {
 }
 
 async function abrirPainel($: EngineInterface) {
-  // As outras abas abrem antes; a do objetivo por último, e é ela que pede o foco e diz se o painel foi posto.
-  for (const a of ABAS.slice(1)) await $.ui.open({ id: a.id, title: a.titulo, closeOnEscape: true, columns: 48 }).catch(() => undefined)
+  // As abas na ordem (Objetivo primeiro); a do objetivo de novo no fim, para ser a mostrada e dizer se o painel foi posto.
+  for (const a of ABAS) await $.ui.open({ id: a.id, title: a.titulo, closeOnEscape: true, columns: 48 }).catch(() => undefined)
   return $.ui.open({ id: PANE, title: ABAS[0].titulo, closeOnEscape: true, columns: 48 })
+}
+
+/** Fecha as abas que vão junto com a que o operador fechou. */
+export async function fecharAsOutras($: Pick<EngineInterface, 'ui'>, e: { id: string; origin: string }): Promise<void> {
+  for (const id of fecharJunto(e.id, e.origin)) await $.ui.close({ id }).catch(() => undefined)
+}
+
+/** O operador fechou uma aba (Esc, a marca): as outras fecham junto, como o painel de uma aba só fechava. */
+export function fecharJunto(id: string, origem: string): string[] {
+  if (origem !== 'person' || !ABAS.some(a => a.id === id)) return []
+  return ABAS.map(a => a.id).filter(x => x !== id)
 }
 
 /** Traz para a sessão o objetivo gravado da pasta atual, se a sessão ainda não o tem. */
@@ -994,6 +1005,12 @@ export const register: Register = on => {
   // feitas recolhidas. O texto longo de cada pendência aparece inteiro com o ponteiro em cima (hover).
   // Acoplado ao lado da conversa no modo tela cheia; acima do prompt fora dele.
   for (const a of ABAS) on('ui.render', { component: 'Pane', requestId: a.id }, ($, e) => desenharPainel($, e, a.id))
+
+  on('ui.close', async ($, e, next) => {
+    const result = await next(e)
+    await fecharAsOutras($, e)
+    return result
+  })
 }
 
 // O painel, aba por aba. Objetivo: medidores do ciclo, o Agora, a vez do operador, a fila, o roadmap e as feitas.

@@ -2,7 +2,7 @@ import { atom, read } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine, TestBody } from 'claude-code/testing'
 
-import { buildSnapshot, cellsFor, chaveObjetivo, groupOf, TOOL } from './register'
+import { buildSnapshot, cellsFor, chaveObjetivo, fecharAsOutras, fecharJunto, groupOf, TOOL } from './register'
 
 const categories = [
   { name: 'System prompt', tokens: 3000, kind: 'used' },
@@ -179,8 +179,10 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   on('session.root', () => ({ value: '/proj/p' }) as never)
   mock.store(on)
   const abertos: string[] = []
+  const titulos: string[] = []
   on('ui.open', (_$, e) => {
     abertos.push((e as { id: string }).id)
+    titulos.push((e as { title: string }).title)
     return { value: { isPlaced: true } } as never
   })
   await $.prompt.submit({ text: 'oi' } as never)
@@ -188,8 +190,9 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   await $.command.run({ command: 'objetivo', args: 'Entrega :: deploy' } as never)
   const antes = abertos.length
   await $.prompt.submit({ text: 'segue' } as never)
-  // As quatro abas; a do objetivo por último (é ela que pede o foco).
-  expect(abertos.slice(antes)).toEqual(['caderno', 'prova', 'agentes', 'objetivo'])
+  // As quatro abas na ordem (Objetivo primeiro); a do objetivo de novo no fim, para ser a mostrada.
+  expect(abertos.slice(antes)).toEqual(['objetivo', 'caderno', 'prova', 'agentes', 'objetivo'])
+  expect(titulos.slice(antes)).toEqual(['Objetivo', 'Caderno', 'Prova', 'Agentes', 'Objetivo'])
   // Desligado, o pedido não abre; ligado de novo, volta a abrir.
   const off = JSON.stringify(await $.command.run({ command: 'objetivo', args: 'auto off' } as never))
   expect(off).toContain('não abre mais sozinho')
@@ -198,7 +201,7 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   expect(abertos.length).toBe(n)
   await $.command.run({ command: 'objetivo', args: 'auto on' } as never)
   await $.prompt.submit({ text: 'segue' } as never)
-  expect(abertos.length).toBe(n + 4)
+  expect(abertos.length).toBe(n + 5)
 })
 
 test('se o store do mod falhar, o painel automático continua ligado (sobrevivente #8 da rodada 4)', async ($, on) => {
@@ -218,7 +221,7 @@ test('se o store do mod falhar, o painel automático continua ligado (sobreviven
   await $.command.run({ command: 'objetivo', args: 'Entrega :: deploy' } as never)
   const antes = abertos.length
   await $.prompt.submit({ text: 'segue' } as never)
-  expect(abertos.length).toBe(antes + 4)
+  expect(abertos.length).toBe(antes + 5)
 })
 
 test('o objetivo vive num arquivo por projeto: sessões em projetos diferentes não se apagam; o store antigo migra uma vez', async ($, on) => {
@@ -1558,4 +1561,23 @@ test('aba Prova: a rodada ao vivo aparece pelo timer de 2 s, sem turno, e fica c
   vivo({ fase: 'fim', estado: 'PROVADO', agora: 9000 })
   await relogio.advance(2000)
   expect(await aba($, 'prova')).toContain('"color":"success"')
+})
+
+test('abas: o operador fecha uma (Esc) e as outras fecham junto; fechar pelo próprio mod não cascateia', () => {
+  expect(fecharJunto('prova', 'person')).toEqual(['objetivo', 'caderno', 'agentes'])
+  expect(fecharJunto('objetivo', 'person')).toEqual(['caderno', 'prova', 'agentes'])
+  expect(fecharJunto('caderno', 'plugin')).toEqual([])
+  expect(fecharJunto('caderno', 'unload')).toEqual([])
+  expect(fecharJunto('outro', 'person')).toEqual([])
+  expect(fecharJunto('', 'person')).toEqual([])
+})
+
+test('abas: o hook de fechar chama o close das outras, e um close que falha não para os seguintes (sobrevivente #10 da 0.19.1)', async () => {
+  const fechados: string[] = []
+  const fake = { ui: { close: async ({ id }: { id: string }) => { fechados.push(id); if (id === 'caderno') throw new Error('já fechado') } } }
+  await fecharAsOutras(fake as never, { id: 'prova', origin: 'person' })
+  expect(fechados).toEqual(['objetivo', 'caderno', 'agentes'])
+  fechados.length = 0
+  await fecharAsOutras(fake as never, { id: 'prova', origin: 'plugin' })
+  expect(fechados).toEqual([])
 })
