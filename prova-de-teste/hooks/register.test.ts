@@ -197,7 +197,7 @@ test('sem HOME, /prova ~/pasta não inventa uma pasta', async ($, on) => {
 })
 
 /** Um repositório em memória: git, cópia, comando de teste e sistema de arquivos. */
-function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean; nomeDoPlugin?: string; venvEditavel?: boolean; sobrescreverFalha?: boolean; cwdSessao?: string; nucleos?: string; statusMuda?: boolean; vaza?: boolean; disputa?: boolean; lento?: boolean; cpFalhaEm?: string } = {}) {
+function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?: boolean; versao?: { v: string }; python?: boolean; pycVelho?: boolean; rmFalha?: boolean; leRepo?: boolean; nomeDoPlugin?: string; venvEditavel?: boolean; sobrescreverFalha?: boolean; cwdSessao?: string; nucleos?: string; statusMuda?: boolean; vaza?: boolean; disputa?: boolean; lento?: boolean; cpFalhaEm?: string; tsc?: { copia: string; base: string }; gitEmArquivo?: boolean } = {}) {
   const fs = new Map<string, string>(o.python ? [
     ['/repo/pyproject.toml', '[tool.pytest.ini_options]\n'],
     ['/repo/src/calc.py', 'def dobro(x):\n    return x * 2\n'],
@@ -234,6 +234,9 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
   const sobrescritos = new Map<string, string>()
   const modelo = { chamadas: 0 }
   const conc = { agora: 0, max: 0, status: 0 }
+  // O tsc: onde rodou (a cópia ou a base) e onde a cópia voltou à base.
+  const tscs: string[] = []
+  const voltas: string[] = []
   const TMP = '/tmp/prova-de-teste-abc'
   // Com a pasta da sessão em outro lugar, sem log fixo: o destino sai da raiz da execução (isolamento, 0.11.0).
   mock.env(on, o.cwdSessao ? { HOME: '/h' } : { PROVA_DE_TESTE_LOG: LOG_PATH })
@@ -269,6 +272,16 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       fs.set(argv[5]!, fs.get(argv[4]!)!)
       sobrescritos.set(argv[5]!, fs.get(argv[4]!)!)
       return r('')
+    }
+    if (argv[0] === 'sh' && argv[2]!.includes('typescript/bin/tsc')) return o.tsc ? r('/h/.npm/_npx/x/node_modules/typescript/bin/tsc\n') : r('')
+    if (argv[0] === 'sh' && argv[2]!.startsWith('git reset')) {
+      voltas.push(`${init?.cwd} ${argv[4]}`)
+      return r('')
+    }
+    if (argv[0] === 'node') {
+      tscs.push(init?.cwd ?? '')
+      const saida = init?.cwd?.includes('/base-tipos') ? o.tsc!.base : o.tsc!.copia
+      return r(saida, saida ? 2 : 0)
     }
     if (argv[0] === 'sh') {
       // O for/mv do executor: renomeia cada arquivo com o sufixo indicado no script.
@@ -338,6 +351,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
   on('fs.stat', (_$, e) => {
     const p = (e as { path: string }).path
     if (p.endsWith('/.venv/bin/sumido')) throw new Error('ENOENT: stat falhou')
+    if (p.endsWith('/.git')) return { value: { kind: o.gitEmArquivo ? 'file' : 'dir', size: 0, mtimeMs: 0, isLink: false } } as never
     return { value: { kind: 'file', size: (fs.get(p) ?? '').length, mtimeMs: 0, isLink: p.endsWith('/.venv/bin/ligado') } } as never
   })
   on('fs.read', (_$, e) => {
@@ -378,7 +392,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       },
     }) as never,
   )
-  return { fs, apagadas, rodadas, ambientes, sobrescritos, TMP, modelo, sobrouEscondido, conc, aoVivo }
+  return { fs, apagadas, rodadas, ambientes, sobrescritos, TMP, modelo, sobrouEscondido, conc, aoVivo, tscs, voltas }
 }
 
 test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver de verdade, restaura e não toca o original', async ($, on) => {
@@ -503,6 +517,59 @@ test('executar: com a linha de base vermelha, nenhum mutante é aplicado e o est
   expect(r).toContain('Estado:     NÃO VERIFICADO')
   expect(r).toContain('Saída da linha de base')
   expect(m.apagadas).toEqual([m.TMP])
+})
+
+const ERRO_ORIGIN = "src/a.ts(1,30): error TS2345: Argument of type '{ readonly kind: \"person\"; }' is not assignable to parameter of type 'string'.\n  Types of property 'origin' are incompatible.\n"
+const ERRO_ANTIGO = "src/b.ts(1,8): error TS2339: Property 'agentId' does not exist on type 'Ctx'.\n"
+
+test('executar R12: erro de tipo que o diff trouxe reprova a linha de base; nenhum mutante roda (o e.origin da 0.19.1 do contexto-bar)', async ($, on) => {
+  const m = mundo(on, { tsc: { copia: ERRO_ORIGIN, base: '' } })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
+  // Os testes passaram na base; o tsc rodou na cópia e, com erro, na cópia voltada à base (HEAD).
+  expect(r).toContain('linha de base passou')
+  expect(m.tscs).toEqual([`${m.TMP}/repo`, `${m.TMP}/base-tipos`])
+  expect(m.voltas).toEqual([`${m.TMP}/base-tipos HEAD`])
+  expect(r).toContain('Tipos:      tsc em .: 1 erro novo → a linha de base reprova')
+  expect(r).toContain('src/a.ts:1 TS2345: Argument of type')
+  expect(m.rodadas.length).toBe(1)
+  expect(r).toContain('Mutantes:   0 aplicados')
+  expect(r).toContain('Estado:     NÃO VERIFICADO')
+  expect(m.apagadas).toEqual([m.TMP])
+})
+
+test('executar R12: o erro de tipo que já existia na base não reprova; o deslocado de linha segue sendo o mesmo', async ($, on) => {
+  const m = mundo(on, { tsc: { copia: ERRO_ANTIGO, base: ERRO_ANTIGO.replace('(1,8)', '(3,8)') } })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
+  expect(r).toContain('Tipos:      tsc em .: nenhum erro novo; 1 já existia na base (não reprova)')
+  expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes')
+  expect(r).toContain('Estado:     FRACO')
+})
+
+test('executar R12: sem erro na cópia, a base nem é montada; sem tsc, o relatório avisa e a rodada segue', async ($, on) => {
+  const m = mundo(on, { tsc: { copia: '', base: ERRO_ORIGIN } })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
+  expect(m.tscs).toEqual([`${m.TMP}/repo`])
+  expect(m.voltas).toEqual([])
+  expect(r).toContain('Tipos:      tsc em .: nenhum erro novo')
+  expect(r).toContain('Estado:     FRACO')
+})
+
+test('executar R12: sem o tsc, a rodada segue e o relatório diz que os tipos ficaram de fora', async ($, on) => {
+  const m = mundo(on)
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
+  expect(m.tscs).toEqual([])
+  expect(r).toContain('Tipos:      ⚠ tsc não encontrado')
+  expect(r).toContain('Estado:     FRACO')
+})
+
+test('executar R12: cópia com .git em arquivo (worktree) não volta à base, que mexeria no original; todo erro conta como novo', async ($, on) => {
+  const m = mundo(on, { tsc: { copia: ERRO_ANTIGO, base: ERRO_ANTIGO }, gitEmArquivo: true })
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'soma' } as never))
+  expect(m.voltas).toEqual([])
+  expect(m.tscs).toEqual([`${m.TMP}/repo`])
+  expect(r).toContain('1 erro novo → a linha de base reprova')
+  expect(r).toContain('⚠ sem a base para comparar (o .git da cópia não é uma pasta própria')
+  expect(r).toContain('Estado:     NÃO VERIFICADO')
 })
 
 test('executar: plugin na raiz do repositório é achado e testado na raiz da cópia (sobrevivente #4 da 3ª execução da rodada 4)', async ($, on) => {

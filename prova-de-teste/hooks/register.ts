@@ -5,6 +5,8 @@ import type { Escolha, ExecucaoFeita, Mutante } from '../types'
 import { progresso, ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, larguraDoParalelo, refazerSozinho, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, categoriasDescobertas, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { AoVivo, Comando, Execucao, FaseAoVivo, Paralelo, Resultado } from './execucao'
 import { efetividade, indicadoresDeEfetividade } from './placar'
+import { ACHAR_TSC, errosDeTipo, errosNovos, pastasParaTipos, VOLTAR_A_BASE } from './tipos'
+import type { Tipos } from './tipos'
 import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, logDoProjeto, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
 import type { Alias } from './alcance'
@@ -485,8 +487,55 @@ async function executar(
       },
       paralelo,
     }
+    /**
+     * R12: o tsc nas pastas tocadas que têm tsconfig, na cópia; havendo erro, também numa cópia voltada à base, e só
+     * o erro novo reprova (tipos.ts). Sem tsc, a rodada segue e o relatório avisa que os tipos ficaram de fora.
+     */
+    const checarTipos = async (): Promise<Tipos | undefined> => {
+      const candidatas = [...new Set(comandos.map(c => c.pasta ?? ''))]
+      const comTsconfig = new Set<string>()
+      for (const p of candidatas) if (await $.fs.exists(`${copia}/${p ? `${p}/` : ''}tsconfig.json`)) comTsconfig.add(p)
+      const pastas = pastasParaTipos(candidatas, p => comTsconfig.has(p), e.enviados)
+      if (!pastas.length) return undefined
+      const achou = await $.process.run(['sh', '-c', ACHAR_TSC, 'sh', copia, (await $.env.get('HOME')) ?? '']).catch(() => undefined)
+      const tsc = achou?.exitCode === 0 ? (achou.stdout.trim().split('\n')[0] ?? '') : ''
+      if (!tsc) return { pastas, novos: [], antigos: 0, aviso: 'tsc não encontrado (no repositório, no cache do npx ou no PATH): os tipos ficaram de fora desta prova' }
+      const argv = /typescript\/bin\/tsc$/.test(tsc) ? ['node', tsc] : [tsc]
+      const checar = async (dir: string) => {
+        const erros = []
+        for (const p of pastas) {
+          const r = await $.process
+            .run([...argv, '-p', '.', '--pretty', 'false'], { cwd: p ? `${dir}/${p}` : dir, timeoutMs })
+            .catch(err => ({ exitCode: -1, stdout: '', stderr: err instanceof Error ? err.message : String(err) }))
+          const achados = errosDeTipo(`${r.stdout}\n${r.stderr}`, p)
+          if (r.exitCode !== 0 && !achados.length) return { erros, ilegivel: `${p || '.'}: ${(r.stdout + r.stderr).trim().slice(-300) || `código de saída ${r.exitCode}`}` }
+          erros.push(...achados)
+        }
+        return { erros }
+      }
+      const agora = await checar(copia)
+      if (agora.ilegivel) return { pastas, novos: [], antigos: 0, aviso: `o tsc falhou sem erro legível (${agora.ilegivel}): os tipos ficaram de fora desta prova` }
+      if (!agora.erros.length) return { pastas, novos: [], antigos: 0 }
+      const dirBase = `${pasta}/base-tipos`
+      const naBase = (await preparar(dirBase, `${pasta}/realocado-tipos`)) ?? (await voltarABase(dirBase))
+      const base = naBase ? undefined : await checar(dirBase)
+      if (!base || base.ilegivel)
+        return { pastas, novos: agora.erros, antigos: 0, aviso: `sem a base para comparar (${naBase ?? base?.ilegivel}): todo erro de tipo conta como novo` }
+      const novos = errosNovos(base.erros, agora.erros)
+      return { pastas, novos, antigos: agora.erros.length - novos.length }
+    }
+    /** A cópia volta à base nas pastas checadas: o índice e os arquivos dela; o que não existia na base sai (o ignorado fica). */
+    const voltarABase = async (dir: string): Promise<string | undefined> => {
+      // .git em arquivo (worktree) aponta para o repositório original: o reset mexeria no índice dele.
+      const git = await $.fs.stat(`${dir}/.git`).catch(() => undefined)
+      if (git?.kind !== 'dir') return 'o .git da cópia não é uma pasta própria (worktree?): voltar à base mexeria no original'
+      const r = await $.process.run(['sh', '-c', VOLTAR_A_BASE, 'sh', e.base || 'HEAD'], { cwd: dir })
+      return r.exitCode === 0 ? undefined : `a volta à base ${e.base || 'HEAD'} falhou: ${r.stderr.trim()}`
+    }
+    if (exec.linhaDeBase.passou) exec.tipos = await checarTipos()
+
     const trabalhadores: Trabalhador[] = [primeiro]
-    if (exec.linhaDeBase.passou) {
+    if (exec.linhaDeBase.passou && !exec.tipos?.novos.length) {
       // As outras cópias. Antes de dividir os mutantes, a linha de base roda em todas ao mesmo tempo: se falha
       // assim e passou sozinha, as suítes disputam algo (uma porta, um arquivo fora da cópia) e a rodada vai em fila.
       const largura = larguraDoParalelo(a.paralelo, nucleos, e.mutantes.length)

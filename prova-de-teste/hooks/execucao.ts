@@ -1,6 +1,8 @@
 import type { Categoria, Mutante } from '../types'
 import { CATEGORIAS, ehArquivoDeTeste } from './prova'
 import { testesQueAlcancam } from './alcance'
+import { linhaTipos } from './tipos'
+import type { Tipos } from './tipos'
 
 /** Uma mutação no formato `trecho original` → `trecho mutado` (aceita também ``a`` com crases duplas). */
 export function lerMutacao(mutacao: string): { de: string; para: string } | null {
@@ -368,6 +370,8 @@ export type Execucao = {
   avisoCorte?: string
   naoAplicaveis: string[]
   linhaDeBase: { passou: boolean; segundos: number; saida?: string }
+  /** A checagem de tipos da base (tipos.ts); erro novo reprova a linha de base. */
+  tipos?: Tipos
   resultados: Resultado[]
   restauracao: 'cmp na cópia: idêntico' | 'cmp na cópia: DIFERENTE'
   /** Nenhum texto mutado chegou ao arquivo do original. */
@@ -409,7 +413,7 @@ export function concentracao(rs: Resultado[]): { maior: number; total: number; t
 }
 
 export function estadoDe(e: Execucao): 'PROVADO' | 'FRACO' | 'NÃO VERIFICADO' {
-  if (!e.linhaDeBase.passou || !e.originalIntocado || e.restauracao !== 'cmp na cópia: idêntico') return 'NÃO VERIFICADO'
+  if (!e.linhaDeBase.passou || e.tipos?.novos.length || !e.originalIntocado || e.restauracao !== 'cmp na cópia: idêntico') return 'NÃO VERIFICADO'
   const c = contar(e.resultados)
   if (c.aplicados === 0) return 'NÃO VERIFICADO'
   if (c.sobreviventes > 0 || categoriasDescobertas(e.resultados, e.naoAplicaveis).length) return 'FRACO'
@@ -474,6 +478,7 @@ export function relatorio(e: Execucao, data: string): string {
     e.avisoNovos ?? '',
     e.avisoCorte ?? '',
     `Comando:    ${e.comando.join(' ; ')} — linha de base ${e.linhaDeBase.passou ? 'passou' : 'FALHOU'} (${e.linhaDeBase.segundos.toFixed(1)} s)`,
+    linhaTipos(e.tipos),
     `Mutantes:   ${c.aplicados} aplicados | ${c.mortos} mortos | ${c.sobreviventes} sobreviventes${e.resultados.length > c.aplicados ? ` | ${e.resultados.length - c.aplicados} não aplicados` : ''}`,
     ...linhas,
     `Categorias: ${CATEGORIAS.map(k => `${k} ${desc.includes(k) ? '✘' : e.naoAplicaveis.some(n => n.startsWith(`${k}:`)) ? 'n/a' : '✔'}`).join(' | ')}`,
