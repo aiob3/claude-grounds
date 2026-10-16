@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-label="163 falhas reais de teste encontradas em 52 rodadas" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-<title>163 falhas reais de teste encontradas em 52 rodadas</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-label="163 falhas reais de teste encontradas em 53 rodadas" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>163 falhas reais de teste encontradas em 53 rodadas</title>
 <style>
   .sup { fill: #fcfcfb; } .sup2 { fill: #f3f2ef; } .borda { stroke: #dedcd5; }
   .t1 { fill: #0b0b0b; } .t2 { fill: #52514e; } .t3 { fill: #8a887f; }
@@ -23,263 +23,268 @@
   <line x1="76" y1="330" x2="1146" y2="330" class="borda" stroke-width="1.5"/>
   
   <g class="barra"><title>Rodada 1: 4 sobreviventes reais</title>
-    <path d="M100.4,330 L100.4,258.0 Q100.4,254.0 104.4,254.0 L107.6,254.0 Q111.6,254.0 111.6,258.0 L111.6,330 Z" class="ac"/>
+    <path d="M100.3,330 L100.3,258.0 Q100.3,254.0 104.3,254.0 L107.3,254.0 Q111.3,254.0 111.3,258.0 L111.3,330 Z" class="ac"/>
   </g>
-  <text x="106.0" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="106.0" y="356" font-size="14" class="t2" text-anchor="middle">R1</text>
+  <text x="105.8" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="105.8" y="356" font-size="14" class="t2" text-anchor="middle">R1</text>
   <g class="barra"><title>Rodada 2: 4 sobreviventes reais</title>
-    <path d="M120.4,330 L120.4,258.0 Q120.4,254.0 124.4,254.0 L127.6,254.0 Q131.6,254.0 131.6,258.0 L131.6,330 Z" class="ac"/>
+    <path d="M119.9,330 L119.9,258.0 Q119.9,254.0 123.9,254.0 L126.9,254.0 Q130.9,254.0 130.9,258.0 L130.9,330 Z" class="ac"/>
   </g>
-  <text x="126.0" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="126.0" y="356" font-size="14" class="t2" text-anchor="middle">R2</text>
+  <text x="125.4" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="125.4" y="356" font-size="14" class="t2" text-anchor="middle">R2</text>
   <g class="barra"><title>Rodada 3: 4 sobreviventes reais</title>
-    <path d="M140.4,330 L140.4,258.0 Q140.4,254.0 144.4,254.0 L147.6,254.0 Q151.6,254.0 151.6,258.0 L151.6,330 Z" class="ac"/>
+    <path d="M139.6,330 L139.6,258.0 Q139.6,254.0 143.6,254.0 L146.6,254.0 Q150.6,254.0 150.6,258.0 L150.6,330 Z" class="ac"/>
   </g>
-  <text x="146.0" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="146.0" y="356" font-size="14" class="t2" text-anchor="middle">R3</text>
+  <text x="145.1" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="145.1" y="356" font-size="14" class="t2" text-anchor="middle">R3</text>
   <g class="barra"><title>Rodada 4: 5 sobreviventes reais</title>
-    <path d="M160.4,330 L160.4,239.0 Q160.4,235.0 164.4,235.0 L167.6,235.0 Q171.6,235.0 171.6,239.0 L171.6,330 Z" class="ac"/>
+    <path d="M159.2,330 L159.2,239.0 Q159.2,235.0 163.2,235.0 L166.2,235.0 Q170.2,235.0 170.2,239.0 L170.2,330 Z" class="ac"/>
   </g>
-  <text x="166.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
-  <text x="166.0" y="356" font-size="14" class="t2" text-anchor="middle">R4</text>
+  <text x="164.7" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
+  <text x="164.7" y="356" font-size="14" class="t2" text-anchor="middle">R4</text>
   <g class="barra"><title>Rodada 5: 2 sobreviventes reais</title>
-    <path d="M180.4,330 L180.4,296.0 Q180.4,292.0 184.4,292.0 L187.6,292.0 Q191.6,292.0 191.6,296.0 L191.6,330 Z" class="ac"/>
+    <path d="M178.8,330 L178.8,296.0 Q178.8,292.0 182.8,292.0 L185.8,292.0 Q189.8,292.0 189.8,296.0 L189.8,330 Z" class="ac"/>
   </g>
-  <text x="186.0" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="186.0" y="356" font-size="14" class="t2" text-anchor="middle">R5</text>
+  <text x="184.3" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="184.3" y="356" font-size="14" class="t2" text-anchor="middle">R5</text>
   <g class="barra"><title>Rodada 6: 4 sobreviventes reais</title>
-    <path d="M200.4,330 L200.4,258.0 Q200.4,254.0 204.4,254.0 L207.6,254.0 Q211.6,254.0 211.6,258.0 L211.6,330 Z" class="ac"/>
+    <path d="M198.4,330 L198.4,258.0 Q198.4,254.0 202.4,254.0 L205.4,254.0 Q209.4,254.0 209.4,258.0 L209.4,330 Z" class="ac"/>
   </g>
-  <text x="206.0" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="206.0" y="356" font-size="14" class="t2" text-anchor="middle">R6</text>
+  <text x="203.9" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="203.9" y="356" font-size="14" class="t2" text-anchor="middle">R6</text>
   <g class="barra"><title>Rodada 7: 6 sobreviventes reais</title>
-    <path d="M220.4,330 L220.4,220.0 Q220.4,216.0 224.4,216.0 L227.6,216.0 Q231.6,216.0 231.6,220.0 L231.6,330 Z" class="ac"/>
+    <path d="M218.1,330 L218.1,220.0 Q218.1,216.0 222.1,216.0 L225.0,216.0 Q229.0,216.0 229.0,220.0 L229.0,330 Z" class="ac"/>
   </g>
-  <text x="226.0" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
-  <text x="226.0" y="356" font-size="14" class="t2" text-anchor="middle">R7</text>
+  <text x="223.5" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
+  <text x="223.5" y="356" font-size="14" class="t2" text-anchor="middle">R7</text>
   <g class="barra"><title>Rodada 8: 6 sobreviventes reais</title>
-    <path d="M240.4,330 L240.4,220.0 Q240.4,216.0 244.4,216.0 L247.6,216.0 Q251.6,216.0 251.6,220.0 L251.6,330 Z" class="ac"/>
+    <path d="M237.7,330 L237.7,220.0 Q237.7,216.0 241.7,216.0 L244.7,216.0 Q248.7,216.0 248.7,220.0 L248.7,330 Z" class="ac"/>
   </g>
-  <text x="246.0" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
-  <text x="246.0" y="356" font-size="14" class="t2" text-anchor="middle">R8</text>
+  <text x="243.2" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
+  <text x="243.2" y="356" font-size="14" class="t2" text-anchor="middle">R8</text>
   <g class="barra"><title>Rodada 9: 8 sobreviventes reais</title>
-    <path d="M260.4,330 L260.4,182.0 Q260.4,178.0 264.4,178.0 L267.6,178.0 Q271.6,178.0 271.6,182.0 L271.6,330 Z" class="ac"/>
+    <path d="M257.3,330 L257.3,182.0 Q257.3,178.0 261.3,178.0 L264.3,178.0 Q268.3,178.0 268.3,182.0 L268.3,330 Z" class="ac"/>
   </g>
-  <text x="266.0" y="168.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">8</text>
-  <text x="266.0" y="356" font-size="14" class="t2" text-anchor="middle">R9</text>
+  <text x="262.8" y="168.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">8</text>
+  <text x="262.8" y="356" font-size="14" class="t2" text-anchor="middle">R9</text>
   <g class="barra"><title>Rodada 10: 2 sobreviventes reais</title>
-    <path d="M280.4,330 L280.4,296.0 Q280.4,292.0 284.4,292.0 L287.6,292.0 Q291.6,292.0 291.6,296.0 L291.6,330 Z" class="ac"/>
+    <path d="M276.9,330 L276.9,296.0 Q276.9,292.0 280.9,292.0 L283.9,292.0 Q287.9,292.0 287.9,296.0 L287.9,330 Z" class="ac"/>
   </g>
-  <text x="286.0" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="286.0" y="356" font-size="14" class="t2" text-anchor="middle">R10</text>
+  <text x="282.4" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="282.4" y="356" font-size="14" class="t2" text-anchor="middle">R10</text>
   <g class="barra"><title>Rodada 11: 4 sobreviventes reais</title>
-    <path d="M300.4,330 L300.4,258.0 Q300.4,254.0 304.4,254.0 L307.6,254.0 Q311.6,254.0 311.6,258.0 L311.6,330 Z" class="ac"/>
+    <path d="M296.5,330 L296.5,258.0 Q296.5,254.0 300.5,254.0 L303.5,254.0 Q307.5,254.0 307.5,258.0 L307.5,330 Z" class="ac"/>
   </g>
-  <text x="306.0" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="306.0" y="356" font-size="14" class="t2" text-anchor="middle">R11</text>
+  <text x="302.0" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="302.0" y="356" font-size="14" class="t2" text-anchor="middle">R11</text>
   <g class="barra"><title>Rodada 12: 4 sobreviventes reais</title>
-    <path d="M320.4,330 L320.4,258.0 Q320.4,254.0 324.4,254.0 L327.6,254.0 Q331.6,254.0 331.6,258.0 L331.6,330 Z" class="ac"/>
+    <path d="M316.2,330 L316.2,258.0 Q316.2,254.0 320.2,254.0 L323.2,254.0 Q327.2,254.0 327.2,258.0 L327.2,330 Z" class="ac"/>
   </g>
-  <text x="326.0" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="326.0" y="356" font-size="14" class="t2" text-anchor="middle">R12</text>
+  <text x="321.7" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="321.7" y="356" font-size="14" class="t2" text-anchor="middle">R12</text>
   <g class="barra"><title>Rodada 13: 3 sobreviventes reais</title>
-    <path d="M340.4,330 L340.4,277.0 Q340.4,273.0 344.4,273.0 L347.6,273.0 Q351.6,273.0 351.6,277.0 L351.6,330 Z" class="ac"/>
+    <path d="M335.8,330 L335.8,277.0 Q335.8,273.0 339.8,273.0 L342.8,273.0 Q346.8,273.0 346.8,277.0 L346.8,330 Z" class="ac"/>
   </g>
-  <text x="346.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="346.0" y="356" font-size="14" class="t2" text-anchor="middle">R13</text>
+  <text x="341.3" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="341.3" y="356" font-size="14" class="t2" text-anchor="middle">R13</text>
   <g class="barra"><title>Rodada 14: 6 sobreviventes reais</title>
-    <path d="M360.4,330 L360.4,220.0 Q360.4,216.0 364.4,216.0 L367.6,216.0 Q371.6,216.0 371.6,220.0 L371.6,330 Z" class="ac"/>
+    <path d="M355.4,330 L355.4,220.0 Q355.4,216.0 359.4,216.0 L362.4,216.0 Q366.4,216.0 366.4,220.0 L366.4,330 Z" class="ac"/>
   </g>
-  <text x="366.0" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
-  <text x="366.0" y="356" font-size="14" class="t2" text-anchor="middle">R14</text>
+  <text x="360.9" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
+  <text x="360.9" y="356" font-size="14" class="t2" text-anchor="middle">R14</text>
   <g class="barra"><title>Rodada 15: 1 sobreviventes reais</title>
-    <path d="M380.4,330 L380.4,315.0 Q380.4,311.0 384.4,311.0 L387.6,311.0 Q391.6,311.0 391.6,315.0 L391.6,330 Z" class="ac"/>
+    <path d="M375.0,330 L375.0,315.0 Q375.0,311.0 379.0,311.0 L382.0,311.0 Q386.0,311.0 386.0,315.0 L386.0,330 Z" class="ac"/>
   </g>
-  <text x="386.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="386.0" y="356" font-size="14" class="t2" text-anchor="middle">R15</text>
+  <text x="380.5" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="380.5" y="356" font-size="14" class="t2" text-anchor="middle">R15</text>
   <g class="barra"><title>Rodada 16: 1 sobreviventes reais</title>
-    <path d="M400.4,330 L400.4,315.0 Q400.4,311.0 404.4,311.0 L407.6,311.0 Q411.6,311.0 411.6,315.0 L411.6,330 Z" class="ac"/>
+    <path d="M394.7,330 L394.7,315.0 Q394.7,311.0 398.7,311.0 L401.6,311.0 Q405.6,311.0 405.6,315.0 L405.6,330 Z" class="ac"/>
   </g>
-  <text x="406.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="406.0" y="356" font-size="14" class="t2" text-anchor="middle">R16</text>
+  <text x="400.2" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="400.2" y="356" font-size="14" class="t2" text-anchor="middle">R16</text>
   <g class="barra"><title>Rodada 17: 2 sobreviventes reais</title>
-    <path d="M420.4,330 L420.4,296.0 Q420.4,292.0 424.4,292.0 L427.6,292.0 Q431.6,292.0 431.6,296.0 L431.6,330 Z" class="ac"/>
+    <path d="M414.3,330 L414.3,296.0 Q414.3,292.0 418.3,292.0 L421.3,292.0 Q425.3,292.0 425.3,296.0 L425.3,330 Z" class="ac"/>
   </g>
-  <text x="426.0" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="426.0" y="356" font-size="14" class="t2" text-anchor="middle">R17</text>
+  <text x="419.8" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="419.8" y="356" font-size="14" class="t2" text-anchor="middle">R17</text>
   <g class="barra"><title>Rodada 18: 3 sobreviventes reais</title>
-    <path d="M440.4,330 L440.4,277.0 Q440.4,273.0 444.4,273.0 L447.6,273.0 Q451.6,273.0 451.6,277.0 L451.6,330 Z" class="ac"/>
+    <path d="M433.9,330 L433.9,277.0 Q433.9,273.0 437.9,273.0 L440.9,273.0 Q444.9,273.0 444.9,277.0 L444.9,330 Z" class="ac"/>
   </g>
-  <text x="446.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="446.0" y="356" font-size="14" class="t2" text-anchor="middle">R18</text>
+  <text x="439.4" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="439.4" y="356" font-size="14" class="t2" text-anchor="middle">R18</text>
   <g class="barra"><title>Rodada 19: 3 sobreviventes reais</title>
-    <path d="M460.4,330 L460.4,277.0 Q460.4,273.0 464.4,273.0 L467.6,273.0 Q471.6,273.0 471.6,277.0 L471.6,330 Z" class="ac"/>
+    <path d="M453.5,330 L453.5,277.0 Q453.5,273.0 457.5,273.0 L460.5,273.0 Q464.5,273.0 464.5,277.0 L464.5,330 Z" class="ac"/>
   </g>
-  <text x="466.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="466.0" y="356" font-size="14" class="t2" text-anchor="middle">R19</text>
+  <text x="459.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="459.0" y="356" font-size="14" class="t2" text-anchor="middle">R19</text>
   <g class="barra"><title>Rodada 20: 1 sobreviventes reais</title>
-    <path d="M480.4,330 L480.4,315.0 Q480.4,311.0 484.4,311.0 L487.6,311.0 Q491.6,311.0 491.6,315.0 L491.6,330 Z" class="ac"/>
+    <path d="M473.1,330 L473.1,315.0 Q473.1,311.0 477.1,311.0 L480.1,311.0 Q484.1,311.0 484.1,315.0 L484.1,330 Z" class="ac"/>
   </g>
-  <text x="486.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="486.0" y="356" font-size="14" class="t2" text-anchor="middle">R20</text>
+  <text x="478.6" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="478.6" y="356" font-size="14" class="t2" text-anchor="middle">R20</text>
   <g class="barra"><title>Rodada 21: 1 sobreviventes reais</title>
-    <path d="M500.4,330 L500.4,315.0 Q500.4,311.0 504.4,311.0 L507.6,311.0 Q511.6,311.0 511.6,315.0 L511.6,330 Z" class="ac"/>
+    <path d="M492.8,330 L492.8,315.0 Q492.8,311.0 496.8,311.0 L499.8,311.0 Q503.8,311.0 503.8,315.0 L503.8,330 Z" class="ac"/>
   </g>
-  <text x="506.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="506.0" y="356" font-size="14" class="t2" text-anchor="middle">R21</text>
+  <text x="498.3" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="498.3" y="356" font-size="14" class="t2" text-anchor="middle">R21</text>
   <g class="barra"><title>Rodada 22: 5 sobreviventes reais</title>
-    <path d="M520.4,330 L520.4,239.0 Q520.4,235.0 524.4,235.0 L527.6,235.0 Q531.6,235.0 531.6,239.0 L531.6,330 Z" class="ac"/>
+    <path d="M512.4,330 L512.4,239.0 Q512.4,235.0 516.4,235.0 L519.4,235.0 Q523.4,235.0 523.4,239.0 L523.4,330 Z" class="ac"/>
   </g>
-  <text x="526.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
-  <text x="526.0" y="356" font-size="14" class="t2" text-anchor="middle">R22</text>
+  <text x="517.9" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
+  <text x="517.9" y="356" font-size="14" class="t2" text-anchor="middle">R22</text>
   <g class="barra"><title>Rodada 23: 2 sobreviventes reais</title>
-    <path d="M540.4,330 L540.4,296.0 Q540.4,292.0 544.4,292.0 L547.6,292.0 Q551.6,292.0 551.6,296.0 L551.6,330 Z" class="ac"/>
+    <path d="M532.0,330 L532.0,296.0 Q532.0,292.0 536.0,292.0 L539.0,292.0 Q543.0,292.0 543.0,296.0 L543.0,330 Z" class="ac"/>
   </g>
-  <text x="546.0" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="546.0" y="356" font-size="14" class="t2" text-anchor="middle">R23</text>
+  <text x="537.5" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="537.5" y="356" font-size="14" class="t2" text-anchor="middle">R23</text>
   <g class="barra"><title>Rodada 24: 1 sobreviventes reais</title>
-    <path d="M560.4,330 L560.4,315.0 Q560.4,311.0 564.4,311.0 L567.6,311.0 Q571.6,311.0 571.6,315.0 L571.6,330 Z" class="ac"/>
+    <path d="M551.6,330 L551.6,315.0 Q551.6,311.0 555.6,311.0 L558.6,311.0 Q562.6,311.0 562.6,315.0 L562.6,330 Z" class="ac"/>
   </g>
-  <text x="566.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="566.0" y="356" font-size="14" class="t2" text-anchor="middle">R24</text>
+  <text x="557.1" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="557.1" y="356" font-size="14" class="t2" text-anchor="middle">R24</text>
   <g class="barra"><title>Rodada 25: 1 sobreviventes reais</title>
-    <path d="M580.4,330 L580.4,315.0 Q580.4,311.0 584.4,311.0 L587.6,311.0 Q591.6,311.0 591.6,315.0 L591.6,330 Z" class="ac"/>
+    <path d="M571.3,330 L571.3,315.0 Q571.3,311.0 575.3,311.0 L578.2,311.0 Q582.2,311.0 582.2,315.0 L582.2,330 Z" class="ac"/>
   </g>
-  <text x="586.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="586.0" y="356" font-size="14" class="t2" text-anchor="middle">R25</text>
+  <text x="576.8" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="576.8" y="356" font-size="14" class="t2" text-anchor="middle">R25</text>
   <g class="barra"><title>Rodada 26: 0 sobreviventes reais</title>
-    <path d="M600.4,330 L600.4,330.0 Q600.4,330.0 600.4,330.0 L611.6,330.0 Q611.6,330.0 611.6,330.0 L611.6,330 Z" class="ac"/>
+    <path d="M590.9,330 L590.9,330.0 Q590.9,330.0 590.9,330.0 L601.9,330.0 Q601.9,330.0 601.9,330.0 L601.9,330 Z" class="ac"/>
   </g>
-  <text x="606.0" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
-  <text x="606.0" y="356" font-size="14" class="t2" text-anchor="middle">R26</text>
+  <text x="596.4" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
+  <text x="596.4" y="356" font-size="14" class="t2" text-anchor="middle">R26</text>
   <g class="barra"><title>Rodada 27: 1 sobreviventes reais</title>
-    <path d="M620.4,330 L620.4,315.0 Q620.4,311.0 624.4,311.0 L627.6,311.0 Q631.6,311.0 631.6,315.0 L631.6,330 Z" class="ac"/>
+    <path d="M610.5,330 L610.5,315.0 Q610.5,311.0 614.5,311.0 L617.5,311.0 Q621.5,311.0 621.5,315.0 L621.5,330 Z" class="ac"/>
   </g>
-  <text x="626.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="626.0" y="356" font-size="14" class="t2" text-anchor="middle">R27</text>
+  <text x="616.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="616.0" y="356" font-size="14" class="t2" text-anchor="middle">R27</text>
   <g class="barra"><title>Rodada 28: 1 sobreviventes reais</title>
-    <path d="M640.4,330 L640.4,315.0 Q640.4,311.0 644.4,311.0 L647.6,311.0 Q651.6,311.0 651.6,315.0 L651.6,330 Z" class="ac"/>
+    <path d="M630.1,330 L630.1,315.0 Q630.1,311.0 634.1,311.0 L637.1,311.0 Q641.1,311.0 641.1,315.0 L641.1,330 Z" class="ac"/>
   </g>
-  <text x="646.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="646.0" y="356" font-size="14" class="t2" text-anchor="middle">R28</text>
+  <text x="635.6" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="635.6" y="356" font-size="14" class="t2" text-anchor="middle">R28</text>
   <g class="barra"><title>Rodada 29: 3 sobreviventes reais</title>
-    <path d="M660.4,330 L660.4,277.0 Q660.4,273.0 664.4,273.0 L667.6,273.0 Q671.6,273.0 671.6,277.0 L671.6,330 Z" class="ac"/>
+    <path d="M649.8,330 L649.8,277.0 Q649.8,273.0 653.8,273.0 L656.7,273.0 Q660.7,273.0 660.7,277.0 L660.7,330 Z" class="ac"/>
   </g>
-  <text x="666.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="666.0" y="356" font-size="14" class="t2" text-anchor="middle">R29</text>
+  <text x="655.2" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="655.2" y="356" font-size="14" class="t2" text-anchor="middle">R29</text>
   <g class="barra"><title>Rodada 30: 2 sobreviventes reais</title>
-    <path d="M680.4,330 L680.4,296.0 Q680.4,292.0 684.4,292.0 L687.6,292.0 Q691.6,292.0 691.6,296.0 L691.6,330 Z" class="ac"/>
+    <path d="M669.4,330 L669.4,296.0 Q669.4,292.0 673.4,292.0 L676.4,292.0 Q680.4,292.0 680.4,296.0 L680.4,330 Z" class="ac"/>
   </g>
-  <text x="686.0" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="686.0" y="356" font-size="14" class="t2" text-anchor="middle">R30</text>
+  <text x="674.9" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="674.9" y="356" font-size="14" class="t2" text-anchor="middle">R30</text>
   <g class="barra"><title>Rodada 31: 3 sobreviventes reais</title>
-    <path d="M700.4,330 L700.4,277.0 Q700.4,273.0 704.4,273.0 L707.6,273.0 Q711.6,273.0 711.6,277.0 L711.6,330 Z" class="ac"/>
+    <path d="M689.0,330 L689.0,277.0 Q689.0,273.0 693.0,273.0 L696.0,273.0 Q700.0,273.0 700.0,277.0 L700.0,330 Z" class="ac"/>
   </g>
-  <text x="706.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="706.0" y="356" font-size="14" class="t2" text-anchor="middle">R31</text>
+  <text x="694.5" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="694.5" y="356" font-size="14" class="t2" text-anchor="middle">R31</text>
   <g class="barra"><title>Rodada 32: 3 sobreviventes reais</title>
-    <path d="M720.4,330 L720.4,277.0 Q720.4,273.0 724.4,273.0 L727.6,273.0 Q731.6,273.0 731.6,277.0 L731.6,330 Z" class="ac"/>
+    <path d="M708.6,330 L708.6,277.0 Q708.6,273.0 712.6,273.0 L715.6,273.0 Q719.6,273.0 719.6,277.0 L719.6,330 Z" class="ac"/>
   </g>
-  <text x="726.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="726.0" y="356" font-size="14" class="t2" text-anchor="middle">R32</text>
+  <text x="714.1" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="714.1" y="356" font-size="14" class="t2" text-anchor="middle">R32</text>
   <g class="barra"><title>Rodada 33: 7 sobreviventes reais</title>
-    <path d="M740.4,330 L740.4,201.0 Q740.4,197.0 744.4,197.0 L747.6,197.0 Q751.6,197.0 751.6,201.0 L751.6,330 Z" class="ac"/>
+    <path d="M728.2,330 L728.2,201.0 Q728.2,197.0 732.2,197.0 L735.2,197.0 Q739.2,197.0 739.2,201.0 L739.2,330 Z" class="ac"/>
   </g>
-  <text x="746.0" y="187.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">7</text>
-  <text x="746.0" y="356" font-size="14" class="t2" text-anchor="middle">R33</text>
+  <text x="733.7" y="187.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">7</text>
+  <text x="733.7" y="356" font-size="14" class="t2" text-anchor="middle">R33</text>
   <g class="barra"><title>Rodada 34: 2 sobreviventes reais</title>
-    <path d="M760.4,330 L760.4,296.0 Q760.4,292.0 764.4,292.0 L767.6,292.0 Q771.6,292.0 771.6,296.0 L771.6,330 Z" class="ac"/>
+    <path d="M747.9,330 L747.9,296.0 Q747.9,292.0 751.9,292.0 L754.9,292.0 Q758.9,292.0 758.9,296.0 L758.9,330 Z" class="ac"/>
   </g>
-  <text x="766.0" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
-  <text x="766.0" y="356" font-size="14" class="t2" text-anchor="middle">R34</text>
+  <text x="753.4" y="282.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">2</text>
+  <text x="753.4" y="356" font-size="14" class="t2" text-anchor="middle">R34</text>
   <g class="barra"><title>Rodada 35: 0 sobreviventes reais</title>
-    <path d="M780.4,330 L780.4,330.0 Q780.4,330.0 780.4,330.0 L791.6,330.0 Q791.6,330.0 791.6,330.0 L791.6,330 Z" class="ac"/>
+    <path d="M767.5,330 L767.5,330.0 Q767.5,330.0 767.5,330.0 L778.5,330.0 Q778.5,330.0 778.5,330.0 L778.5,330 Z" class="ac"/>
   </g>
-  <text x="786.0" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
-  <text x="786.0" y="356" font-size="14" class="t2" text-anchor="middle">R35</text>
+  <text x="773.0" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
+  <text x="773.0" y="356" font-size="14" class="t2" text-anchor="middle">R35</text>
   <g class="barra"><title>Rodada 36: 3 sobreviventes reais</title>
-    <path d="M800.4,330 L800.4,277.0 Q800.4,273.0 804.4,273.0 L807.6,273.0 Q811.6,273.0 811.6,277.0 L811.6,330 Z" class="ac"/>
+    <path d="M787.1,330 L787.1,277.0 Q787.1,273.0 791.1,273.0 L794.1,273.0 Q798.1,273.0 798.1,277.0 L798.1,330 Z" class="ac"/>
   </g>
-  <text x="806.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="806.0" y="356" font-size="14" class="t2" text-anchor="middle">R36</text>
+  <text x="792.6" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="792.6" y="356" font-size="14" class="t2" text-anchor="middle">R36</text>
   <g class="barra"><title>Rodada 37: 5 sobreviventes reais</title>
-    <path d="M820.4,330 L820.4,239.0 Q820.4,235.0 824.4,235.0 L827.6,235.0 Q831.6,235.0 831.6,239.0 L831.6,330 Z" class="ac"/>
+    <path d="M806.7,330 L806.7,239.0 Q806.7,235.0 810.7,235.0 L813.7,235.0 Q817.7,235.0 817.7,239.0 L817.7,330 Z" class="ac"/>
   </g>
-  <text x="826.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
-  <text x="826.0" y="356" font-size="14" class="t2" text-anchor="middle">R37</text>
+  <text x="812.2" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
+  <text x="812.2" y="356" font-size="14" class="t2" text-anchor="middle">R37</text>
   <g class="barra"><title>Rodada 38: 0 sobreviventes reais</title>
-    <path d="M840.4,330 L840.4,330.0 Q840.4,330.0 840.4,330.0 L851.6,330.0 Q851.6,330.0 851.6,330.0 L851.6,330 Z" class="ac"/>
+    <path d="M826.4,330 L826.4,330.0 Q826.4,330.0 826.4,330.0 L837.3,330.0 Q837.3,330.0 837.3,330.0 L837.3,330 Z" class="ac"/>
   </g>
-  <text x="846.0" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
-  <text x="846.0" y="356" font-size="14" class="t2" text-anchor="middle">R38</text>
+  <text x="831.8" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
+  <text x="831.8" y="356" font-size="14" class="t2" text-anchor="middle">R38</text>
   <g class="barra"><title>Rodada 39: 6 sobreviventes reais</title>
-    <path d="M860.4,330 L860.4,220.0 Q860.4,216.0 864.4,216.0 L867.6,216.0 Q871.6,216.0 871.6,220.0 L871.6,330 Z" class="ac"/>
+    <path d="M846.0,330 L846.0,220.0 Q846.0,216.0 850.0,216.0 L853.0,216.0 Q857.0,216.0 857.0,220.0 L857.0,330 Z" class="ac"/>
   </g>
-  <text x="866.0" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
-  <text x="866.0" y="356" font-size="14" class="t2" text-anchor="middle">R39</text>
+  <text x="851.5" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
+  <text x="851.5" y="356" font-size="14" class="t2" text-anchor="middle">R39</text>
   <g class="barra"><title>Rodada 40: 1 sobreviventes reais</title>
-    <path d="M880.4,330 L880.4,315.0 Q880.4,311.0 884.4,311.0 L887.6,311.0 Q891.6,311.0 891.6,315.0 L891.6,330 Z" class="ac"/>
+    <path d="M865.6,330 L865.6,315.0 Q865.6,311.0 869.6,311.0 L872.6,311.0 Q876.6,311.0 876.6,315.0 L876.6,330 Z" class="ac"/>
   </g>
-  <text x="886.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="886.0" y="356" font-size="14" class="t2" text-anchor="middle">R40</text>
+  <text x="871.1" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="871.1" y="356" font-size="14" class="t2" text-anchor="middle">R40</text>
   <g class="barra"><title>Rodada 41: 3 sobreviventes reais</title>
-    <path d="M900.4,330 L900.4,277.0 Q900.4,273.0 904.4,273.0 L907.6,273.0 Q911.6,273.0 911.6,277.0 L911.6,330 Z" class="ac"/>
+    <path d="M885.2,330 L885.2,277.0 Q885.2,273.0 889.2,273.0 L892.2,273.0 Q896.2,273.0 896.2,277.0 L896.2,330 Z" class="ac"/>
   </g>
-  <text x="906.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="906.0" y="356" font-size="14" class="t2" text-anchor="middle">R41</text>
+  <text x="890.7" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="890.7" y="356" font-size="14" class="t2" text-anchor="middle">R41</text>
   <g class="barra"><title>Rodada 42: 3 sobreviventes reais</title>
-    <path d="M920.4,330 L920.4,277.0 Q920.4,273.0 924.4,273.0 L927.6,273.0 Q931.6,273.0 931.6,277.0 L931.6,330 Z" class="ac"/>
+    <path d="M904.8,330 L904.8,277.0 Q904.8,273.0 908.8,273.0 L911.8,273.0 Q915.8,273.0 915.8,277.0 L915.8,330 Z" class="ac"/>
   </g>
-  <text x="926.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="926.0" y="356" font-size="14" class="t2" text-anchor="middle">R42</text>
+  <text x="910.3" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="910.3" y="356" font-size="14" class="t2" text-anchor="middle">R42</text>
   <g class="barra"><title>Rodada 43: 6 sobreviventes reais</title>
-    <path d="M940.4,330 L940.4,220.0 Q940.4,216.0 944.4,216.0 L947.6,216.0 Q951.6,216.0 951.6,220.0 L951.6,330 Z" class="ac"/>
+    <path d="M924.5,330 L924.5,220.0 Q924.5,216.0 928.5,216.0 L931.5,216.0 Q935.5,216.0 935.5,220.0 L935.5,330 Z" class="ac"/>
   </g>
-  <text x="946.0" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
-  <text x="946.0" y="356" font-size="14" class="t2" text-anchor="middle">R43</text>
+  <text x="930.0" y="206.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">6</text>
+  <text x="930.0" y="356" font-size="14" class="t2" text-anchor="middle">R43</text>
   <g class="barra"><title>Rodada 44: 5 sobreviventes reais</title>
-    <path d="M960.4,330 L960.4,239.0 Q960.4,235.0 964.4,235.0 L967.6,235.0 Q971.6,235.0 971.6,239.0 L971.6,330 Z" class="ac"/>
+    <path d="M944.1,330 L944.1,239.0 Q944.1,235.0 948.1,235.0 L951.1,235.0 Q955.1,235.0 955.1,239.0 L955.1,330 Z" class="ac"/>
   </g>
-  <text x="966.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
-  <text x="966.0" y="356" font-size="14" class="t2" text-anchor="middle">R44</text>
+  <text x="949.6" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
+  <text x="949.6" y="356" font-size="14" class="t2" text-anchor="middle">R44</text>
   <g class="barra"><title>Rodada 45: 0 sobreviventes reais</title>
-    <path d="M980.4,330 L980.4,330.0 Q980.4,330.0 980.4,330.0 L991.6,330.0 Q991.6,330.0 991.6,330.0 L991.6,330 Z" class="ac"/>
+    <path d="M963.7,330 L963.7,330.0 Q963.7,330.0 963.7,330.0 L974.7,330.0 Q974.7,330.0 974.7,330.0 L974.7,330 Z" class="ac"/>
   </g>
-  <text x="986.0" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
-  <text x="986.0" y="356" font-size="14" class="t2" text-anchor="middle">R45</text>
+  <text x="969.2" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
+  <text x="969.2" y="356" font-size="14" class="t2" text-anchor="middle">R45</text>
   <g class="barra"><title>Rodada 46: 4 sobreviventes reais</title>
-    <path d="M1000.4,330 L1000.4,258.0 Q1000.4,254.0 1004.4,254.0 L1007.6,254.0 Q1011.6,254.0 1011.6,258.0 L1011.6,330 Z" class="ac"/>
+    <path d="M983.3,330 L983.3,258.0 Q983.3,254.0 987.3,254.0 L990.3,254.0 Q994.3,254.0 994.3,258.0 L994.3,330 Z" class="ac"/>
   </g>
-  <text x="1006.0" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
-  <text x="1006.0" y="356" font-size="14" class="t2" text-anchor="middle">R46</text>
+  <text x="988.8" y="244.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">4</text>
+  <text x="988.8" y="356" font-size="14" class="t2" text-anchor="middle">R46</text>
   <g class="barra"><title>Rodada 47: 1 sobreviventes reais</title>
-    <path d="M1020.4,330 L1020.4,315.0 Q1020.4,311.0 1024.4,311.0 L1027.6,311.0 Q1031.6,311.0 1031.6,315.0 L1031.6,330 Z" class="ac"/>
+    <path d="M1003.0,330 L1003.0,315.0 Q1003.0,311.0 1007.0,311.0 L1009.9,311.0 Q1013.9,311.0 1013.9,315.0 L1013.9,330 Z" class="ac"/>
   </g>
-  <text x="1026.0" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
-  <text x="1026.0" y="356" font-size="14" class="t2" text-anchor="middle">R47</text>
+  <text x="1008.5" y="301.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">1</text>
+  <text x="1008.5" y="356" font-size="14" class="t2" text-anchor="middle">R47</text>
   <g class="barra"><title>Rodada 48: 10 sobreviventes reais</title>
-    <path d="M1040.4,330 L1040.4,144.0 Q1040.4,140.0 1044.4,140.0 L1047.6,140.0 Q1051.6,140.0 1051.6,144.0 L1051.6,330 Z" class="ac"/>
+    <path d="M1022.6,330 L1022.6,144.0 Q1022.6,140.0 1026.6,140.0 L1029.6,140.0 Q1033.6,140.0 1033.6,144.0 L1033.6,330 Z" class="ac"/>
   </g>
-  <text x="1046.0" y="130.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">10</text>
-  <text x="1046.0" y="356" font-size="14" class="t2" text-anchor="middle">R48</text>
+  <text x="1028.1" y="130.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">10</text>
+  <text x="1028.1" y="356" font-size="14" class="t2" text-anchor="middle">R48</text>
   <g class="barra"><title>Rodada 49: 0 sobreviventes reais</title>
-    <path d="M1060.4,330 L1060.4,330.0 Q1060.4,330.0 1060.4,330.0 L1071.6,330.0 Q1071.6,330.0 1071.6,330.0 L1071.6,330 Z" class="ac"/>
+    <path d="M1042.2,330 L1042.2,330.0 Q1042.2,330.0 1042.2,330.0 L1053.2,330.0 Q1053.2,330.0 1053.2,330.0 L1053.2,330 Z" class="ac"/>
   </g>
-  <text x="1066.0" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
-  <text x="1066.0" y="356" font-size="14" class="t2" text-anchor="middle">R49</text>
+  <text x="1047.7" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
+  <text x="1047.7" y="356" font-size="14" class="t2" text-anchor="middle">R49</text>
   <g class="barra"><title>Rodada 50: 3 sobreviventes reais</title>
-    <path d="M1080.4,330 L1080.4,277.0 Q1080.4,273.0 1084.4,273.0 L1087.6,273.0 Q1091.6,273.0 1091.6,277.0 L1091.6,330 Z" class="ac"/>
+    <path d="M1061.8,330 L1061.8,277.0 Q1061.8,273.0 1065.8,273.0 L1068.8,273.0 Q1072.8,273.0 1072.8,277.0 L1072.8,330 Z" class="ac"/>
   </g>
-  <text x="1086.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="1086.0" y="356" font-size="14" class="t2" text-anchor="middle">R50</text>
+  <text x="1067.3" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="1067.3" y="356" font-size="14" class="t2" text-anchor="middle">R50</text>
   <g class="barra"><title>Rodada 51: 3 sobreviventes reais</title>
-    <path d="M1100.4,330 L1100.4,277.0 Q1100.4,273.0 1104.4,273.0 L1107.6,273.0 Q1111.6,273.0 1111.6,277.0 L1111.6,330 Z" class="ac"/>
+    <path d="M1081.4,330 L1081.4,277.0 Q1081.4,273.0 1085.4,273.0 L1088.4,273.0 Q1092.4,273.0 1092.4,277.0 L1092.4,330 Z" class="ac"/>
   </g>
-  <text x="1106.0" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
-  <text x="1106.0" y="356" font-size="14" class="t2" text-anchor="middle">R51</text>
+  <text x="1086.9" y="263.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">3</text>
+  <text x="1086.9" y="356" font-size="14" class="t2" text-anchor="middle">R51</text>
   <g class="barra"><title>Rodada 52: 5 sobreviventes reais</title>
-    <path d="M1120.4,330 L1120.4,239.0 Q1120.4,235.0 1124.4,235.0 L1127.6,235.0 Q1131.6,235.0 1131.6,239.0 L1131.6,330 Z" class="ac"/>
+    <path d="M1101.1,330 L1101.1,239.0 Q1101.1,235.0 1105.1,235.0 L1108.1,235.0 Q1112.1,235.0 1112.1,239.0 L1112.1,330 Z" class="ac"/>
   </g>
-  <text x="1126.0" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
-  <text x="1126.0" y="356" font-size="14" class="t2" text-anchor="middle">R52</text>
+  <text x="1106.6" y="225.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">5</text>
+  <text x="1106.6" y="356" font-size="14" class="t2" text-anchor="middle">R52</text>
+  <g class="barra"><title>Rodada 53: 0 sobreviventes reais</title>
+    <path d="M1120.7,330 L1120.7,330.0 Q1120.7,330.0 1120.7,330.0 L1131.7,330.0 Q1131.7,330.0 1131.7,330.0 L1131.7,330 Z" class="ac"/>
+  </g>
+  <text x="1126.2" y="320.0" font-size="15" font-weight="700" class="t1" text-anchor="middle">0</text>
+  <text x="1126.2" y="356" font-size="14" class="t2" text-anchor="middle">R53</text>
 </svg>

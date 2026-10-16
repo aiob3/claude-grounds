@@ -314,7 +314,7 @@ diff`), medidos pelo próprio mod.
 - Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
-Em aberto: os critérios de saída estão cumpridos (34 medições, instrumento estável); a decisão de promover é do operador; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
+Em aberto: os critérios de saída estão cumpridos (35 medições, instrumento estável); a decisão de promover é do operador; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 
 ## Avaliar
