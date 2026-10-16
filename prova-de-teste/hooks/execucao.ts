@@ -524,3 +524,50 @@ export function conferir(
     'Registre os números executados; um reforço exige executar de novo.'
   )
 }
+
+// Ao vivo (0.15.0): a rodada escreve o progresso num arquivo da sessão, para o painel do contexto-bar acompanhar
+// enquanto a ferramenta roda (nenhum hook da sessão dispara no meio dela). Contrato, versão 1:
+// ~/.claude/prova-de-teste/ao-vivo/<id da sessão, encodeURIComponent>.json = AoVivo. Quem lê ignora o que não conhece.
+export const VERSAO_AO_VIVO = 1
+export type FaseAoVivo = 'base' | 'mutantes' | 'fim'
+export type AoVivo = {
+  versao: 1
+  fonte: 'prova-de-teste'
+  tarefa: string
+  fase: FaseAoVivo
+  total: number
+  feitos: number
+  mortos: number
+  sobreviventes: number
+  naoAplicados: number
+  inicio: number
+  agora: number
+  copias?: number
+  estado?: string
+}
+
+/** O progresso da rodada: os números saem dos resultados já processados (os da fila ainda não rodados não contam). */
+export function progresso(
+  r: { tarefa: string; resultados: Resultado[]; feitos: number; total: number; copias?: number },
+  fase: FaseAoVivo,
+  inicio: number,
+  agora: number,
+  estado?: string,
+): AoVivo {
+  const c = contar(r.resultados)
+  return {
+    versao: VERSAO_AO_VIVO,
+    fonte: 'prova-de-teste',
+    tarefa: r.tarefa,
+    fase,
+    total: r.total,
+    feitos: r.feitos,
+    mortos: c.mortos,
+    sobreviventes: c.sobreviventes,
+    naoAplicados: fase === 'fim' ? r.resultados.length - c.aplicados : 0,
+    inicio,
+    agora,
+    ...(r.copias ? { copias: r.copias } : {}),
+    ...(estado ? { estado } : {}),
+  }
+}

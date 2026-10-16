@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
-import type { VizinhoHerdr } from '../types'
+import type { AoVivoProva, VizinhoHerdr } from '../types'
 import type { Atividade, Decisao, EventoRoadmap, Executores, Goal, GoalItem, GroupKey, Horizonte, Indicador, ItemRoadmap, Nivel, Nota, Owner, Segment, Size, Snapshot, TipoNota } from '../types'
 import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, bloqueioDeLicenca, comando, textoDisparo, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
@@ -10,7 +10,7 @@ import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VO
 import type { SegundoPlano } from './segundo-plano'
 import { DECISOES, entrega, GLIFO_DECISAO, idade, lembrete, paraLembrar, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
 import { abertos, destinoRoadmap, doHorizonte, ehHorizonte, faixaRoadmap, HORIZONTES, lembreteRoadmap, lerRoadmap, linha as linhaRoadmap, novoItem, resumoRoadmap, VERSAO_ROADMAP } from './roadmap'
-import { centralizar, centroIndicador, COR_INDICADOR, encurtar, estadoDoHerdr, ESTADOS, faixaVizinhos, nomeModelo, textoAtividade, validarIndicadores, validarVizinhos } from './painel'
+import { centralizar, centroIndicador, COR_INDICADOR, encurtar, estadoDoHerdr, ESTADOS, faixaVizinhos, nomeModelo, textoAtividade, validarAoVivo, linhaAoVivo, validarIndicadores, validarVizinhos } from './painel'
 import { estiloDoTerminal, gauge, LARGURA_GAUGE, LINHAS_GAUGE, pedacos } from './gauge'
 import type { EstiloGauge } from './gauge'
 
@@ -34,11 +34,20 @@ const passos = atom({ plugin: 'contexto-bar', key: 'passos' } as const, 0)
 const ultimaEntrega = atom({ plugin: 'contexto-bar', key: 'ultimaEntrega' } as const, {})
 const roadmap = atom({ plugin: 'contexto-bar', key: 'roadmap' } as const, [])
 const vizinhos = atom({ plugin: 'contexto-bar', key: 'vizinhos' } as const, [])
+const aoVivo = atom({ plugin: 'contexto-bar', key: 'aoVivo' } as const, null)
 const verRoadmap = atom({ plugin: 'contexto-bar', key: 'verRoadmap' } as const, false)
 
 export const TOOL_NAME = 'objetivo'
 export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
 const PANE = 'objetivo'
+// As abas do painel: cada uma é um painel nativo; com mais de um aberto, a superfície desenha os títulos como abas.
+export const ABAS = [
+  { id: 'objetivo', titulo: 'Objetivo' },
+  { id: 'caderno', titulo: 'Caderno' },
+  { id: 'prova', titulo: 'Prova' },
+  { id: 'agentes', titulo: 'Agentes' },
+] as const
+type Aba = (typeof ABAS)[number]['id']
 
 const TOOL_SPEC = {
   name: TOOL_NAME,
@@ -196,6 +205,7 @@ export function fmtTokens(n: number): string {
 async function refresh($: EngineInterface, hookTexts: Set<string>) {
   await lerIndicadores($).catch(() => undefined)
   await lerVizinhos($).catch(() => undefined)
+  await lerAoVivo($).catch(() => undefined)
   await lerDoCaderno($).catch(() => undefined)
   try {
     const usage = await $.session.usage({ breakdown: 'summary' })
@@ -212,8 +222,22 @@ async function refresh($: EngineInterface, hookTexts: Set<string>) {
   }
 }
 
-export const INTERVALO_VIZINHOS_MS = 5000
-let timerVizinhos: Timer | undefined
+export const INTERVALO_LEITURA_MS = 2000
+let timerLeitura: Timer | undefined
+
+/** A rodada do prova-de-teste nesta sessão, do arquivo que o executar escreve enquanto roda (contrato no prova-de-teste). */
+async function lerAoVivo($: EngineInterface): Promise<void> {
+  const [home, id] = await Promise.all([$.env.get('HOME'), $.session.id()])
+  const arquivo = home && id ? `${home}/.claude/prova-de-teste/ao-vivo/${encodeURIComponent(id)}.json` : undefined
+  if (!arquivo || !(await $.fs.exists(arquivo).catch(() => false))) return
+  let lido: AoVivoProva | null
+  try {
+    lido = validarAoVivo(JSON.parse(await $.fs.read(arquivo)))
+  } catch {
+    return
+  }
+  if (JSON.stringify(await read($, aoVivo)) !== JSON.stringify(lido)) await update($, aoVivo, () => lido)
+}
 
 /** Os outros workspaces do herdr (contrato em painel.ts), do arquivo deste pane; fora do herdr, nenhum. */
 async function lerVizinhos($: EngineInterface): Promise<void> {
@@ -631,7 +655,9 @@ async function mudarAuto($: EngineInterface, ligado: boolean): Promise<void> {
 }
 
 async function abrirPainel($: EngineInterface) {
-  return $.ui.open({ id: PANE, title: 'Objetivo', closeOnEscape: true, columns: 48 })
+  // As outras abas abrem antes; a do objetivo por último, e é ela que pede o foco e diz se o painel foi posto.
+  for (const a of ABAS.slice(1)) await $.ui.open({ id: a.id, title: a.titulo, closeOnEscape: true, columns: 48 }).catch(() => undefined)
+  return $.ui.open({ id: PANE, title: ABAS[0].titulo, closeOnEscape: true, columns: 48 })
 }
 
 /** Traz para a sessão o objetivo gravado da pasta atual, se a sessão ainda não o tem. */
@@ -735,10 +761,15 @@ export const register: Register = on => {
     await carregarObjetivo($)
     await lerDoRoadmap($).catch(() => undefined)
     await semearCache($)
-    // Dentro do herdr, os vizinhos mudam com esta sessão parada: relidos a cada 5 s, a faixa avisa sem esperar um turno.
-    if (!e.agentId && (await $.env.get('HERDR_PANE_ID').catch(() => undefined))) {
-      timerVizinhos?.cancel()
-      timerVizinhos = $.clock.every(INTERVALO_VIZINHOS_MS, () => void lerVizinhos($).catch(() => undefined))
+    // O que muda com esta sessão parada ou presa numa ferramenta: a rodada do prova-de-teste e, dentro do herdr, os
+    // vizinhos. Relidos a cada 2 s, o painel e a faixa acompanham sem esperar um turno.
+    if (!e.agentId) {
+      const noHerdr = !!(await $.env.get('HERDR_PANE_ID').catch(() => undefined))
+      timerLeitura?.cancel()
+      timerLeitura = $.clock.every(INTERVALO_LEITURA_MS, () => {
+        void lerAoVivo($).catch(() => undefined)
+        if (noHerdr) void lerVizinhos($).catch(() => undefined)
+      })
     }
     return result
   })
@@ -962,7 +993,14 @@ export const register: Register = on => {
   // O painel, de cima para baixo: medidores, o cartão Agora, a vez do operador com botões, a fila do Claude e as
   // feitas recolhidas. O texto longo de cada pendência aparece inteiro com o ponteiro em cima (hover).
   // Acoplado ao lado da conversa no modo tela cheia; acima do prompt fora dele.
-  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+  for (const a of ABAS) on('ui.render', { component: 'Pane', requestId: a.id }, ($, e) => desenharPainel($, e, a.id))
+}
+
+// O painel, aba por aba. Objetivo: medidores do ciclo, o Agora, a vez do operador, a fila, o roadmap e as feitas.
+// Caderno: a porta do operador. Prova: os indicadores e a rodada ao vivo. Agentes: quem executa, os outros
+// workspaces e o segundo plano.
+async function desenharPainel($: EngineInterface, e: any, aba: Aba) {
+  {
     const elementos = $.ui.resolve(e)
     const { Box, Text, Button } = elementos
     // O celular não tem campo de texto: lá a nota vai pelo /objetivo nota <texto>.
@@ -1007,13 +1045,18 @@ export const register: Register = on => {
       snap
         ? desenharGauge('jan', 'janela', snap.percent / 100, `${snap.percent}%`, snap.percent >= 80 ? 'error' : snap.percent >= 60 ? 'warning' : 'success', p ? `${ESTADO[p.estado]} · precisa ~${fmtTokens(p.necessario)} de ${fmtTokens(p.livre)}` : undefined)
         : null,
-      ...inds.map(i =>
-        desenharGauge(`${i.fonte}-${i.id}`, i.rotulo, i.meta ? i.valor / i.meta : 0, centroIndicador(i), i.estado ? COR_INDICADOR[i.estado] : 'claude', i.detalhe),
-      ),
     ].filter(Boolean)
     const medidores = gauges.length ? (
       <Box flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1}>
         {gauges}
+      </Box>
+    ) : null
+    // Os indicadores de outros mods (o EXP-001 do prova-de-teste) vão para a aba Prova.
+    const medidoresProva = inds.length ? (
+      <Box flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1}>
+        {inds.map(i =>
+          desenharGauge(`${i.fonte}-${i.id}`, i.rotulo, i.meta ? i.valor / i.meta : 0, centroIndicador(i), i.estado ? COR_INDICADOR[i.estado] : 'claude', i.detalhe),
+        )}
       </Box>
     ) : null
 
@@ -1054,21 +1097,10 @@ export const register: Register = on => {
           </Text>
         </Text>
         {quem || subs.length ? (
-          <Box key="quem" flexDirection="column">
-            <Text dimColor>
-              {quem}
-              {subs.length ? `${quem ? ' · ' : ''}${subs.length} ${subs.length === 1 ? 'subagente' : 'subagentes'}` : ''}
-            </Text>
-            {subs.length ? (
-              <Box display="none" hover={{ display: 'flex' }} flexDirection="column" paddingLeft={2}>
-                {subs.map(s => (
-                  <Text key={`sub-${s.id}`} wrap="wrap">
-                    <Text color="claude">●</Text> {s.tipo} <Text dimColor>({nomeModelo(s.modelo)}{s.effort ? `, ${s.effort}` : ''})</Text> {s.descricao}
-                  </Text>
-                ))}
-              </Box>
-            ) : null}
-          </Box>
+          <Text key="quem" dimColor>
+            {quem}
+            {subs.length ? `${quem ? ' · ' : ''}${subs.length} ${subs.length === 1 ? 'subagente' : 'subagentes'} (aba Agentes)` : ''}
+          </Text>
         ) : null}
         {goal ? (
           (() => {
@@ -1265,6 +1297,67 @@ export const register: Register = on => {
       </Box>
     ) : null
 
+    // Aba Agentes: quem executa e os subagentes por extenso, os outros workspaces e o que roda em segundo plano.
+    const linhasSp = sp ? linhasDoPainel(sp, await agora($)) : []
+    const agentesBloco = (
+      <Box flexDirection="column">
+        <Text weight="bold">QUEM EXECUTA</Text>
+        <Text>
+          <Text color={ESTADOS[est].cor}>{ESTADOS[est].glifo}</Text> esta sessão{quem ? ` · ${quem}` : ''}
+        </Text>
+        {subs.map(s => (
+          <Text key={`sub-${s.id}`} wrap="wrap">
+            <Text color="claude">●</Text> {s.tipo} <Text dimColor>({nomeModelo(s.modelo)}{s.effort ? `, ${s.effort}` : ''})</Text> {s.descricao}
+          </Text>
+        ))}
+        {vizinhosBloco}
+        {linhasSp.length ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text weight="bold">SEGUNDO PLANO</Text>
+            {linhasSp.map(l => (
+              <Text key={l} color={l.endsWith('em curso') ? 'subtle' : 'warning'} wrap="wrap">
+                {l}
+              </Text>
+            ))}
+          </Box>
+        ) : null}
+      </Box>
+    )
+
+    // Aba Prova: a rodada do executar ao vivo (contrato em execucao.ts do prova-de-teste) e os indicadores.
+    const vivo = await read($, aoVivo)
+    const provaBloco = (
+      <Box flexDirection="column">
+        {vivo ? (
+          <Box flexDirection="column">
+            <Text weight="bold" wrap="wrap">
+              {vivo.fase === 'fim' ? 'ÚLTIMA RODADA ' : '▶ RODANDO '}
+              <Text dimColor>{vivo.tarefa}</Text>
+            </Text>
+            <Text color={vivo.fase === 'fim' ? (vivo.estado === 'PROVADO' ? 'success' : 'warning') : 'claude'} wrap="wrap">
+              {linhaAoVivo(vivo, largura)}
+            </Text>
+          </Box>
+        ) : (
+          <Text dimColor>Nenhuma rodada do prova-de-teste nesta sessão.</Text>
+        )}
+        {medidoresProva ? (
+          <Box flexDirection="column" marginTop={1}>
+            {medidoresProva}
+          </Box>
+        ) : null}
+      </Box>
+    )
+
+    // Aba Objetivo: uma linha aponta para o caderno, que tem a aba dele.
+    const avisoCaderno = abertasCaderno ? (
+      <Box flexDirection="column" marginTop={1}>
+        <Text color="warning">
+          ✎ caderno · {abertasCaderno} sem resposta <Text dimColor>(aba Caderno)</Text>
+        </Text>
+      </Box>
+    ) : null
+
     const rodape = (
       <Box flexDirection="column" marginTop={1}>
         <Box flexDirection="row">
@@ -1277,25 +1370,23 @@ export const register: Register = on => {
           ) : null}
         </Box>
         <LinhaCache c={await read($, cache)} req={await read($, pedido)} Text={Text} />
-        {(sp ? linhasDoPainel(sp, await agora($)) : []).map(l => (
-          <Text key={l} color={l.endsWith('em curso') ? 'subtle' : 'warning'} wrap="wrap">
-            {l}
-          </Text>
-        ))}
       </Box>
     )
+
+    if (aba === 'caderno') return cadernoBloco
+    if (aba === 'prova') return provaBloco
+    if (aba === 'agentes') return agentesBloco
 
     if (!goal) {
       return (
         <Box flexDirection="column">
           {medidores}
           {agoraCard}
-          {vizinhosBloco}
           <Box flexDirection="column" marginTop={1}>
             <Text dimColor>Nenhum objetivo ativo.</Text>
             <Text dimColor>/objetivo texto :: passo que conclui</Text>
           </Box>
-          {cadernoBloco}
+          {avisoCaderno}
           {roadmapBloco}
           {rodape}
         </Box>
@@ -1326,7 +1417,6 @@ export const register: Register = on => {
           {medidores}
         </Box>
         {agoraCard}
-        {vizinhosBloco}
         {suaVez.length ? (
           <Box flexDirection="column" marginTop={1}>
             <Text>
@@ -1340,7 +1430,7 @@ export const register: Register = on => {
             )}
           </Box>
         ) : null}
-        {cadernoBloco}
+        {avisoCaderno}
         {fila.length ? (
           <Box flexDirection="column" marginTop={1}>
             <Text>
@@ -1360,7 +1450,7 @@ export const register: Register = on => {
         {rodape}
       </Box>
     )
-  })
+  }
 }
 
 // O que o operador lê ao passar o ponteiro no título do caderno.

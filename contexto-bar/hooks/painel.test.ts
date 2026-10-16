@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { centralizar, centroIndicador, encurtar, nomeFerramenta, nomeModelo, textoAtividade, validarIndicadores, validarVizinhos, faixaVizinhos, estadoDoHerdr } from './painel'
+import { centralizar, centroIndicador, encurtar, nomeFerramenta, nomeModelo, textoAtividade, validarIndicadores, validarVizinhos, faixaVizinhos, estadoDoHerdr, validarAoVivo, linhaAoVivo } from './painel'
 
 test('centralizar: largura exata, sobra à direita quando ímpar, corte com reticências', () => {
   expect(centralizar('ab', 6)).toBe('  ab  ')
@@ -108,4 +108,31 @@ test('vizinhos na faixa: só quem espera o operador ou terminou; o vocabulário 
   expect(estadoDoHerdr('blocked')).toBe('bloqueado')
   expect(estadoDoHerdr('done')).toBe('concluido')
   expect(estadoDoHerdr('unknown')).toBe('ocioso')
+})
+
+test('ao vivo: só o contrato do prova-de-teste; a linha mostra a fase, a barra dos feitos e o estado no fim', () => {
+  const v = { versao: 1, fonte: 'prova-de-teste', tarefa: 't', fase: 'mutantes', total: 10, feitos: 5, mortos: 4, sobreviventes: 1, naoAplicados: 0, inicio: 1000, agora: 31000, copias: 8 }
+  expect(validarAoVivo(v)).toEqual({ tarefa: 't', fase: 'mutantes', total: 10, feitos: 5, mortos: 4, sobreviventes: 1, naoAplicados: 0, inicio: 1000, agora: 31000, copias: 8 })
+  expect(validarAoVivo({ ...v, versao: 2 })).toBeNull()
+  expect(validarAoVivo({ ...v, fonte: 'outro' })).toBeNull()
+  expect(validarAoVivo({ ...v, fase: 'outra' })).toBeNull()
+  expect(validarAoVivo({ ...v, tarefa: 3 })).toBeNull()
+  expect(validarAoVivo({ ...v, feitos: -1 })).toBeNull()
+  expect(validarAoVivo({ ...v, total: Number.NaN })).toBeNull()
+  expect(validarAoVivo(null)).toBeNull()
+  expect(validarAoVivo({ ...v, copias: 'x', estado: '' })).toStrictEqual({ tarefa: 't', fase: 'mutantes', total: 10, feitos: 5, mortos: 4, sobreviventes: 1, naoAplicados: 0, inicio: 1000, agora: 31000 })
+  const r = validarAoVivo(v)!
+  // Largo: a barra para em 20, metade cheia; mais estreito, ocupa o que sobra do texto.
+  expect(linhaAoVivo(r, 100)).toBe('[■■■■■■■■■■··········] 5/10 · 4 mortos · 1 sobreviventes · 8 cópias · 30 s')
+  // 1 de 3 em 20 colunas: 6,67 arredonda para 7 (sobrevivente #3).
+  expect(linhaAoVivo({ ...r, feitos: 1, total: 3 }, 100).startsWith('[■■■■■■■·')).toBe(true)
+  expect(linhaAoVivo(r, 60)).toBe('[■■■···] 5/10 · 4 mortos · 1 sobreviventes · 8 cópias · 30 s')
+  expect(linhaAoVivo({ ...r, copias: 1 }, 60)).not.toContain('cópias')
+  expect(linhaAoVivo({ ...r, fase: 'base' }, 60)).toBe('linha de base · 10 mutantes na fila · 30 s')
+  expect(linhaAoVivo({ ...r, fase: 'fim', estado: 'PROVADO', naoAplicados: 2 }, 60)).toBe('PROVADO · 4 mortos · 1 sobreviventes · 2 não aplicados · 30 s')
+  expect(linhaAoVivo({ ...r, fase: 'fim' }, 60)).toBe('fim · 4 mortos · 1 sobreviventes · 30 s')
+  // Estreito: a barra não some (4 no mínimo); sem total, vazia.
+  expect(linhaAoVivo(r, 10).startsWith('[■■··]')).toBe(true)
+  expect(linhaAoVivo({ ...r, total: 0, feitos: 0 }, 60).startsWith('[····')).toBe(true)
+  expect(linhaAoVivo({ ...r, agora: 500 }, 60)).toContain(' · 0 s')
 })

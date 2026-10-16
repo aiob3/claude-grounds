@@ -346,9 +346,11 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
     if (o.versao && !fs.has(p) && p.endsWith('/.claude-plugin/plugin.json')) return { value: JSON.stringify({ version: o.versao.v }) } as never
     return { value: fs.get(p) ?? '' } as never
   })
+  const aoVivo: string[] = []
   on('fs.write', (_$, e) => {
     const { path, text } = e as { path: string; text: string }
     fs.set(path, text)
+    if (path.includes('/ao-vivo/')) aoVivo.push(text)
     // Um defeito simulado: a escrita do mutante na cópia chega também ao original.
     if (o.vaza && path.startsWith(`${TMP}/repo/src/`) && text.includes('a - b')) fs.set(path.replace(`${TMP}/repo/`, '/repo/'), text)
     return { value: undefined } as never
@@ -376,7 +378,7 @@ function mundo(on: On, o: { baseFalha?: boolean; pluginNaRaiz?: boolean; quebra?
       },
     }) as never,
   )
-  return { fs, apagadas, rodadas, ambientes, sobrescritos, TMP, modelo, sobrouEscondido, conc }
+  return { fs, apagadas, rodadas, ambientes, sobrescritos, TMP, modelo, sobrouEscondido, conc, aoVivo }
 }
 
 test('executar: copia, roda a base, aplica pelo trecho, mata e deixa sobreviver de verdade, restaura e não toca o original', async ($, on) => {
@@ -933,4 +935,34 @@ test('registrar 0.14.0: mutante manual morto cobre a categoria descoberta e vai 
   expect(ok).toContain('manuais: src/calc.py:2 borda/vazio mover a linha')
   expect(m.fs.get(LOG_PATH)).toContain('mutantes: 2/1/1 | reais: 0 | PROVADO')
   expect(m.fs.get(LOG_PATH)).toContain('null/inválido mover a linha → morto por \"test_dobro\"')
+})
+
+test('executar ao vivo: o progresso vai a um arquivo da sessão (base, cada mutante, fim com o estado), para o painel acompanhar a rodada', async ($, on) => {
+  const m = mundo(on, { cwdSessao: '/repo', nucleos: '1' })
+  on('session.id', () => ({ value: 's/1' }) as never)
+  await executarJa($)
+  const passos = m.aoVivo.map(t => JSON.parse(t))
+  expect(passos[0]).toMatchObject({ versao: 1, fonte: 'prova-de-teste', tarefa: 'soma', fase: 'base', total: 3, feitos: 0 })
+  expect(passos.filter(p => p.fase === 'mutantes').map(p => p.feitos)).toEqual([0, 1, 2, 3])
+  const fim = passos.at(-1)
+  expect(fim).toMatchObject({ fase: 'fim', total: 3, feitos: 3, mortos: 1, sobreviventes: 1, naoAplicados: 1, estado: 'FRACO' })
+  expect(typeof fim.inicio).toBe('number')
+  expect(fim.agora).toBeGreaterThanOrEqual(fim.inicio)
+  expect(m.fs.has('/h/.claude/prova-de-teste/ao-vivo/s%2F1.json')).toBe(true)
+})
+
+test('executar ao vivo: sem HOME, nada é escrito e a rodada sai igual; base que falha termina em fim com NÃO VERIFICADO', async ($, on) => {
+  const m = mundo(on, { baseFalha: true, cwdSessao: '/repo' })
+  on('session.id', () => ({ value: 's1' }) as never)
+  await executarJa($)
+  const passos = m.aoVivo.map(t => JSON.parse(t))
+  expect(passos.map(p => p.fase)).toEqual(['base', 'fim'])
+  expect(passos.at(-1)).toMatchObject({ estado: 'NÃO VERIFICADO', feitos: 0 })
+})
+
+test('executar ao vivo: sem HOME (o mundo sem a pasta da sessão), nada vai ao arquivo', async ($, on) => {
+  const m = mundo(on)
+  on('session.id', () => ({ value: 's1' }) as never)
+  expect(await executarJa($)).toContain('Mutantes:')
+  expect(m.aoVivo).toEqual([])
 })

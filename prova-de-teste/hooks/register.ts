@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Escolha, ExecucaoFeita, Mutante } from '../types'
-import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, larguraDoParalelo, refazerSozinho, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, categoriasDescobertas, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
-import type { Comando, Execucao, Paralelo, Resultado } from './execucao'
+import { progresso, ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, larguraDoParalelo, refazerSozinho, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, categoriasDescobertas, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
+import type { AoVivo, Comando, Execucao, FaseAoVivo, Paralelo, Resultado } from './execucao'
 import { efetividade, indicadoresDeEfetividade } from './placar'
 import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, logDoProjeto, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
 import type { Registro } from './prova'
@@ -314,6 +314,13 @@ async function pluginsTocados($: EngineInterface, raiz: string, tocados: string[
   return nomes
 }
 
+/** O progresso da rodada no arquivo da sessão (contrato em execucao.ts); sem HOME ou sem sessão, nada. */
+async function publicarAoVivo($: EngineInterface, p: AoVivo): Promise<void> {
+  const [home, id] = await Promise.all([$.env.get('HOME'), $.session.id()])
+  if (!home || !id) return
+  await $.fs.write(`${home}/.claude/prova-de-teste/ao-vivo/${encodeURIComponent(id)}.json`, `${JSON.stringify(p)}\n`)
+}
+
 async function executar(
   $: EngineInterface,
   a: { tarefa?: string; cwd?: string; base?: string; modelo?: string; novos?: boolean; comando?: string[]; timeoutSegundos?: number; repetir?: boolean; incremental?: boolean; paralelo?: number },
@@ -327,6 +334,13 @@ async function executar(
   if (esc.erro) return esc
   const e = await read($, ultima)
   if (!e) return { texto: 'Erro: a escolha não ficou registrada.', erro: true }
+  // Ao vivo: o painel acompanha a rodada; uma falha ao escrever nunca derruba a prova.
+  const vivo = { tarefa: a.tarefa.trim(), resultados: [] as Resultado[], feitos: 0, total: e.mutantes.length, copias: undefined as number | undefined }
+  let fimPublicado = false
+  const aoVivo = async (fase: FaseAoVivo, estado?: string) => {
+    if (fase === 'fim') fimPublicado = true
+    await publicarAoVivo($, progresso(vivo, fase, inicio, Date.now(), estado)).catch(() => undefined)
+  }
   const timeoutMs = Math.min(600, Math.max(5, a.timeoutSegundos ?? 120)) * 1000
 
   const raiz = e.raiz
@@ -440,6 +454,7 @@ async function executar(
     type Trabalhador = ReturnType<typeof trabalhador>
     const primeiro = trabalhador(copia)
 
+    await aoVivo('base')
     const base = await primeiro.rodar(primeiro.comandos)
     const lsTree = await git($, ['ls-tree', '-r', '-l', 'HEAD'], raiz)
 
@@ -492,6 +507,7 @@ async function executar(
         }
       }
       paralelo.copias = trabalhadores.length
+      vivo.copias = trabalhadores.length
 
       /** Por recorte: se ele passa sem mutante (ver chaveDoRecorte); a chave não depende da cópia, e cada recorte roda uma vez. */
       const basesDoRecorte = new Map<string, Promise<boolean>>()
@@ -572,6 +588,8 @@ async function executar(
         exec.resultados.push(r)
         return { m, r }
       })
+      vivo.resultados = exec.resultados
+      await aoVivo('mutantes')
       let proximo = 0
       // allSettled: se uma cópia lança, as outras terminam antes de a pasta ser apagada; depois o erro sobe.
       const feitos = await Promise.allSettled(
@@ -579,6 +597,8 @@ async function executar(
           while (proximo < fila.length) {
             const { m, r } = fila[proximo++]!
             await processar(t, m, r)
+            vivo.feitos++
+            await aoVivo('mutantes')
           }
         }),
       )
@@ -625,10 +645,14 @@ async function executar(
       custo: resumoCusto(exec),
     }
     await update($, execucao, () => feita)
+    vivo.resultados = exec.resultados
+    await aoVivo('fim', feita.estado)
     const texto = relatorio(exec, new Date().toISOString().slice(0, 10))
     const saidaBase = exec.linhaDeBase.saida ? `\n\nSaída da linha de base (fim):\n${exec.linhaDeBase.saida}` : ''
     return { texto: `${texto}${saidaBase}\n\nRegistre com ${TOOL_REGISTRAR}: aplicados ${c.aplicados}, mortos ${c.mortos}, sobreviventes ${c.sobreviventes}.`, erro: false }
   } finally {
+    // Rodada que saiu no meio (erro, cópia que falhou): o painel não fica mostrando uma prova que não roda mais.
+    if (!fimPublicado && vivo.total) await aoVivo('fim', 'interrompida')
     // Só apaga a pasta que o próprio mod criou.
     if (pasta.includes(PREFIXO_TMP)) await $.process.run(['rm', '-rf', '--', pasta]).catch(() => undefined)
   }

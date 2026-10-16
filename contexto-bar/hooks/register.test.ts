@@ -188,8 +188,8 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   await $.command.run({ command: 'objetivo', args: 'Entrega :: deploy' } as never)
   const antes = abertos.length
   await $.prompt.submit({ text: 'segue' } as never)
-  expect(abertos.length).toBe(antes + 1)
-  expect(abertos.at(-1)).toBe('objetivo')
+  // As quatro abas; a do objetivo por último (é ela que pede o foco).
+  expect(abertos.slice(antes)).toEqual(['caderno', 'prova', 'agentes', 'objetivo'])
   // Desligado, o pedido não abre; ligado de novo, volta a abrir.
   const off = JSON.stringify(await $.command.run({ command: 'objetivo', args: 'auto off' } as never))
   expect(off).toContain('não abre mais sozinho')
@@ -198,7 +198,7 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   expect(abertos.length).toBe(n)
   await $.command.run({ command: 'objetivo', args: 'auto on' } as never)
   await $.prompt.submit({ text: 'segue' } as never)
-  expect(abertos.length).toBe(n + 1)
+  expect(abertos.length).toBe(n + 4)
 })
 
 test('se o store do mod falhar, o painel automático continua ligado (sobrevivente #8 da rodada 4)', async ($, on) => {
@@ -218,7 +218,7 @@ test('se o store do mod falhar, o painel automático continua ligado (sobreviven
   await $.command.run({ command: 'objetivo', args: 'Entrega :: deploy' } as never)
   const antes = abertos.length
   await $.prompt.submit({ text: 'segue' } as never)
-  expect(abertos.length).toBe(antes + 1)
+  expect(abertos.length).toBe(antes + 4)
 })
 
 test('o objetivo vive num arquivo por projeto: sessões em projetos diferentes não se apagam; o store antigo migra uma vez', async ($, on) => {
@@ -519,7 +519,9 @@ const sessaoComSegundoPlano = (on: any, opts: { mtime?: (agora: number) => numbe
   return { passar: (min: number) => (agora += min * 60000) }
 }
 const contextoDe = async ($: Engine, text: string) => JSON.stringify(((await $.prompt.submit({ text } as never)) as unknown as { context?: string[] }).context)
-const painel = async ($: Engine) => JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'terminal', props: {} } as never))
+const aba = async ($: Engine, requestId: string) => JSON.stringify(await $.ui.render({ component: 'Pane', requestId, surface: 'terminal', props: {} } as never))
+// O painel inteiro: as quatro abas, na ordem em que aparecem.
+const painel = async ($: Engine) => (await Promise.all(['objetivo', 'caderno', 'prova', 'agentes'].map(a => aba($, a)))).join('\n')
 
 test('segundo plano: tarefa muda e sem volta agendada aparece no painel e na linha do próximo pedido; a notificação limpa', async ($, on) => {
   const s = sessaoComSegundoPlano(on)
@@ -792,7 +794,7 @@ test('painel: a fila do Claude vem na ordem da prioridade, melhoria por último 
 
 // O caderno do operador: arquivo simulado, gravado pelo `cat >>` que o mod roda.
 type Montado = { input: (t: object) => Promise<unknown>; press: (t: object) => Promise<unknown>; find: (q: object) => Promise<unknown>; unmount: () => Promise<void> }
-const montar = async ($: Engine) => (await $.ui.mount({ plugin: 'contexto-bar', surface: 'terminal', ...PAINEL } as never)) as unknown as Montado
+const montar = async ($: Engine, requestId = 'caderno') => (await $.ui.mount({ plugin: 'contexto-bar', surface: 'terminal', ...PAINEL, requestId } as never)) as unknown as Montado
 const comCaderno = (on: Parameters<TestBody>[1]) => {
   let arq = ''
   const execs: { argv: readonly string[] }[] = []
@@ -885,7 +887,7 @@ test('caderno: os tipos são botões, a regra do escolhido aparece, e a nota sai
   await ui2.input({ key: 'nota-1', text: '   ' } as never)
   await ui2.unmount()
   expect(c.texto().trim().split('\n').length).toBe(1)
-  const cel = JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'objetivo', surface: 'mobile', props: { bodyColumns: 48 } } as never))
+  const cel = JSON.stringify(await $.ui.render({ component: 'Pane', requestId: 'caderno', surface: 'mobile', props: { bodyColumns: 48 } } as never))
   expect(cel).toContain('/objetivo nota [tipo] [#id] texto')
   expect(cel).not.toContain('"Input"')
 })
@@ -962,18 +964,18 @@ test('painel: quem executa — modelo e effort da conversa principal, subagentes
   await $.agent.spawn({ tool_use_id: 'tu', prompt: 'p', description: 'varrer os testes', subagentType: 'Explore', provider: { kind: 'engine' } } as never)
   await passo({ model: 'claude-sonnet-5-5', effort: 'low', agentId: 'ag1' })
   let pane = await painel($)
-  expect(pane).toContain('"Opus 5.5 · effort high"," · 1 subagente"')
+  expect(pane).toContain('"Opus 5.5 · effort high"," · 1 subagente (aba Agentes)"')
   expect(pane).toContain('"Explore"')
   expect(pane).toContain('Sonnet 5.5')
   expect(pane).toContain(', low')
   expect(pane).toContain('varrer os testes')
   // O mesmo id duas vezes não duplica; um segundo subagente entra depois do primeiro (sobreviventes #8 e #9 da 0.13.0).
   await $.agent.spawn({ tool_use_id: 'tu', prompt: 'p', description: 'varrer os testes', subagentType: 'Explore', provider: { kind: 'engine' } } as never)
-  expect(await painel($)).toContain('" · 1 subagente"')
+  expect(await painel($)).toContain('" · 1 subagente (aba Agentes)"')
   proximo = 'ag2'
   await $.agent.spawn({ tool_use_id: 'tu2', prompt: 'p', description: 'rever o diff', subagentType: 'Plan', provider: { kind: 'engine' } } as never)
   pane = await painel($)
-  expect(pane).toContain('" · 2 subagentes"')
+  expect(pane).toContain('" · 2 subagentes (aba Agentes)"')
   expect(pane.indexOf('varrer os testes') < pane.indexOf('rever o diff')).toBe(true)
   await umTurno($, 'ts2', 'ag2')
   // O subagente termina: sai da lista; a conversa principal fica.
@@ -1373,7 +1375,7 @@ test('roadmap no painel: agora sempre, próximo e depois pelo botão; Promover s
   expect(pane).not.toContain('mod do herdr')
   expect(pane).not.toContain('Promover')
   await comObjetivo($)
-  const ui = await montar($)
+  const ui = await montar($, 'objetivo')
   await ui.press({ key: 'ver-roadmap' } as never)
   expect(await ui.find({ type: 'Text', text: /mod do herdr/ } as never)).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /adversário/ } as never)).toBeDefined()
@@ -1442,7 +1444,7 @@ test('herdr: o painel mostra os outros workspaces do arquivo deste pane e a faix
   expect(await barText($)).not.toContain('motor')
 })
 
-test('herdr: com HERDR_PANE_ID, o arquivo dos vizinhos é relido a cada 5 s sem turno; sem ele, nenhum timer', async ($, on) => {
+test('herdr: com HERDR_PANE_ID, o arquivo dos vizinhos é relido a cada 2 s sem turno; sem ele, nenhum timer', async ($, on) => {
   on('session.usage', () => usageWith(50000))
   const relogio = mock.clock(on, { now: 0 })
   const arqs: Record<string, string> = {}
@@ -1461,7 +1463,7 @@ test('herdr: com HERDR_PANE_ID, o arquivo dos vizinhos é relido a cada 5 s sem 
   await $.session.start({ cwd: '/proj' } as never)
   await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
   arqs['/h/.claude/herdr/vizinhos/w1%3Ap1.json'] = JSON.stringify({ versao: 1, fonte: 'herdr', em: 'x', workspace: 'w1', vizinhos: [{ workspace: 'w2', rotulo: 'motor', estado: 'blocked', agentes: [] }] })
-  await relogio.advance(4999)
+  await relogio.advance(1999)
   expect(await barText($)).not.toContain('motor')
   await relogio.advance(1)
   expect(await barText($)).toContain('◆ motor esperando você')
@@ -1497,4 +1499,63 @@ test('disparo: a ferramenta grava, o painel mostra o meio de cada frente e a cob
   expect(r).toContain('⇉ herdr·codex')
   expect(await contextoDe($, 'segue')).not.toContain('declarar disparo')
   expect(await painel($)).toContain('⇉ herdr·codex')
+})
+
+test('abas: objetivo, caderno, prova e agentes, cada uma com o seu; o objetivo só aponta o caderno com nota sem resposta', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  comCaderno(on)
+  await comObjetivo($)
+  const obj = await aba($, 'objetivo')
+  expect(obj).toContain('FILA DO CLAUDE')
+  expect(obj).not.toContain('CADERNO')
+  expect(obj).not.toContain('QUEM EXECUTA')
+  expect(obj).not.toContain('caderno ·')
+  expect(await aba($, 'caderno')).toContain('CADERNO')
+  expect(await aba($, 'caderno')).not.toContain('FILA DO CLAUDE')
+  expect(await aba($, 'agentes')).toContain('QUEM EXECUTA')
+  expect(await aba($, 'prova')).toContain('Nenhuma rodada do prova-de-teste nesta sessão.')
+  const ui = await montar($)
+  await ui.input({ key: 'nota-0', text: 'e se fosse em abas?' } as never)
+  await ui.unmount()
+  expect(await aba($, 'objetivo')).toContain('"✎ caderno · ","1"," sem resposta "')
+})
+
+test('aba Prova: a rodada ao vivo aparece pelo timer de 2 s, sem turno, e fica como a última no fim', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  const relogio = mock.clock(on, { now: 0 })
+  const arqs: Record<string, string> = {}
+  mock.env(on, { HOME: '/h' })
+  on('session.id', () => ({ value: 's1' }) as never)
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path in arqs }) as never)
+  on('fs.read', (_$, e) => {
+    const p = (e as { path: string }).path
+    if (p in arqs) return { value: arqs[p] } as never
+    throw new Error('ENOENT')
+  })
+  on('session.start', () => ({ cwd: '/proj' }) as never)
+  on('tool.register', () => ({ value: undefined }) as never)
+  on('command.register', () => ({ value: undefined }) as never)
+  await $.session.start({ cwd: '/proj' } as never)
+  const ARQ = '/h/.claude/prova-de-teste/ao-vivo/s1.json'
+  const vivo = (o: object) => (arqs[ARQ] = JSON.stringify({ versao: 1, fonte: 'prova-de-teste', tarefa: 'soma', fase: 'mutantes', total: 4, feitos: 1, mortos: 1, sobreviventes: 0, naoAplicados: 0, inicio: 0, agora: 3000, ...o }))
+  vivo({})
+  await relogio.advance(1999)
+  expect(await aba($, 'prova')).toContain('Nenhuma rodada')
+  await relogio.advance(1)
+  const rodando = await aba($, 'prova')
+  expect(rodando).toContain('▶ RODANDO ')
+  expect(rodando).toContain(' 1/4 · 1 mortos · 0 sobreviventes · 3 s')
+  vivo({ fase: 'fim', feitos: 4, mortos: 3, sobreviventes: 1, estado: 'FRACO', agora: 9000 })
+  await relogio.advance(2000)
+  const fim = await aba($, 'prova')
+  expect(fim).toContain('ÚLTIMA RODADA ')
+  expect(fim).toContain('FRACO · 3 mortos · 1 sobreviventes · 9 s')
+  expect(fim).toContain('"color":"warning"')
+  // Arquivo quebrado no meio da escrita: fica o que estava.
+  arqs[ARQ] = '{"versao":1,'
+  await relogio.advance(2000)
+  expect(await aba($, 'prova')).toContain('FRACO · 3 mortos')
+  vivo({ fase: 'fim', estado: 'PROVADO', agora: 9000 })
+  await relogio.advance(2000)
+  expect(await aba($, 'prova')).toContain('"color":"success"')
 })

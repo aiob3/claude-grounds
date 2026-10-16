@@ -93,8 +93,8 @@ claude plugin install prova-de-teste@claude-grounds
 
 | Mod | Versão | Papel |
 |---|---|---|
-| [`contexto-bar`](contexto-bar/) | 0.18.0 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
-| [`prova-de-teste`](prova-de-teste/) | 0.14.0 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
+| [`contexto-bar`](contexto-bar/) | 0.19.0 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
+| [`prova-de-teste`](prova-de-teste/) | 0.15.0 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
 
 O log do `prova-de-teste` vai para `PROVA_DE_TESTE_LOG` ou, sem essa variável, para
 `~/.claude/prova-de-teste/EXP-001-log.md`. O agente usa as ferramentas `objetivo`, `executar` e `registrar`; você usa

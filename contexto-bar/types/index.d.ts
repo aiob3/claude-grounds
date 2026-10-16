@@ -62,6 +62,8 @@ export type Estado = 'ocioso' | 'trabalhando' | 'bloqueado' | 'concluido'
 
 /** 0.16.0: um workspace vizinho, como o mod herdr-vizinhos o escreve (contrato em painel.ts). */
 export type EstadoHerdr = 'idle' | 'working' | 'blocked' | 'done' | 'unknown'
+/** 0.19.0: a rodada do prova-de-teste como o executar a escreve enquanto roda (contrato em painel.ts). */
+export type AoVivoProva = { tarefa: string; fase: 'base' | 'mutantes' | 'fim'; total: number; feitos: number; mortos: number; sobreviventes: number; naoAplicados: number; inicio: number; agora: number; copias?: number; estado?: string }
 export type VizinhoHerdr = { workspace: string; rotulo: string; estado: EstadoHerdr; agentes: { pane: string; estado: EstadoHerdr; titulo: string }[] }
 
 export type Atividade = { estado: Estado; /** Ferramenta em curso, quando trabalhando. */ ferramenta?: string; desde: number }
@@ -136,6 +138,8 @@ declare module 'claude-code' {
       verRoadmap: boolean
       /** Os outros workspaces do herdr, do arquivo deste pane; vazio fora do herdr ou sem o mod. */
       vizinhos: VizinhoHerdr[]
+      /** A rodada do prova-de-teste desta sessão (o arquivo ao vivo do executar); null sem nenhuma. */
+      aoVivo: AoVivoProva | null
     }
   }
 }

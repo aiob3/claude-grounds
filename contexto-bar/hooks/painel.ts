@@ -1,5 +1,5 @@
 // Peças puras do painel: medidores, texto que cabe na largura, o estado do agente e os indicadores de outros mods.
-import type { Atividade, Estado, EstadoHerdr, Indicador, VizinhoHerdr } from '../types'
+import type { AoVivoProva, Atividade, Estado, EstadoHerdr, Indicador, VizinhoHerdr } from '../types'
 
 /** Corta o texto em `max` colunas com reticências; devolve o pedaço que coube e o resto (para o hover). */
 export function encurtar(texto: string, max: number): { curto: string; resto: string } {
@@ -120,4 +120,38 @@ export function faixaVizinhos(vs: VizinhoHerdr[]): string {
     .filter(v => v.estado === 'blocked' || v.estado === 'done')
     .map(v => (v.estado === 'blocked' ? `${ESTADOS.bloqueado.glifo} ${v.rotulo} esperando você` : `${ESTADOS.concluido.glifo} ${v.rotulo} terminou`))
     .join(' · ')
+}
+
+// Ao vivo: a rodada do executar, escrita pelo prova-de-teste em ~/.claude/prova-de-teste/ao-vivo/<id da sessão>.json
+// = { versao: 1, fonte: 'prova-de-teste', tarefa, fase, total, feitos, mortos, sobreviventes, naoAplicados, inicio, agora, copias?, estado? }.
+const FASES = ['base', 'mutantes', 'fim'] as const
+const numero = (x: unknown) => typeof x === 'number' && Number.isFinite(x) && x >= 0
+
+/** A rodada válida do arquivo ao vivo; o que não segue o contrato é nada. */
+export function validarAoVivo(json: unknown): AoVivoProva | null {
+  const j = json as Record<string, unknown> | null
+  if (!j || typeof j !== 'object' || j.versao !== 1 || j.fonte !== 'prova-de-teste') return null
+  if (typeof j.tarefa !== 'string' || !FASES.includes(j.fase as never)) return null
+  const campos = ['total', 'feitos', 'mortos', 'sobreviventes', 'naoAplicados', 'inicio', 'agora'] as const
+  if (!campos.every(k => numero(j[k]))) return null
+  return {
+    tarefa: j.tarefa,
+    fase: j.fase as AoVivoProva['fase'],
+    ...(Object.fromEntries(campos.map(k => [k, j[k] as number])) as Pick<AoVivoProva, (typeof campos)[number]>),
+    ...(numero(j.copias) ? { copias: j.copias as number } : {}),
+    ...(typeof j.estado === 'string' && j.estado ? { estado: j.estado } : {}),
+  }
+}
+
+/** A linha da rodada: a fase, a barra dos mutantes feitos, mortos e sobreviventes, o tempo e o estado no fim. */
+export function linhaAoVivo(v: AoVivoProva, largura: number): string {
+  const s = Math.max(0, Math.round((v.agora - v.inicio) / 1000))
+  const tempo = `${s} s`
+  if (v.fase === 'base') return `linha de base · ${v.total} mutantes na fila · ${tempo}`
+  const contas = `${v.mortos} mortos · ${v.sobreviventes} sobreviventes`
+  if (v.fase === 'fim') return `${v.estado ?? 'fim'} · ${contas}${v.naoAplicados ? ` · ${v.naoAplicados} não aplicados` : ''} · ${tempo}`
+  const texto = ` ${v.feitos}/${v.total} · ${contas}${v.copias && v.copias > 1 ? ` · ${v.copias} cópias` : ''} · ${tempo}`
+  const barra = Math.max(4, Math.min(20, largura - texto.length - 2))
+  const cheio = v.total ? Math.round((v.feitos / v.total) * barra) : 0
+  return `[${'■'.repeat(cheio)}${'·'.repeat(barra - cheio)}]${texto}`
 }

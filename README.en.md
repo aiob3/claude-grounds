@@ -94,8 +94,8 @@ claude plugin install prova-de-teste@claude-grounds
 
 | Mod | Version | Role |
 |---|---|---|
-| [`contexto-bar`](contexto-bar/) | 0.18.0 | context band, goal per project, panel and window projection |
-| [`prova-de-teste`](prova-de-teste/) | 0.14.0 | blind mutant round in an isolated copy, report and log |
+| [`contexto-bar`](contexto-bar/) | 0.19.0 | context band, goal per project, panel and window projection |
+| [`prova-de-teste`](prova-de-teste/) | 0.15.0 | blind mutant round in an isolated copy, report and log |
 
 The `prova-de-teste` log goes to `PROVA_DE_TESTE_LOG` or, without that variable, to
 `~/.claude/prova-de-teste/EXP-001-log.md`. The agent uses the `objetivo` (goal), `executar` (run) and `registrar`
