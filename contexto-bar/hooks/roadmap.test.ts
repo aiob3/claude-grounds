@@ -69,7 +69,7 @@ test('resumo: abertos por horizonte na ordem agora, próximo, depois; promovidos
 
 test('lembrete na linha do pedido: só sem pendência a fazer e com algo em agora', () => {
   const itens = lerRoadmap([novoItem('a', 'agora', EM, 'a', 'claude')!, novoItem('b', 'proximo', EM, 'b', 'claude')!, novoItem('c', 'agora', EM, 'c', 'claude')!].map(linha).join(''))
-  expect(lembreteRoadmap(itens, true)).toBe(' · roadmap em agora: R1, R3 (promova com a ferramenta roadmap, acao "promover")')
+  expect(lembreteRoadmap(itens, true)).toBe(' · roadmap em agora: R1, R3 (já aprovado: promova com a ferramenta roadmap, acao "promover", e siga neste turno, sem pedir licença)')
   expect(lembreteRoadmap(itens, false)).toBe('')
   expect(lembreteRoadmap(lerRoadmap(linha(novoItem('b', 'proximo', EM, 'b', 'claude')!)), true)).toBe('')
 })

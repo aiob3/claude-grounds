@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { alinhamento, aoCarregar, aplicar, avisoJanela, comando, linhaContexto, nivelDe, notaPublicacao, ordenar, projetar, proxima, publica, UNIDADE_PADRAO, verificacaoAberta } from './objetivo'
+import { alinhamento, aoCarregar, aplicar, avisoJanela, comando, linhaContexto, nivelDe, notaPublicacao, ordenar, projetar, proxima, publica, UNIDADE_PADRAO, verificacaoAberta, pedeLicenca, bloqueioDeLicenca } from './objetivo'
 import type { Snapshot } from '../types'
 
 const snapCom = (livre: number): Snapshot => ({
@@ -225,4 +225,50 @@ test('publicar: a nota sai com pendência do Claude aberta que é bloqueante ou 
   // Com duas abertas, a nota cita a de maior prioridade, não a primeira da lista (sobrevivente #6 da 0.10.0).
   const duas = aplicar(null, { acao: 'definir', titulo: 'D', itens: [{ texto: 'verificar o rodapé' }, { texto: 'provar a camada', nivel: 'bloqueante' }] }, 'claude', 0, 1).goal!
   expect(verificacaoAberta(duas)?.id).toBe(2)
+})
+
+test('pede licença: a última frase da resposta pergunta se segue; pergunta de conteúdo ou no meio do texto não conta (16/10: "Sigo?" com R9 e R10 já aprovados)', () => {
+  expect(pedeLicenca('Fiz tudo.\n\nO próximo passo é R9 e R10. Sigo?')).toBe('Sigo?')
+  expect(pedeLicenca('Pronto.\n\nQuer que eu promova os dois e comece?')).toBe('Quer que eu promova os dois e comece?')
+  expect(pedeLicenca('Feito. Posso seguir com a #3?  ')).toBe('Posso seguir com a #3?')
+  expect(pedeLicenca('Feito.\n\nDevo continuar?')).toBe('Devo continuar?')
+  expect(pedeLicenca('Feito.\n\nProssigo com a Fase 2?')).toBe('Prossigo com a Fase 2?')
+  expect(pedeLicenca('Feito. Deseja que eu abra o objetivo?')).toBe('Deseja que eu abra o objetivo?')
+  expect(pedeLicenca('Se não disser nada em contrário, sigo com R9 e R10 no próximo turno.')).toBe('Se não disser nada em contrário, sigo com R9 e R10 no próximo turno.')
+  // Não é pedido de licença: pergunta de conteúdo, pergunta no meio, resposta sem pergunta.
+  expect(pedeLicenca('Qual dos dois nomes você prefere?')).toBeUndefined()
+  expect(pedeLicenca('Sigo? Sim: já comecei e terminei a #2.')).toBeUndefined()
+  expect(pedeLicenca('Tudo feito. Nada é seu.')).toBeUndefined()
+  expect(pedeLicenca('')).toBeUndefined()
+  // A pergunta citada no meio da frase não é o fim da resposta (sobrevivente #13).
+  expect(pedeLicenca('Ele perguntou "sigo?" e eu segui.')).toBeUndefined()
+})
+
+test('bloqueio de licença: só com trabalho já aprovado do Claude (a próxima do objetivo ou o roadmap em agora); diz qual e manda seguir', () => {
+  const g = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: 'a', dono: 'claude' }, { texto: 'b', dono: 'operador' }] }, 'claude', 0, 0).goal!
+  const r = bloqueioDeLicenca('Feito. Sigo?', g, [])
+  expect(r).toContain('"Sigo?"')
+  expect(r).toContain('#1 a')
+  expect(r).toContain('AskUserQuestion')
+  // A próxima é do operador: perguntar a ele é legítimo.
+  const vezDele = aplicar(g, { acao: 'concluir', ids: [1] }, 'claude', 0, 0).goal!
+  expect(bloqueioDeLicenca('Feito. Sigo?', vezDele, [])).toBeUndefined()
+  // Sem objetivo, ou com tudo feito: o roadmap em agora é o trabalho aprovado.
+  const agora = [{ n: 9, id: 'r9', texto: 'modo habilitado', horizonte: 'agora' as const, estado: 'aberto' as const }, { n: 4, id: 'r4', texto: 'abas', horizonte: 'proximo' as const, estado: 'aberto' as const }]
+  expect(bloqueioDeLicenca('Sigo com R9?', null, agora)).toContain('R9 modo habilitado')
+  expect(bloqueioDeLicenca('Sigo com R9?', null, agora)).not.toContain('R4')
+  const feito = aplicar(vezDele, { acao: 'concluir', ids: [2] }, 'claude', 0, 0).goal!
+  expect(bloqueioDeLicenca('Sigo com R9?', feito, agora)).toContain('R9')
+  // Nada aprovado: perguntar é legítimo.
+  expect(bloqueioDeLicenca('Sigo?', null, [agora[1]!])).toBeUndefined()
+  expect(bloqueioDeLicenca('Sigo?', feito, [])).toBeUndefined()
+  // Sem pedido de licença, nada.
+  expect(bloqueioDeLicenca('Feito.', g, agora)).toBeUndefined()
+  // A minha que vem primeiro é a da ordem de execução (bloqueante antes), não a que entrou antes (sobrevivente #4).
+  const ordem = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: 'pode esperar', dono: 'claude', nivel: 'melhoria' }, { texto: 'trava', dono: 'claude', nivel: 'bloqueante' }] }, 'claude', 0, 0).goal!
+  expect(bloqueioDeLicenca('Sigo?', ordem, [])).toContain('#2 trava')
+  // Os de agora na ordem do roadmap; promovido não é mais de agora (sobreviventes #5 e #7).
+  const dois = [agora[0]!, { n: 10, id: 'r10', texto: 'disparo', horizonte: 'agora' as const, estado: 'aberto' as const }]
+  expect(bloqueioDeLicenca('Sigo?', null, dois)).toContain('R9 modo habilitado; R10 disparo')
+  expect(bloqueioDeLicenca('Sigo?', null, [{ ...agora[0]!, estado: 'promovido' as const, pendencia: 1 }])).toBeUndefined()
 })

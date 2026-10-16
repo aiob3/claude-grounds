@@ -1,4 +1,4 @@
-import type { Goal, GoalItem, Nivel, Owner, Size, Snapshot } from '../types'
+import type { Goal, GoalItem, ItemRoadmap, Nivel, Owner, Size, Snapshot } from '../types'
 
 // Peso de cada tamanho na projeção; o custo por unidade vem do histórico (ou do padrão abaixo).
 export const PESO: Record<Size, number> = { P: 1, M: 2, G: 4 }
@@ -310,4 +310,34 @@ export function comando(args: string): Acao | 'painel' | 'auto-on' | 'auto-off' 
   // Qualquer outro texto define um objetivo novo; "::" separa o passo que conclui.
   const [titulo, conclusao] = t.split('::').map(s => s.trim())
   return { acao: 'definir', titulo, conclusao }
+}
+
+// Pedir licença para o que já foi aprovado: o ciclo para à toa e o operador precisa voltar só para dizer "sim"
+// (16/10: "Sigo com R9 e R10?" com os dois no roadmap em agora; a memória não bastou, a regra virou código).
+const LICENCA =
+  /(\b(sigo|prossigo|continuo|come[çc]o|posso (seguir|continuar|come[çc]ar|prosseguir)|devo (seguir|continuar|prosseguir|come[çc]ar)|quer que eu|deseja que eu|prefere que eu)\b[^?]*\?$)|(\b(sigo|prossigo|continuo)\b.*\bno pr[óo]ximo turno\b[^?]*\.?$)/i
+
+/** A última frase da resposta, quando ela pede licença para seguir; nada quando a resposta termina de outro jeito. */
+export function pedeLicenca(texto: string): string | undefined {
+  const paragrafo = texto.trim().split(/\n\s*\n/).pop()?.trim() ?? ''
+  const frase = paragrafo.split(/(?<=[.!?])\s+(?=\S)/).pop()?.trim() ?? ''
+  return frase && LICENCA.test(frase) ? frase : undefined
+}
+
+/**
+ * O motivo para não deixar o turno acabar: a resposta pede licença e há trabalho do Claude já aprovado (pendência
+ * aberta dele no objetivo; sem nenhuma, o roadmap em agora). Nada aprovado, a pergunta é legítima.
+ */
+export function bloqueioDeLicenca(texto: string, g: Goal | null, roadmap: ItemRoadmap[]): string | undefined {
+  const frase = pedeLicenca(texto)
+  if (!frase) return undefined
+  const minha = g ? ordenar(g.itens.filter(i => !i.feito && i.dono === 'claude'))[0] : undefined
+  const agora = roadmap.filter(i => i.estado === 'aberto' && i.horizonte === 'agora')
+  const aprovado = minha ? `#${minha.id} ${minha.texto}` : agora.length ? agora.map(i => `R${i.n} ${i.texto}`).join('; ') : undefined
+  if (!aprovado) return undefined
+  return (
+    `[objetivo] Você terminou pedindo licença ("${frase}") para trabalho já aprovado: ${curto(aprovado)}. ` +
+    'Não peça: siga agora (no roadmap, promova e defina o objetivo neste turno). ' +
+    'Se houver uma decisão genuína do operador, pergunte pela ferramenta AskUserQuestion, não em texto no fim da resposta.'
+  )
 }

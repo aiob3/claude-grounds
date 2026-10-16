@@ -3,7 +3,7 @@ import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-co
 
 import type { VizinhoHerdr } from '../types'
 import type { Atividade, Decisao, EventoRoadmap, Executores, Goal, GoalItem, GroupKey, Horizonte, Indicador, ItemRoadmap, Nivel, Nota, Owner, Segment, Size, Snapshot, TipoNota } from '../types'
-import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
+import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, bloqueioDeLicenca, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
 import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
 import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
@@ -856,6 +856,12 @@ export const register: Register = on => {
     if (!e.agent_id) {
       const quando = await agora($)
       await mudarSegundoPlano($, sp => fimDeTurno(sp, quando, e.background_tasks, e.session_crons?.length))
+      // Resposta que acaba pedindo licença para o que já foi aprovado: o turno continua, com o motivo. Uma vez só
+      // (stop_hook_active): se o modelo parar de novo, para.
+      if (!e.stop_hook_active && !result.block) {
+        const motivo = await (async () => bloqueioDeLicenca(e.last_assistant_message ?? '', await read($, objetivo), await lerDoRoadmap($).catch(() => [])))().catch(() => undefined)
+        if (motivo) return { ...result, block: motivo }
+      }
     }
     return result
   })

@@ -1270,7 +1270,7 @@ test('roadmap: adicionar, mover e descartar gravam por acréscimo no arquivo do 
   expect(await rm($, { acao: 'apagar', ids: [1] })).toContain('acao é uma de ver, adicionar')
   // Sem objetivo, o pedido lembra o que está em agora.
   const ctx = await contextoDe($, 'e agora?')
-  expect(ctx).toContain(' · roadmap em agora: R1, R2 (promova com a ferramenta roadmap, acao \\"promover\\")')
+  expect(ctx).toContain(' · roadmap em agora: R1, R2 (já aprovado: promova com a ferramenta roadmap, acao \\"promover\\", e siga neste turno, sem pedir licença)')
 })
 
 test('roadmap: promover vira pendência do objetivo com a frente no texto; adiar tira do objetivo e guarda a origem', async ($, on) => {
@@ -1465,4 +1465,25 @@ test('herdr: com HERDR_PANE_ID, o arquivo dos vizinhos é relido a cada 5 s sem 
   expect(await barText($)).not.toContain('motor')
   await relogio.advance(1)
   expect(await barText($)).toContain('◆ motor esperando você')
+})
+
+test('fim de turno que pede licença para trabalho aprovado é bloqueado com o motivo; na segunda vez (stop_hook_active) passa', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('classic.Stop', () => ({}) as never)
+  await comObjetivo($)
+  const r = JSON.parse(JSON.stringify(await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Pronto.\n\nSigo com a próxima?', background_tasks: [], session_crons: [] } as never)))
+  expect(r.block).toContain('"Sigo com a próxima?"')
+  expect(r.block).toContain('#2')
+  const de_novo = JSON.parse(JSON.stringify(await $.classic.Stop({ stop_hook_active: true, last_assistant_message: 'Sigo?', background_tasks: [], session_crons: [] } as never)))
+  expect(de_novo.block).toBeUndefined()
+  const semPergunta = JSON.parse(JSON.stringify(await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Feito.', background_tasks: [], session_crons: [] } as never)))
+  expect(semPergunta.block).toBeUndefined()
+})
+
+test('fim de turno: o bloqueio de outro hook vale e não é trocado pelo de licença (sobrevivente #12 da 0.17.0)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('classic.Stop', () => ({ block: 'outro motivo' }) as never)
+  await comObjetivo($)
+  const r = JSON.parse(JSON.stringify(await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Sigo?', background_tasks: [], session_crons: [] } as never)))
+  expect(r.block).toBe('outro motivo')
 })

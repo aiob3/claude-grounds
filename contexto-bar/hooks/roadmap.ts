@@ -110,7 +110,7 @@ export function lembreteRoadmap(itens: ItemRoadmap[], semPendencia: boolean): st
   if (!semPendencia) return ''
   const agora = doHorizonte(itens, 'agora')
   if (!agora.length) return ''
-  return ` · roadmap em agora: ${agora.map(i => `R${i.n}`).join(', ')} (promova com a ferramenta roadmap, acao "promover")`
+  return ` · roadmap em agora: ${agora.map(i => `R${i.n}`).join(', ')} (já aprovado: promova com a ferramenta roadmap, acao "promover", e siga neste turno, sem pedir licença)`
 }
 
 /**
