@@ -30,6 +30,12 @@ Cada frente vira uma pendência do objetivo, com dono (o próprio agente, um age
 
 Cada pane recebe um briefing próprio: o objetivo da frente, os arquivos dela, o que conta como feito e o que não pode tocar. O briefing fica num arquivo da pasta da frente, para que o agente delegado não dependa da conversa de quem o criou.
 
+A ferramenta `briefing` do `herdr-vizinhos` (só dentro do herdr) faz isso em três ações:
+
+- **escrever** grava `<pasta>/.herdr/frentes/<frente>.md` e devolve a instrução curta para o pane: "Leia <arquivo> e trabalhe só nessa frente". O arquivo é Markdown comum, com títulos fixos, e qualquer harness lê. A pasta `.herdr` leva um `.gitignore` próprio, e o briefing não entra no diff nem na prova.
+- **ler** devolve o briefing.
+- **conferir** compara os arquivos tocados na pasta (o `git diff HEAD` e os novos) com "Arquivos" e "O que não tocar". Um arquivo fora do escopo deixa a frente por fazer até ser desfeito ou justificado. A conferência vem antes da prova, e a Fase 2 vai usá-la para concluir a pendência delegada.
+
 ### 3. Validação do disparo
 
 Antes de abrir panes, o plano responde a três perguntas:
@@ -56,7 +62,7 @@ O operador vê o que está rodando sem perguntar:
 | Ver os outros workspaces e ser avisado (etapa 4, leitura) | feito: `herdr-vizinhos` 0.1.0 |
 | Modo habilitado: a regra vai em todo pedido quando o herdr está ligado (inteira no primeiro e depois de compactar) | feito: `herdr-vizinhos` 0.2.0 |
 | Validação do disparo: com duas ou mais frentes do Claude, a linha do pedido cobra o disparo de cada uma até ser declarado (`objetivo`, acao `disparo`: modo, meio, harness), e o painel mostra o meio (⇉ herdr·codex) | feito: `contexto-bar` 0.18.0 |
-| Briefing por frente num arquivo (etapa 2) | roadmap |
+| Briefing por frente num arquivo (etapa 2): escrever, ler e conferir o escopo do que a frente tocou | feito: `herdr-vizinhos` 0.3.0 |
 | Pendência com agente como dono (`agent wait` + prova) | roadmap (Fase 2) |
 | Fila distribuída para outro harness | roadmap (Fase 3) |
 

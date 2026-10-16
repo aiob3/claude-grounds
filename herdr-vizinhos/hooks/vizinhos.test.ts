@@ -62,6 +62,7 @@ test('modo habilitado: a regra inteira na primeira vez, a curta depois; as duas 
   expect(REGRA_HABILITADO).toContain('workspace = projeto, tab = frente, pane = perfil de agente')
   expect(REGRA_HABILITADO).toContain('paralelo ou fila')
   expect(REGRA_HABILITADO).toContain('codex')
+  expect(REGRA_HABILITADO).toContain('Frente delegada a um pane leva briefing (ferramenta briefing')
   expect(REGRA_CURTA.length).toBeLessThan(140)
   expect(REGRA_CURTA).toContain('paralelo ou fila, meio e harness')
 })

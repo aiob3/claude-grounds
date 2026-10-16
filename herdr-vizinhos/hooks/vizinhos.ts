@@ -86,7 +86,8 @@ export const conteudo = (em: string, workspace: string, vizinhos: Vizinho[]) =>
 export const REGRA_HABILITADO =
   '[herdr] habilitado (herdr-vizinhos/ACIONAMENTO.md): planeje em frentes (workspace = projeto, tab = frente, pane = perfil de agente). ' +
   'Com duas ou mais frentes, decida e mostre no plano, por frente: paralelo ou fila, o meio (sessão, subagente, workflow ou pane do herdr) ' +
-  'e o harness (claude, codex…). A sessão de outro workspace é do operador.'
+  'e o harness (claude, codex…). Frente delegada a um pane leva briefing (ferramenta briefing: escrever antes de abrir o pane, ' +
+  'conferir o escopo antes da prova). A sessão de outro workspace é do operador.'
 export const REGRA_CURTA = '[herdr] habilitado: plano com 2+ frentes declara, por frente, paralelo ou fila, meio e harness.'
 
 export const regraHabilitado = (inteira: boolean) => (inteira ? REGRA_HABILITADO : REGRA_CURTA)
