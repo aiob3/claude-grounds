@@ -15,7 +15,10 @@ export type Size = 'P' | 'M' | 'G'
 /** Prioridade: bloqueante trava outra pendência ou a entrega; requisito é preciso para a entrega; melhoria pode esperar. */
 export type Nivel = 'bloqueante' | 'requisito' | 'melhoria'
 
-export type GoalItem = { id: number; texto: string; dono: Owner; tamanho: Size; feito: boolean; /** Ausente nos objetivos gravados antes da 0.5.0: vale requisito. */ nivel?: Nivel }
+/** 0.18.0: como uma frente roda (ACIONAMENTO.md do herdr-vizinhos): em paralelo ou em fila, por qual meio, em qual harness. */
+export type Disparo = { modo: 'paralelo' | 'fila'; meio: 'sessao' | 'subagente' | 'workflow' | 'herdr'; harness?: string }
+
+export type GoalItem = { id: number; texto: string; dono: Owner; tamanho: Size; feito: boolean; /** Ausente nos objetivos gravados antes da 0.5.0: vale requisito. */ nivel?: Nivel; disparo?: Disparo }
 
 export type Goal = {
   titulo: string

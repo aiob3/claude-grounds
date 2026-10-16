@@ -54,8 +54,8 @@ O operador vê o que está rodando sem perguntar:
 | Peça | Estado |
 |---|---|
 | Ver os outros workspaces e ser avisado (etapa 4, leitura) | feito: `herdr-vizinhos` 0.1.0 |
-| Modo habilitado: lembrete curto no pedido quando o herdr está ligado | roadmap |
-| Validação do disparo como seção obrigatória do plano (etapa 3) | roadmap |
+| Modo habilitado: a regra vai em todo pedido quando o herdr está ligado (inteira no primeiro e depois de compactar) | feito: `herdr-vizinhos` 0.2.0 |
+| Validação do disparo: com duas ou mais frentes do Claude, a linha do pedido cobra o disparo de cada uma até ser declarado (`objetivo`, acao `disparo`: modo, meio, harness), e o painel mostra o meio (⇉ herdr·codex) | feito: `contexto-bar` 0.18.0 |
 | Briefing por frente num arquivo (etapa 2) | roadmap |
 | Pendência com agente como dono (`agent wait` + prova) | roadmap (Fase 2) |
 | Fila distribuída para outro harness | roadmap (Fase 3) |

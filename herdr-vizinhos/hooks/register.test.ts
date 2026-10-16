@@ -109,3 +109,36 @@ test('a sessão que sai apaga o arquivo dela', async ($, on) => {
   await m.relogio.advance(20000)
   expect(m.argv.length).toBe(n)
 })
+
+test('modo habilitado: todo pedido leva a regra (inteira no primeiro e depois de compactar, curta nos outros); fora do herdr, nada', async ($, on) => {
+  mundo(on)
+  on('session.compact', () => ({ messages: [{ role: 'user', text: 'resumo', toolUses: [] }] }) as never)
+  await $.session.start({ cwd: '/proj' } as never)
+  const ctx = async () => ((await pedido($)).context ?? []).join('\n')
+  const primeiro = await ctx()
+  expect(primeiro).toContain('[herdr] habilitado (herdr-vizinhos/ACIONAMENTO.md)')
+  const segundo = await ctx()
+  expect(segundo).toContain('[herdr] habilitado: plano com 2+ frentes')
+  expect(segundo).not.toContain('ACIONAMENTO.md')
+  await $.session.compact({ trigger: 'manual', messages: [{ role: 'user', text: 'antes', toolUses: [] }] } as never)
+  expect(await ctx()).toContain('ACIONAMENTO.md')
+  // Comando do operador (/algo) não leva a regra.
+  expect(JSON.stringify(await $.prompt.submit({ text: '/objetivo', command: { name: 'objetivo' } } as never))).not.toContain('[herdr] habilitado')
+})
+
+test('modo habilitado: fora do herdr, o pedido não leva a regra', async ($, on) => {
+  mundo(on, { herdr: false })
+  await $.session.start({ cwd: '/proj' } as never)
+  expect(JSON.stringify(await pedido($))).not.toContain('[herdr]')
+})
+
+test('modo habilitado: com aviso pendente, a regra vem antes do aviso no mesmo pedido (sobrevivente #6 da 0.2.0)', async ($, on) => {
+  const m = mundo(on)
+  await $.session.start({ cwd: '/proj' } as never)
+  m.snap = snapDe('blocked')
+  const ctx = (await pedido($)).context ?? []
+  const iRegra = ctx.findIndex(c => c.startsWith('[herdr] habilitado'))
+  const iAviso = ctx.findIndex(c => c.includes('está esperando o operador'))
+  expect(iRegra).toBeGreaterThanOrEqual(0)
+  expect(iAviso).toBe(iRegra + 1)
+})

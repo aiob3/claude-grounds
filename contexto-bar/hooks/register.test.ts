@@ -1487,3 +1487,14 @@ test('fim de turno: o bloqueio de outro hook vale e não é trocado pelo de lice
   const r = JSON.parse(JSON.stringify(await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Sigo?', background_tasks: [], session_crons: [] } as never)))
   expect(r.block).toBe('outro motivo')
 })
+
+test('disparo: a ferramenta grava, o painel mostra o meio de cada frente e a cobrança some da linha do pedido', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  await $.tool.call({ tool: TOOL, acao: 'definir', titulo: 'Duas frentes', conclusao: 'x', itens: [{ texto: 'frente A', dono: 'claude' }, { texto: 'frente B', dono: 'claude' }] } as never)
+  expect(await contextoDe($, 'segue')).toContain('declarar disparo: #1, #2')
+  const r = JSON.stringify(await $.tool.call({ tool: TOOL, acao: 'disparo', ids: [1, 2], modo: 'paralelo', meio: 'herdr', harness: 'codex' } as never))
+  expect(r).toContain('⇉ herdr·codex')
+  expect(await contextoDe($, 'segue')).not.toContain('declarar disparo')
+  expect(await painel($)).toContain('⇉ herdr·codex')
+})

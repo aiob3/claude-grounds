@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { arquivoVizinhos, contextoAvisos, conteudo, estadosDe, lerSnapshot, mudancas, textoAviso } from './vizinhos'
+import { REGRA_CURTA, REGRA_HABILITADO, regraHabilitado, arquivoVizinhos, contextoAvisos, conteudo, estadosDe, lerSnapshot, mudancas, textoAviso } from './vizinhos'
 
 const agente = (pane: string, ws: string, estado: string, titulo = '') => ({ pane_id: pane, workspace_id: ws, agent_status: estado, terminal_title_stripped: titulo })
 const snap = (workspaces: object[], agents: object[]) => JSON.stringify({ id: 'x', result: { snapshot: { workspaces, agents } } })
@@ -54,4 +54,14 @@ test('avisos: frase curta por mudança; ao modelo, com a regra de não agir na s
 test('contrato: um arquivo por pane, versão 1', () => {
   expect(arquivoVizinhos('/h', 'w5:p1')).toBe('/h/.claude/herdr/vizinhos/w5%3Ap1.json')
   expect(JSON.parse(conteudo('2026-10-16T00:00:00.000Z', 'w5', []))).toEqual({ versao: 1, fonte: 'herdr', em: '2026-10-16T00:00:00.000Z', workspace: 'w5', vizinhos: [] })
+})
+
+test('modo habilitado: a regra inteira na primeira vez, a curta depois; as duas nomeiam o disparo por frente', () => {
+  expect(regraHabilitado(true)).toBe(REGRA_HABILITADO)
+  expect(regraHabilitado(false)).toBe(REGRA_CURTA)
+  expect(REGRA_HABILITADO).toContain('workspace = projeto, tab = frente, pane = perfil de agente')
+  expect(REGRA_HABILITADO).toContain('paralelo ou fila')
+  expect(REGRA_HABILITADO).toContain('codex')
+  expect(REGRA_CURTA.length).toBeLessThan(140)
+  expect(REGRA_CURTA).toContain('paralelo ou fila, meio e harness')
 })

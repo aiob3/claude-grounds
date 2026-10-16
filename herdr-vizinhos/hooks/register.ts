@@ -6,11 +6,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import { arquivoVizinhos, contextoAvisos, conteudo, estadosDe, lerSnapshot, mudancas, textoAviso } from './vizinhos'
+import { arquivoVizinhos, contextoAvisos, conteudo, estadosDe, lerSnapshot, mudancas, regraHabilitado, textoAviso } from './vizinhos'
 
 const estados = atom({ plugin: 'herdr-vizinhos', key: 'estados' } as const, null)
 const pendentes = atom({ plugin: 'herdr-vizinhos', key: 'pendentes' } as const, [])
 const vizinhos = atom({ plugin: 'herdr-vizinhos', key: 'vizinhos' } as const, [])
+const regraEnviada = atom({ plugin: 'herdr-vizinhos', key: 'regraEnviada' } as const, false)
 
 /** De quanto em quanto tempo o snapshot é relido (ele responde em poucos milissegundos). */
 export const INTERVALO_MS = 5000
@@ -72,7 +73,21 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     if (e.command) return next(e)
     const ctx = await lerEEntregar($).catch(() => undefined)
-    return next(ctx ? { ...e, context: [...(e.context ?? []), ctx] } : e)
+    const regra = await (async () => {
+      if (!(await dentroDoHerdr($))) return undefined
+      const inteira = !(await read($, regraEnviada))
+      if (inteira) await update($, regraEnviada, () => true)
+      return regraHabilitado(inteira)
+    })().catch(() => undefined)
+    const extra = [regra, ctx].filter((x): x is string => !!x)
+    return next(extra.length ? { ...e, context: [...(e.context ?? []), ...extra] } : e)
+  })
+
+  // A compactação descarta o texto injetado: a regra inteira volta no próximo pedido.
+  on('session.compact', async ($, e, next) => {
+    const result = await next(e)
+    if (!e.agentId) await update($, regraEnviada, () => false).catch(() => undefined)
+    return result
   })
 
   // A sessão que sai leva o arquivo dela: o painel de quem ficou não mostra vizinhos de uma sessão que não existe.

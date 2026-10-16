@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { alinhamento, aoCarregar, aplicar, avisoJanela, comando, linhaContexto, nivelDe, notaPublicacao, ordenar, projetar, proxima, publica, UNIDADE_PADRAO, verificacaoAberta, pedeLicenca, bloqueioDeLicenca } from './objetivo'
+import { alinhamento, aoCarregar, aplicar, avisoJanela, comando, linhaContexto, nivelDe, notaPublicacao, ordenar, projetar, proxima, publica, UNIDADE_PADRAO, verificacaoAberta, pedeLicenca, bloqueioDeLicenca, disparoPendente, textoDisparo } from './objetivo'
 import type { Snapshot } from '../types'
 
 const snapCom = (livre: number): Snapshot => ({
@@ -271,4 +271,37 @@ test('bloqueio de licença: só com trabalho já aprovado do Claude (a próxima 
   const dois = [agora[0]!, { n: 10, id: 'r10', texto: 'disparo', horizonte: 'agora' as const, estado: 'aberto' as const }]
   expect(bloqueioDeLicenca('Sigo?', null, dois)).toContain('R9 modo habilitado; R10 disparo')
   expect(bloqueioDeLicenca('Sigo?', null, [{ ...agora[0]!, estado: 'promovido' as const, pendencia: 1 }])).toBeUndefined()
+})
+
+test('disparo: declarar por frente (modo, meio, harness); com duas ou mais frentes abertas do Claude, a linha cobra as que faltam', () => {
+  const g = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: 'a', dono: 'claude' }, { texto: 'b', dono: 'claude' }, { texto: 'c', dono: 'operador' }] }, 'claude', 0, 0).goal!
+  expect(disparoPendente(g).map(i => i.id)).toEqual([1, 2])
+  expect(linhaContexto(g, null, 'T')).toContain(' · declarar disparo: #1, #2')
+  const r = aplicar(g, { acao: 'disparo', ids: [1], modo: 'paralelo', meio: 'herdr', harness: ' codex ' }, 'claude', 0, 0)
+  expect(r.erro).toBeUndefined()
+  expect(r.goal!.itens[0]!.disparo).toEqual({ modo: 'paralelo', meio: 'herdr', harness: 'codex' })
+  expect(disparoPendente(r.goal!).map(i => i.id)).toEqual([2])
+  const dois = aplicar(r.goal, { acao: 'disparo', ids: [2], modo: 'fila', meio: 'sessao' }, 'claude', 0, 0).goal!
+  // Sem harness, a chave não existe (sobrevivente #10).
+  expect(dois.itens[1]!.disparo).toStrictEqual({ modo: 'fila', meio: 'sessao' })
+  expect(aplicar(g, { acao: 'disparo', ids: [1], modo: 'fila', meio: 'sessao', harness: '  ' }, 'claude', 0, 0).goal!.itens[0]!.disparo).toStrictEqual({ modo: 'fila', meio: 'sessao' })
+  // As que faltam vêm na ordem de execução, bloqueante antes (sobrevivente #5).
+  const ordem = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: 'a', dono: 'claude', nivel: 'melhoria' }, { texto: 'b', dono: 'claude', nivel: 'bloqueante' }] }, 'claude', 0, 0).goal!
+  expect(disparoPendente(ordem).map(i => i.id)).toEqual([2, 1])
+  expect(disparoPendente(dois)).toEqual([])
+  expect(linhaContexto(dois, null, 'T')).not.toContain('declarar disparo')
+  // Erros: modo ou meio fora da lista, sem ids.
+  expect(aplicar(g, { acao: 'disparo', ids: [1], modo: 'talvez' as never, meio: 'herdr' }, 'claude', 0, 0).erro).toContain('modo')
+  expect(aplicar(g, { acao: 'disparo', ids: [1], modo: 'fila', meio: 'nuvem' as never }, 'claude', 0, 0).erro).toContain('meio')
+  expect(aplicar(g, { acao: 'disparo', modo: 'fila', meio: 'sessao' }, 'claude', 0, 0).erro).toContain('ids')
+  // Uma frente só do Claude: nada a declarar; a que já foi feita não conta.
+  const uma = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: 'a', dono: 'claude' }, { texto: 'c', dono: 'operador' }] }, 'claude', 0, 0).goal!
+  expect(disparoPendente(uma)).toEqual([])
+  const feita = aplicar(g, { acao: 'concluir', ids: [1] }, 'claude', 0, 0).goal!
+  expect(disparoPendente(feita)).toEqual([])
+  // O texto curto que o painel mostra.
+  expect(textoDisparo({ modo: 'paralelo', meio: 'herdr', harness: 'codex' })).toBe('⇉ herdr·codex')
+  expect(textoDisparo({ modo: 'fila', meio: 'sessao' })).toBe('→ sessão')
+  expect(textoDisparo({ modo: 'paralelo', meio: 'subagente' })).toBe('⇉ subagente')
+  expect(textoDisparo({ modo: 'fila', meio: 'workflow', harness: 'claude' })).toBe('→ workflow·claude')
 })

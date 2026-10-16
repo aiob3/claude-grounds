@@ -5,6 +5,6 @@ export type Vizinho = { workspace: string; rotulo: string; estado: EstadoHerdr; 
 declare module 'claude-code' {
   interface PluginState {
     /** O último estado de cada pane vizinho (para ver a mudança), os avisos ainda não entregues ao modelo e os vizinhos escritos. */
-    'herdr-vizinhos': { estados: Record<string, string> | null; pendentes: string[]; vizinhos: Vizinho[] }
+    'herdr-vizinhos': { estados: Record<string, string> | null; pendentes: string[]; vizinhos: Vizinho[]; regraEnviada: boolean }
   }
 }

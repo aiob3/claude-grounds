@@ -3,7 +3,7 @@ import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-co
 
 import type { VizinhoHerdr } from '../types'
 import type { Atividade, Decisao, EventoRoadmap, Executores, Goal, GoalItem, GroupKey, Horizonte, Indicador, ItemRoadmap, Nivel, Nota, Owner, Segment, Size, Snapshot, TipoNota } from '../types'
-import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, bloqueioDeLicenca, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
+import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, bloqueioDeLicenca, comando, textoDisparo, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
 import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cache'
 import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
@@ -46,7 +46,7 @@ const TOOL_SPEC = {
     'Objetivo da tarefa em curso, compartilhado com o operador numa barra acima do prompt. Use ao começar um pedido com etapas ' +
     '(definir: titulo, conclusao = o passo que encerra, itens com dono claude|operador, tamanho P|M|G e nivel ' +
     'bloqueante|requisito|melhoria), ao concluir cada pendência (concluir: ids), para repriorizar (priorizar: ids + nivel), ' +
-    'acrescentar (adicionar), reabrir, encerrar ou ver. Bloqueante trava outra pendência ou a entrega; requisito é preciso ' +
+    'acrescentar (adicionar), reabrir, encerrar ou ver. Com duas ou mais frentes suas, declare como cada uma roda (disparo: ids, modo, meio, harness). Bloqueante trava outra pendência ou a entrega; requisito é preciso ' +
     'para a entrega; melhoria pode esperar. A resposta traz a fila na ordem e a projeção de janela. ' +
     'Notas do caderno do operador chegam com o resultado de outras ferramentas: responda a cada uma com triar ' +
     '(nota, decisao, motivo, destino, contraponto).',
@@ -54,7 +54,7 @@ const TOOL_SPEC = {
   inputSchema: {
     type: 'object',
     properties: {
-      acao: { type: 'string', enum: ['definir', 'adicionar', 'concluir', 'reabrir', 'priorizar', 'encerrar', 'ver', 'triar'] },
+      acao: { type: 'string', enum: ['definir', 'adicionar', 'concluir', 'reabrir', 'priorizar', 'encerrar', 'ver', 'triar', 'disparo'] },
       titulo: { type: 'string' },
       conclusao: { type: 'string', description: 'O passo que, feito, encerra o objetivo.' },
       itens: {
@@ -72,6 +72,9 @@ const TOOL_SPEC = {
       },
       ids: { type: 'array', items: { type: 'integer' } },
       nivel: { type: 'string', enum: ['bloqueante', 'requisito', 'melhoria'], description: 'Para priorizar.' },
+      modo: { type: 'string', enum: ['paralelo', 'fila'], description: 'Para disparo: a frente roda em paralelo com as outras ou em fila.' },
+      meio: { type: 'string', enum: ['sessao', 'subagente', 'workflow', 'herdr'], description: 'Para disparo: onde a frente roda (esta sessão, um subagente, um workflow ou um pane do herdr).' },
+      harness: { type: 'string', description: 'Para disparo: o agente de linha de comando que executa (claude, codex…).' },
       nota: { type: 'string', description: 'Para triar: o id da nota do caderno (n-...).' },
       decisao: { type: 'string', enum: ['aceita', 'recusada', 'muda-plano', 'registrada'], description: 'Para triar.' },
       motivo: { type: 'string', description: 'Para triar: o porquê, em uma frase.' },
@@ -1023,6 +1026,7 @@ export const register: Register = on => {
           <Box flexDirection="row" justifyContent="space-between">
             <Text dimColor={i.feito || i.nivel === 'melhoria'}>
               <Text color={cor}>{glifo}</Text> #{i.id} {curto}
+              {i.disparo ? <Text dimColor> {textoDisparo(i.disparo)}</Text> : null}
             </Text>
             {botao ?? null}
           </Box>
@@ -1075,6 +1079,7 @@ export const register: Register = on => {
               <Box flexDirection="column">
                 <Text color={cor} weight="bold" wrap="wrap">
                   ▣ #{prox.id} {prox.texto}
+                  {prox.disparo ? <Text dimColor> {textoDisparo(prox.disparo)}</Text> : null}
                 </Text>
                 <Text dimColor>
                   {'  '}

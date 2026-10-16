@@ -80,3 +80,13 @@ export const arquivoVizinhos = (home: string, pane: string) => `${home}/.claude/
 
 export const conteudo = (em: string, workspace: string, vizinhos: Vizinho[]) =>
   `${JSON.stringify({ versao: VERSAO_VIZINHOS, fonte: 'herdr', em, workspace, vizinhos }, null, 2)}\n`
+
+// Modo habilitado (ACIONAMENTO.md): dentro do herdr, todo pedido lembra o agente de pensar o trabalho em frentes e
+// mostrar o disparo de cada uma. A regra inteira vai no primeiro pedido e depois de compactar; nos outros, a curta.
+export const REGRA_HABILITADO =
+  '[herdr] habilitado (herdr-vizinhos/ACIONAMENTO.md): planeje em frentes (workspace = projeto, tab = frente, pane = perfil de agente). ' +
+  'Com duas ou mais frentes, decida e mostre no plano, por frente: paralelo ou fila, o meio (sessão, subagente, workflow ou pane do herdr) ' +
+  'e o harness (claude, codex…). A sessão de outro workspace é do operador.'
+export const REGRA_CURTA = '[herdr] habilitado: plano com 2+ frentes declara, por frente, paralelo ou fila, meio e harness.'
+
+export const regraHabilitado = (inteira: boolean) => (inteira ? REGRA_HABILITADO : REGRA_CURTA)

@@ -1,4 +1,4 @@
-import type { Goal, GoalItem, ItemRoadmap, Nivel, Owner, Size, Snapshot } from '../types'
+import type { Disparo, Goal, GoalItem, ItemRoadmap, Nivel, Owner, Size, Snapshot } from '../types'
 
 // Peso de cada tamanho na projeção; o custo por unidade vem do histórico (ou do padrão abaixo).
 export const PESO: Record<Size, number> = { P: 1, M: 2, G: 4 }
@@ -25,13 +25,20 @@ export function proxima(g: Goal): GoalItem | undefined {
 export const etiqueta = (i: GoalItem) => (nivelDe(i) === 'requisito' ? '' : `[${nivelDe(i)}] `)
 
 export type Acao = {
-  acao: 'definir' | 'adicionar' | 'concluir' | 'reabrir' | 'priorizar' | 'encerrar' | 'ver' | 'retirar'
+  acao: 'definir' | 'adicionar' | 'concluir' | 'reabrir' | 'priorizar' | 'encerrar' | 'ver' | 'retirar' | 'disparo'
   titulo?: string
   conclusao?: string
   itens?: { texto: string; dono?: Owner; tamanho?: Size; nivel?: Nivel }[]
   ids?: number[]
   nivel?: Nivel
+  /** Para disparo. */
+  modo?: Disparo['modo']
+  meio?: Disparo['meio']
+  harness?: string
 }
+
+export const MODOS: Disparo['modo'][] = ['paralelo', 'fila']
+export const MEIOS: Disparo['meio'][] = ['sessao', 'subagente', 'workflow', 'herdr']
 
 export type Projecao = {
   abertasClaude: number
@@ -114,6 +121,15 @@ export function aplicar(
   if (a.acao === 'priorizar') {
     if (!ehNivel(a.nivel)) return { goal: atual, erro: `priorizar precisa de nivel (${NIVEIS.join(' | ')}).` }
     g.itens = g.itens.map(i => (ids.has(i.id) ? { ...i, nivel: a.nivel } : i))
+    return { goal: g }
+  }
+  // disparo: como a frente roda (validação do disparo, ACIONAMENTO.md); a cobrança na linha some quando todas têm.
+  if (a.acao === 'disparo') {
+    if (!MODOS.includes(a.modo as Disparo['modo'])) return { goal: atual, erro: `disparo precisa de modo (${MODOS.join(' | ')}).` }
+    if (!MEIOS.includes(a.meio as Disparo['meio'])) return { goal: atual, erro: `disparo precisa de meio (${MEIOS.join(' | ')}).` }
+    const harness = a.harness?.trim()
+    const d: Disparo = { modo: a.modo!, meio: a.meio!, ...(harness ? { harness } : {}) }
+    g.itens = g.itens.map(i => (ids.has(i.id) ? { ...i, disparo: d } : i))
     return { goal: g }
   }
   // retirar: a pendência sai do objetivo (o roadmap a guarda antes, pela acao "adiar"); não é concluir.
@@ -207,6 +223,16 @@ const curto = (t: string) => (t.length > 60 ? `${t.slice(0, 59)}…` : t)
  * fica curta: as listas e a conclusão saem pela ferramenta (acao "ver") e nas respostas de definir e concluir.
  * `completa` (objetivo recém-definido ou início de sessão) acrescenta uma vez a conclusão e como marcar.
  */
+/** As frentes abertas do Claude sem disparo declarado, quando há duas ou mais abertas; com uma só, nada a validar. */
+export function disparoPendente(g: Goal): GoalItem[] {
+  const minhas = ordenar(g.itens.filter(i => !i.feito && i.dono === 'claude'))
+  return minhas.length >= 2 ? minhas.filter(i => !i.disparo) : []
+}
+
+const NOME_MEIO: Record<Disparo['meio'], string> = { sessao: 'sessão', subagente: 'subagente', workflow: 'workflow', herdr: 'herdr' }
+/** O disparo em poucas colunas: ⇉ em paralelo, → em fila, o meio e o harness. */
+export const textoDisparo = (d: Disparo) => `${d.modo === 'paralelo' ? '⇉' : '→'} ${NOME_MEIO[d.meio]}${d.harness ? `·${d.harness}` : ''}`
+
 export function linhaContexto(g: Goal | null, snap: Snapshot | null, tool: string, completa = false): string {
   if (!g) {
     return `[objetivo] Nenhum objetivo ativo. Se este pedido for uma tarefa com etapas, defina-o com ${tool} (acao "definir": titulo, conclusao = o passo que encerra, itens com dono claude|operador e tamanho P|M|G).`
@@ -218,6 +244,12 @@ export function linhaContexto(g: Goal | null, snap: Snapshot | null, tool: strin
     `[objetivo] ${g.titulo} · ${p.feitas}/${p.total}` +
     (prox ? ` · próxima #${prox.id} ${etiqueta(prox)}${curto(prox.texto)} (${prox.dono})` : ' · tudo feito') +
     JANELA[p.estado] +
+    (() => {
+      const falta = disparoPendente(g)
+      return falta.length
+        ? ` · declarar disparo: ${falta.map(i => `#${i.id}`).join(', ')}`
+        : ''
+    })() +
     (temConclusao ? ' · antes de agir: isso aproxima da conclusão?' : '')
   if (!completa) return linha
   return (
@@ -283,7 +315,7 @@ export function avisoJanela(g: Goal, snap: Snapshot | null): { nivel: Goal['avis
 export function resumo(g: Goal | null, snap: Snapshot | null): string {
   if (!g) return 'Nenhum objetivo ativo.'
   const p = projetar(g, snap)
-  const linhas = ordenar(g.itens).map(i => `${i.feito ? '[x]' : '[ ]'} #${i.id} (${i.dono}, ${i.tamanho}) ${etiqueta(i)}${i.texto}`)
+  const linhas = ordenar(g.itens).map(i => `${i.feito ? '[x]' : '[ ]'} #${i.id} (${i.dono}, ${i.tamanho}) ${etiqueta(i)}${i.texto}${i.disparo ? ` ${textoDisparo(i.disparo)}` : ''}`)
   return [
     `Objetivo: ${g.titulo}${g.conclusao ? ` · conclui quando: ${g.conclusao}` : ''}`,
     ...linhas,
