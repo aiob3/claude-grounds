@@ -18,7 +18,7 @@ plants bugs in the code the agent changed, and the task only closes when the tes
 round and refuses inflated numbers. There are no settings hooks to wire up and no gate blocking the agent.
 
 Building the mods themselves, the proof found 152 real test gaps. On three private projects, unrelated to these,
-it found 1 more. On a project with 8881 tests, proving a change takes about 2 and a half minutes,
+it found 4 more. On a project with 8881 tests, proving a change takes about 2 and a half minutes,
 2.8x less than running the full suite for every planted bug, with the same verdicts.
 
 ## What you get
@@ -323,7 +323,7 @@ measured by the mod itself.
 - The mods need Claude Code 2.1.287 or later (the version mods shipped in) and were tested on 2.1.300. They
   work in the terminal and in the Code tab of the Desktop app.
 
-Open: the minimum duration is reached (31 measurements); the instrument still has to settle, with 3 measurements in a row on the same version, before the operator decides whether the method becomes a criterion; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
+Open: the exit criteria are met (32 measurements, stable instrument); promoting it is the operator's call; measure the affected-tests speedup on more projects and languages; keep the consumption history per project, independent of the goal; see whether the per-unit
 average settles across sessions.
 
 ## Evaluate

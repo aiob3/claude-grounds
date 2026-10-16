@@ -18,7 +18,7 @@ planta bugs no código que o agente mudou, e a tarefa só fecha quando os testes
 e recusa número inflado. Não há settings hook para configurar nem gate travando o agente.
 
 Construindo os próprios mods, a prova achou 152 falhas reais de teste. Em três projetos privados, sem relação com
-estes, achou mais 1. Num projeto com 8881 testes, provar uma mudança leva uns 2 minutos e meio,
+estes, achou mais 4. Num projeto com 8881 testes, provar uma mudança leva uns 2 minutos e meio,
 2,8 vezes menos que rodar a suíte completa para cada bug plantado, com os mesmos vereditos.
 
 ## O que você ganha
@@ -314,7 +314,7 @@ diff`), medidos pelo próprio mod.
 - Os mods exigem o Claude Code 2.1.287 ou mais recente (a versão em que os mods chegaram) e foram testados na
   2.1.300. Funcionam no terminal e na aba Code do app Desktop.
 
-Em aberto: a duração mínima foi atingida (31 medições); falta o instrumento ficar estável, com 3 medições seguidas na mesma versão, para o operador decidir se o método vira critério; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
+Em aberto: os critérios de saída estão cumpridos (32 medições, instrumento estável); a decisão de promover é do operador; medir o ganho dos testes afetados em mais projetos e linguagens; guardar o histórico de consumo por projeto, independente do objetivo; observar se a média por
 unidade se estabiliza entre sessões.
 
 ## Avaliar
