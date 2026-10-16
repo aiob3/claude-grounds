@@ -192,7 +192,7 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   await $.prompt.submit({ text: 'segue' } as never)
   // As quatro abas; a do objetivo por último, para ser a mostrada (a superfície mostra a última aberta).
   expect(abertos.slice(antes)).toEqual(['caderno', 'prova', 'agentes', 'objetivo'])
-  expect(titulos.slice(antes)).toEqual(['Caderno', 'Prova', 'Agentes', 'Objetivo'])
+  expect(titulos.slice(antes)).toEqual(['Caderno', 'Prova', 'Agentes', 'Home'])
   // Desligado, o pedido não abre; ligado de novo, volta a abrir.
   const off = JSON.stringify(await $.command.run({ command: 'objetivo', args: 'auto off' } as never))
   expect(off).toContain('não abre mais sozinho')
@@ -1148,7 +1148,7 @@ test('caderno: nota entregue e sem resposta volta inteira a cada 8 passos; triad
 })
 
 // Indicadores em pastas: um mundo de arquivos com pastas, para os testes por raiz.
-const mundoIndicadores = (on: Parameters<TestBody>[1], o: { raiz?: string | null; listaFalha?: string; existeFalha?: string } = {}) => {
+const mundoIndicadores = (on: Parameters<TestBody>[1], o: { raiz?: string | null; listaFalha?: string; existeFalha?: string; semUso?: boolean; semMeta?: boolean } = {}) => {
   if (o.raiz === null) {
     on('session.root', () => {
       throw new Error('sem raiz')
@@ -1164,6 +1164,8 @@ const mundoIndicadores = (on: Parameters<TestBody>[1], o: { raiz?: string | null
     ['/h/.claude/indicadores/velho.json.bak', ind('velho', 'backup velho', 5)],
     ['/h/.claude/indicadores/%2Fproj%2Fa/prova-de-teste.json', ind('prova-de-teste', 'desta raiz', 20)],
     ['/h/.claude/indicadores/%2Fproj%2Fb/prova-de-teste.json', ind('prova-de-teste', 'da outra raiz', 30)],
+    // Indicador sem meta e sem estado: a fração cai em 0 e a cor na do Claude.
+    ...(o.semMeta ? [['/h/.claude/indicadores/solto.json', JSON.stringify({ versao: 1, fonte: 'solto', itens: [{ id: 's', rotulo: 'sem meta', valor: 7, texto: '7' }] })] as [string, string]] : []),
   ])
   const pastas = new Set(['/h/.claude/indicadores', '/h/.claude/indicadores/%2Fproj%2Fa', '/h/.claude/indicadores/%2Fproj%2Fb'])
   on('fs.exists', (_$, e) => {
@@ -1183,7 +1185,7 @@ const mundoIndicadores = (on: Parameters<TestBody>[1], o: { raiz?: string | null
     if (t === undefined) throw new Error('ENOENT')
     return { value: t } as never
   })
-  on('session.usage', () => usageWith(50000))
+  if (!o.semUso) on('session.usage', () => usageWith(50000))
   on('tool.call', () => ({ result: { text: 'ok' } }) as never)
   return { fs, pastas }
 }
@@ -1210,8 +1212,9 @@ test('painel: indicadores globais e os da raiz da sessão; os de outra raiz não
 test('painel: sem raiz, os globais aparecem uma vez só; a pasta do projeto ilegível não esconde os globais (sobreviventes #5, #6 e #7 da 0.14.1)', async ($, on) => {
   mundoIndicadores(on, { raiz: null })
   await $.tool.call({ tool: 'Bash', command: 'true' } as never)
-  const pane = await painel($)
-  expect(pane.match(/"  global   "/g)?.length).toBe(1)
+  // Os globais aparecem uma vez na Home e uma na aba Prova (detalhe): nunca repetidos dentro da mesma aba.
+  expect((await aba($, 'objetivo')).match(/"  global   "/g)?.length).toBe(1)
+  expect((await aba($, 'prova')).match(/"  global   "/g)?.length).toBe(1)
 })
 
 test('painel: lista da pasta do projeto que falha não derruba a leitura dos globais', async ($, on) => {
@@ -1228,6 +1231,47 @@ test('painel: checar a pasta do projeto que dá erro não derruba a leitura dos 
   const pane = await painel($)
   expect(pane).toContain('global')
   expect(pane).not.toContain('desta raiz')
+})
+
+/** O nó do medidor de chave `g-<chave>` na árvore de uma aba. */
+const medidor = (arvore: string, chave: string): unknown => {
+  const achar = (n: unknown): unknown => {
+    if (!n || typeof n !== 'object') return undefined
+    const o = n as { props?: { key?: string }; children?: unknown[] }
+    if (o.props?.key === `g-${chave}`) return n
+    for (const c of o.children ?? []) {
+      const r = achar(c)
+      if (r) return r
+    }
+    return undefined
+  }
+  return achar(JSON.parse(arvore))
+}
+
+test('Home (R17): os medidores da prova ficam na linha dos do ciclo, iguais aos da aba Prova, com e sem objetivo', async ($, on) => {
+  mundoIndicadores(on, { semMeta: true })
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  // Sem objetivo: o da janela e os da prova.
+  const sem = await aba($, 'objetivo')
+  expect(medidor(sem, 'jan')).toBeDefined()
+  expect(medidor(sem, 'global-i')).toEqual(medidor(await aba($, 'prova'), 'global-i'))
+  // O indicador sem meta e sem estado sai igual ao da aba Prova (fração 0, cor do Claude).
+  expect(medidor(sem, 'solto-s')).toBeDefined()
+  expect(medidor(sem, 'solto-s')).toEqual(medidor(await aba($, 'prova'), 'solto-s'))
+  expect(JSON.stringify(medidor(sem, 'solto-s'))).toContain('"color":"claude"')
+  // Com objetivo: pendências, janela e os da prova, na Home.
+  await comObjetivo($)
+  const com = await aba($, 'objetivo')
+  expect(medidor(com, 'pend')).toBeDefined()
+  expect(medidor(com, 'global-i')).toEqual(medidor(await aba($, 'prova'), 'global-i'))
+})
+
+test('Home (R17): sem uso medido (nenhum medidor do ciclo), os da prova aparecem sozinhos', async ($, on) => {
+  mundoIndicadores(on, { semUso: true })
+  await $.tool.call({ tool: 'Bash', command: 'true' } as never)
+  const home = await aba($, 'objetivo')
+  expect(medidor(home, 'jan')).toBeUndefined()
+  expect(medidor(home, 'global-i')).toBeDefined()
 })
 
 // Roadmap: o arquivo do projeto num mapa por caminho, gravado por acréscimo como o caderno.
@@ -1435,6 +1479,11 @@ test('herdr: o painel mostra os outros workspaces do arquivo deste pane e a faix
   expect(pane).toContain('motor')
   expect(pane).toContain('trabalhando')
   expect(pane).toContain('Retomada do motor')
+  // A Home (R17) também mostra os outros workspaces, além da aba Agentes.
+  const homeViz = await aba($, 'objetivo')
+  expect(homeViz).toContain('OUTROS WORKSPACES')
+  expect(homeViz.indexOf('OUTROS WORKSPACES')).toBeGreaterThan(homeViz.indexOf('"CADERNO"'))
+  expect(await aba($, 'agentes')).toContain('OUTROS WORKSPACES')
   expect(await barText($)).not.toContain('esperando você')
   escrever('blocked')
   await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
@@ -1504,23 +1553,33 @@ test('disparo: a ferramenta grava, o painel mostra o meio de cada frente e a cob
   expect(await painel($)).toContain('⇉ herdr·codex')
 })
 
-test('abas: objetivo, caderno, prova e agentes, cada uma com o seu; o objetivo só aponta o caderno com nota sem resposta', async ($, on) => {
+test('Home (R17): objetivo, fila, caderno com o campo e o roadmap na mesma aba; as outras abas ficam como detalhe', async ($, on) => {
   on('session.usage', () => usageWith(50000))
   comCaderno(on)
   await comObjetivo($)
-  const obj = await aba($, 'objetivo')
-  expect(obj).toContain('FILA DO CLAUDE')
-  expect(obj).not.toContain('CADERNO')
-  expect(obj).not.toContain('QUEM EXECUTA')
-  expect(obj).not.toContain('caderno ·')
+  const home = await aba($, 'objetivo')
+  expect(home).toContain('FILA DO CLAUDE')
+  expect(home).toContain('SUA VEZ')
+  expect(home).toContain('"CADERNO"')
+  expect(home).toContain('"placeholder":"✎ escreva aqui; #id no começo liga a uma pendência"')
+  // O detalhe longo continua nas abas dele.
   expect(await aba($, 'caderno')).toContain('CADERNO')
   expect(await aba($, 'caderno')).not.toContain('FILA DO CLAUDE')
   expect(await aba($, 'agentes')).toContain('QUEM EXECUTA')
   expect(await aba($, 'prova')).toContain('Nenhuma rodada do prova-de-teste nesta sessão.')
+  // Sem rodada, a Home não mostra linha de prova vazia.
+  expect(home).not.toContain('"PROVA "')
+  // A nota escrita na Home aparece na própria Home, com a contagem.
   const ui = await montar($)
   await ui.input({ key: 'nota-0', text: 'e se fosse em abas?' } as never)
   await ui.unmount()
-  expect(await aba($, 'objetivo')).toContain('"✎ caderno · ","1"," sem resposta "')
+  const depois = await aba($, 'objetivo')
+  // A ordem do esboço aprovado (16/10): agora, sua vez, caderno, fila do Claude.
+  const ordem = ['"AGORA "', '"SUA VEZ"', '"CADERNO"', '"FILA DO CLAUDE"'].map(t => depois.indexOf(t))
+  expect(ordem.every(i => i >= 0)).toBe(true)
+  expect([...ordem].sort((a, b) => a - b)).toEqual(ordem)
+  expect(depois).toContain('" · 1 sem resposta"')
+  expect(depois).toContain('e se fosse em abas?')
 })
 
 test('aba Prova: a rodada ao vivo aparece pelo timer de 2 s, sem turno, e fica como a última no fim', async ($, on) => {
@@ -1548,12 +1607,22 @@ test('aba Prova: a rodada ao vivo aparece pelo timer de 2 s, sem turno, e fica c
   const rodando = await aba($, 'prova')
   expect(rodando).toContain('▶ RODANDO ')
   expect(rodando).toContain(' 1/4 · 1 mortos · 0 sobreviventes · 3 s')
+  // A Home (R17) mostra a mesma rodada numa linha, com a tarefa.
+  const homeRodando = await aba($, 'objetivo')
+  expect(homeRodando).toContain('"PROVA "')
+  // Na Home sem objetivo, a prova vem depois do caderno.
+  expect(homeRodando.indexOf('"CADERNO"')).toBeGreaterThan(-1)
+  expect(homeRodando.indexOf('"PROVA "')).toBeGreaterThan(homeRodando.indexOf('"CADERNO"'))
+  expect(homeRodando).toContain('"▶ rodando: "')
+  expect(homeRodando).toContain('"color":"claude"},"children":["▶ rodando: "')
+  expect(homeRodando).toContain('"soma"')
   vivo({ fase: 'fim', feitos: 4, mortos: 3, sobreviventes: 1, estado: 'FRACO', agora: 9000 })
   await relogio.advance(2000)
   const fim = await aba($, 'prova')
   expect(fim).toContain('ÚLTIMA RODADA ')
   expect(fim).toContain('FRACO · 3 mortos · 1 sobreviventes · 9 s')
   expect(fim).toContain('"color":"warning"')
+  expect(await aba($, 'objetivo')).toContain('"color":"warning"},"children":["última: "')
   // Arquivo quebrado no meio da escrita: fica o que estava.
   arqs[ARQ] = '{"versao":1,'
   await relogio.advance(2000)
@@ -1561,6 +1630,7 @@ test('aba Prova: a rodada ao vivo aparece pelo timer de 2 s, sem turno, e fica c
   vivo({ fase: 'fim', estado: 'PROVADO', agora: 9000 })
   await relogio.advance(2000)
   expect(await aba($, 'prova')).toContain('"color":"success"')
+  expect(await aba($, 'objetivo')).toContain('"color":"success"},"children":["última: "')
 })
 
 test('abas: o operador fecha uma (Esc) e as outras fecham junto; fechar pelo próprio mod não cascateia', () => {

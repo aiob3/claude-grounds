@@ -42,7 +42,7 @@ export const TOOL = `mcp__contexto-bar__${TOOL_NAME}`
 const PANE = 'objetivo'
 // As abas do painel: cada uma é um painel nativo; com mais de um aberto, a superfície desenha os títulos como abas.
 export const ABAS = [
-  { id: 'objetivo', titulo: 'Objetivo' },
+  { id: 'objetivo', titulo: 'Home' },
   { id: 'caderno', titulo: 'Caderno' },
   { id: 'prova', titulo: 'Prova' },
   { id: 'agentes', titulo: 'Agentes' },
@@ -1066,11 +1066,6 @@ async function desenharPainel($: EngineInterface, e: any, aba: Aba) {
         ? desenharGauge('jan', 'janela', snap.percent / 100, `${snap.percent}%`, snap.percent >= 80 ? 'error' : snap.percent >= 60 ? 'warning' : 'success', p ? `${ESTADO[p.estado]} · precisa ~${fmtTokens(p.necessario)} de ${fmtTokens(p.livre)}` : undefined)
         : null,
     ].filter(Boolean)
-    const medidores = gauges.length ? (
-      <Box flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1}>
-        {gauges}
-      </Box>
-    ) : null
     // Os indicadores de outros mods (o EXP-001 do prova-de-teste) vão para a aba Prova.
     const medidoresProva = inds.length ? (
       <Box flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1}>
@@ -1369,11 +1364,27 @@ async function desenharPainel($: EngineInterface, e: any, aba: Aba) {
       </Box>
     )
 
-    // Aba Objetivo: uma linha aponta para o caderno, que tem a aba dele.
-    const avisoCaderno = abertasCaderno ? (
+    // Home (R17, pedido do operador em 16/10): tudo num lugar só, como no painel único da 0.18. As outras abas ficam
+    // como detalhe. Os medidores do ciclo e os da prova numa linha; a prova numa linha; o caderno inteiro, com o campo.
+    const medidoresHome = gauges.length || inds.length ? (
+      <Box flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1}>
+        {gauges}
+        {inds.map(i =>
+          desenharGauge(`${i.fonte}-${i.id}`, i.rotulo, i.meta ? i.valor / i.meta : 0, centroIndicador(i), i.estado ? COR_INDICADOR[i.estado] : 'claude', i.detalhe),
+        )}
+      </Box>
+    ) : null
+    const provaResumo = vivo ? (
       <Box flexDirection="column" marginTop={1}>
-        <Text color="warning">
-          ✎ caderno · {abertasCaderno} sem resposta <Text dimColor>(aba Caderno)</Text>
+        <Text wrap="wrap">
+          <Text weight="bold">PROVA </Text>
+          <Text color={vivo.fase === 'fim' ? (vivo.estado === 'PROVADO' ? 'success' : 'warning') : 'claude'}>
+            {vivo.fase === 'fim' ? 'última: ' : '▶ rodando: '}
+            {linhaAoVivo(vivo, largura)}
+          </Text>
+        </Text>
+        <Text dimColor wrap="wrap">
+          {vivo.tarefa}
         </Text>
       </Box>
     ) : null
@@ -1400,13 +1411,15 @@ async function desenharPainel($: EngineInterface, e: any, aba: Aba) {
     if (!goal) {
       return (
         <Box flexDirection="column">
-          {medidores}
+          {medidoresHome}
           {agoraCard}
           <Box flexDirection="column" marginTop={1}>
             <Text dimColor>Nenhum objetivo ativo.</Text>
             <Text dimColor>/objetivo texto :: passo que conclui</Text>
           </Box>
-          {avisoCaderno}
+          {cadernoBloco}
+          {provaResumo}
+          {vizinhosBloco}
           {roadmapBloco}
           {rodape}
         </Box>
@@ -1434,7 +1447,7 @@ async function desenharPainel($: EngineInterface, e: any, aba: Aba) {
           ) : null}
         </Box>
         <Box flexDirection="column" marginTop={1}>
-          {medidores}
+          {medidoresHome}
         </Box>
         {agoraCard}
         {suaVez.length ? (
@@ -1450,7 +1463,9 @@ async function desenharPainel($: EngineInterface, e: any, aba: Aba) {
             )}
           </Box>
         ) : null}
-        {avisoCaderno}
+        {cadernoBloco}
+        {provaResumo}
+        {vizinhosBloco}
         {fila.length ? (
           <Box flexDirection="column" marginTop={1}>
             <Text>
