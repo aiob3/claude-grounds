@@ -1335,21 +1335,34 @@ test('roadmap: adicionar, mover e descartar gravam por acréscimo no arquivo do 
   expect(await rm($, { acao: 'ver' })).toBe('Roadmap vazio.')
   expect(await rm($, { acao: 'adicionar', itens: [{ texto: '  ' }] })).toContain('adicionar precisa de itens com texto')
   const ok = await rm($, { acao: 'adicionar', itens: [{ texto: 'mod do herdr só leitura', horizonte: 'agora', frente: 'herdr' }, { texto: 'delegação com agente dono' }, { texto: 'adversário de outro fornecedor', horizonte: 'depois', frente: 'herdr' }] })
-  expect(ok).toBe('Roadmap · 3 abertos\nagora:\n  R1 [herdr] mod do herdr só leitura\npróximo:\n  R2 delegação com agente dono\ndepois:\n  R3 [herdr] adversário de outro fornecedor')
+  // O que o Claude adiciona entra como proposta (R18).
+  expect(ok).toBe('Roadmap · 3 abertos\nagora:\n  R1 (proposta) [herdr] mod do herdr só leitura\npróximo:\n  R2 (proposta) delegação com agente dono\ndepois:\n  R3 (proposta) [herdr] adversário de outro fornecedor')
   expect(r.linhas().map(l => [l.ev, l.autor, l.horizonte])).toEqual([['item', 'claude', 'agora'], ['item', 'claude', 'proximo'], ['item', 'claude', 'depois']])
   expect(await rm($, { acao: 'mover', ids: [2] })).toContain('mover precisa de horizonte')
   expect(await rm($, { acao: 'mover', horizonte: 'agora' })).toContain('precisa de ids')
   expect(await rm($, { acao: 'mover', ids: [2, 9], horizonte: 'agora' })).toContain('R9 não estão abertos')
   expect(r.linhas().length).toBe(3)
-  expect(await rm($, { acao: 'mover', ids: [2], horizonte: 'agora' })).toContain('agora:\n  R1 [herdr] mod do herdr só leitura\n  R2 delegação com agente dono')
+  expect(await rm($, { acao: 'mover', ids: [2], horizonte: 'agora' })).toContain('agora:\n  R1 (proposta) [herdr] mod do herdr só leitura\n  R2 (proposta) delegação com agente dono')
   expect(await rm($, { acao: 'descartar', ids: [3], motivo: ' ' })).toContain('descartar precisa do motivo')
   expect(await rm($, { acao: 'descartar', ids: [3], motivo: 'o operador decidiu outro caminho' })).toContain('descartados: R3')
   expect(r.linhas().at(-1)).toMatchObject({ ev: 'descartar', motivo: 'o operador decidiu outro caminho' })
   expect(await rm($, { acao: 'descartar', ids: [3], motivo: 'de novo' })).toContain('R3 não estão abertos')
-  expect(await rm($, { acao: 'apagar', ids: [1] })).toContain('acao é uma de ver, adicionar')
-  // Sem objetivo, o pedido lembra o que está em agora.
-  const ctx = await contextoDe($, 'e agora?')
-  expect(ctx).toContain(' · roadmap em agora: R1, R2 (já aprovado: promova com a ferramenta roadmap, acao \\"promover\\", e siga neste turno, sem pedir licença)')
+  expect(await rm($, { acao: 'apagar', ids: [1] })).toContain('acao é uma de ver, adicionar, mover, promover, adiar, descartar, aprovar')
+  // Sem objetivo, o pedido lembra o que está em agora: as propostas esperam o operador (R18).
+  expect(await contextoDe($, 'e agora?')).toContain(' · propostas em agora esperando o operador: R1, R2 (não promova: pergunte pela AskUserQuestion)')
+  // Aprovar pela ferramenta só com a frase do operador; aprovado, vira "já aprovado".
+  const n = r.linhas().length
+  expect(await rm($, { acao: 'aprovar', ids: [1] })).toContain('aprovar pela ferramenta precisa da citacao')
+  expect(await rm($, { acao: 'aprovar', ids: [1], citacao: '   ' })).toContain('precisa da citacao')
+  expect(r.linhas().length).toBe(n)
+  expect(await rm($, { acao: 'aprovar', ids: [1, 2], citacao: 'Ok, aprovados' })).toContain('R1, R2 aprovados.')
+  expect(r.linhas().slice(-2)).toEqual([
+    expect.objectContaining({ ev: 'aprovar', por: 'claude', citacao: 'Ok, aprovados' }),
+    expect.objectContaining({ ev: 'aprovar', por: 'claude', citacao: 'Ok, aprovados' }),
+  ])
+  expect(await rm($, { acao: 'aprovar', ids: [1], citacao: 'de novo' })).toContain('Nada a aprovar')
+  expect(r.linhas().length).toBe(n + 2)
+  expect(await contextoDe($, 'e agora?')).toContain(' · roadmap em agora: R1, R2 (já aprovado: promova com a ferramenta roadmap, acao \\"promover\\", e siga neste turno, sem pedir licença)')
 })
 
 test('roadmap: promover vira pendência do objetivo com a frente no texto; adiar tira do objetivo e guarda a origem', async ($, on) => {
@@ -1357,6 +1370,11 @@ test('roadmap: promover vira pendência do objetivo com a frente no texto; adiar
   on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
   const r = comRoadmap(on)
   await rm($, { acao: 'adicionar', itens: [{ texto: 'estados dos outros workspaces no painel', horizonte: 'agora', frente: 'herdr' }] })
+  // Proposta do Claude não vira pendência sem o operador (R18), e nada é gravado.
+  const antes = r.linhas().length
+  expect(await rm($, { acao: 'promover', ids: [1] })).toContain('Erro: R1 é proposta sua: só vira pendência com a aprovação do operador')
+  expect(r.linhas().length).toBe(antes)
+  await rm($, { acao: 'aprovar', ids: [1], citacao: 'pode seguir com o R1' })
   expect(await rm($, { acao: 'promover', ids: [1] })).toContain('promover precisa de um objetivo ativo')
   await comObjetivo($)
   // Com pendência a fazer, o pedido não cobra o roadmap.
@@ -1364,6 +1382,7 @@ test('roadmap: promover vira pendência do objetivo com a frente no texto; adiar
   const p = await rm($, { acao: 'promover', ids: [1], nivel: 'bloqueante', tamanho: 'G' })
   expect(p).toContain('R1 → #4 no objetivo "Painel novo".')
   expect(p).toContain('promovidos: R1→#4')
+  expect(r.linhas().at(-1)).toMatchObject({ ev: 'promover', pendencia: 4, por: 'claude' })
   expect(await objetivoAgora($)).toContain('[ ] #4 (claude, G) [bloqueante] herdr: estados dos outros workspaces no painel')
   expect(await rm($, { acao: 'promover', ids: [1] })).toContain('R1 não estão abertos')
   // Adiar: #2 sai do objetivo e entra em agora, com a origem; pendência feita ou inexistente não sai.
@@ -1381,6 +1400,10 @@ test('roadmap: promover vira pendência do objetivo com a frente no texto; adiar
   expect(await rm($, { acao: 'adiar', pendencias: [3] })).toContain('já feitas: 3')
   // Promovido sem nível nem tamanho: requisito, M, do Claude.
   await rm($, { acao: 'adicionar', itens: [{ texto: 'sem frente', horizonte: 'agora' }] })
+  // Duas propostas pedidas juntas: o erro diz as duas no plural.
+  await rm($, { acao: 'adicionar', itens: [{ texto: 'outra', horizonte: 'agora' }] })
+  expect(await rm($, { acao: 'promover', ids: [3, 4] })).toContain('R3, R4 são propostas suas'.replace('suas', 'sua'))
+  expect(await rm($, { acao: 'aprovar', ids: [3], citacao: 'sim, o R3' })).toContain('R3 aprovado.\n')
   await rm($, { acao: 'promover', ids: [3], dono: 'operador' })
   expect(await objetivoAgora($)).toContain('[ ] #5 (operador, M) sem frente')
 })
@@ -1439,28 +1462,43 @@ test('roadmap: a nota aceita com destino roadmap vira item com a origem; recusad
   expect(r.linhas().length).toBe(1)
 })
 
-test('roadmap no painel: agora sempre, próximo e depois pelo botão; Promover só com objetivo; sem nada aberto, sem seção', async ($, on) => {
+test('roadmap no painel: agora sempre, próximo e depois pelo botão; proposta marcada com Aprovar; Promover só com objetivo; sem nada aberto, sem seção', async ($, on) => {
   on('session.usage', () => usageWith(50000))
-  comRoadmap(on)
+  const r = comRoadmap(on)
   expect(await painel($)).not.toContain('ROADMAP')
-  await rm($, { acao: 'adicionar', itens: [{ texto: 'abas nativas', horizonte: 'agora', frente: 'painel' }, { texto: 'mod do herdr', horizonte: 'proximo' }, { texto: 'adversário', horizonte: 'depois' }] })
-  // Sem objetivo: a seção aparece, sem o botão Promover.
-  let pane = await painel($)
+  await rm($, { acao: 'adicionar', itens: [{ texto: 'abas', horizonte: 'agora', frente: 'painel' }, { texto: 'mod do herdr', horizonte: 'proximo' }, { texto: 'adversário', horizonte: 'depois' }] })
+  // Sem objetivo: a seção aparece, a proposta marcada e com Aprovar, sem o botão Promover.
+  let pane = await aba($, 'objetivo')
   expect(pane).toContain('ROADMAP ')
   expect(pane).toContain('agora 1 · próximo 1 · depois 1 ▸')
-  expect(pane).toContain('abas nativas')
+  expect(pane).toContain('abas')
+  expect(pane).toContain('"proposta · "')
+  expect(pane).toContain('"key":"aprovar-1","label":"Aprovar"')
   expect(pane).not.toContain('mod do herdr')
   expect(pane).not.toContain('Promover')
+  // O operador aprova pelo botão: a marca e o botão somem, e o evento diz que foi ele.
+  const ui0 = await montar($, 'objetivo')
+  await ui0.press({ key: 'aprovar-1' } as never)
+  await ui0.unmount()
+  expect(r.linhas().at(-1)).toMatchObject({ ev: 'aprovar', por: 'operador' })
+  expect(r.linhas().at(-1)).not.toHaveProperty('citacao')
+  pane = await aba($, 'objetivo')
+  expect(pane).not.toContain('"proposta · "')
+  expect(pane).not.toContain('aprovar-1')
   await comObjetivo($)
   const ui = await montar($, 'objetivo')
   await ui.press({ key: 'ver-roadmap' } as never)
   expect(await ui.find({ type: 'Text', text: /mod do herdr/ } as never)).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /adversário/ } as never)).toBeDefined()
+  // O operador promove a proposta direto pelo botão (promover dele aprova).
+  await ui.press({ key: 'promover-2' } as never)
   await ui.press({ key: 'promover-1' } as never)
   await ui.unmount()
-  expect(await objetivoAgora($)).toContain('#4 (claude, M) painel: abas nativas')
+  expect(await objetivoAgora($)).toContain('painel: abas')
+  expect(await objetivoAgora($)).toContain('mod do herdr')
+  expect(r.linhas().filter(l => l.ev === 'promover').map(l => l.por)).toEqual(['operador', 'operador'])
   pane = await painel($)
-  expect(pane).toContain('agora 0 · próximo 1 · depois 1 ▾')
+  expect(pane).toContain('agora 0 · próximo 0 · depois 1 ▾')
 })
 
 test('faixa: sem objetivo ou com tudo feito, mostra o roadmap e a próxima dele; com pendência a fazer, não (16/10: a prioridade sumia ao encerrar)', async ($, on) => {

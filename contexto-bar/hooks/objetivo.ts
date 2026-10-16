@@ -364,7 +364,8 @@ export function bloqueioDeLicenca(texto: string, g: Goal | null, roadmap: ItemRo
   const frase = pedeLicenca(texto)
   if (!frase) return undefined
   const minha = g ? ordenar(g.itens.filter(i => !i.feito && i.dono === 'claude'))[0] : undefined
-  const agora = roadmap.filter(i => i.estado === 'aberto' && i.horizonte === 'agora')
+  // Só o aprovado pelo operador (R18): proposta do Claude em agora não é licença para seguir.
+  const agora = roadmap.filter(i => i.estado === 'aberto' && i.horizonte === 'agora' && i.aprovado)
   const aprovado = minha ? `#${minha.id} ${minha.texto}` : agora.length ? agora.map(i => `R${i.n} ${i.texto}`).join('; ') : undefined
   if (!aprovado) return undefined
   return (

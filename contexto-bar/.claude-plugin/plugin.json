@@ -1,6 +1,6 @@
 {
   "name": "contexto-bar",
-  "version": "0.20.1",
+  "version": "0.21.0",
   "description": "Barra de contexto acima do prompt, com uma segunda camada de objetivo e pendências compartilhada entre o operador e o Claude",
   "types": "./types/index.d.ts",
   "author": {

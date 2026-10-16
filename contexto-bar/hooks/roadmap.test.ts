@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { destinoRoadmap, doHorizonte, faixaRoadmap, lembreteRoadmap, lerRoadmap, linha, novoItem, resumoRoadmap } from './roadmap'
+import { destinoRoadmap, doHorizonte, faixaRoadmap, lembreteRoadmap, lerRoadmap, linha, novoItem, propostas, resumoRoadmap } from './roadmap'
 
 const EM = '2026-10-16T01:02:03.456Z'
 
@@ -61,17 +61,49 @@ test('resumo: abertos por horizonte na ordem agora, próximo, depois; promovidos
   ]
   const texto = evs.map(linha).join('') + JSON.stringify({ v: 1, ev: 'promover', id: evs[3]!.id, em: EM, pendencia: 9 }) + '\n' + JSON.stringify({ v: 1, ev: 'descartar', id: evs[4]!.id, em: EM, motivo: 'm' })
   expect(resumoRoadmap(lerRoadmap(texto))).toBe(
-    ['Roadmap · 3 abertos', 'agora:', '  R2 [herdr] agora (de #3)', 'próximo:', '  R3 próximo', 'depois:', '  R1 depois primeiro', 'promovidos: R4→#9 · descartados: R5'].join('\n'),
+    // O que veio do objetivo (de #3) nasce aprovado; o resto que o Claude escreveu é proposta (R18).
+    ['Roadmap · 3 abertos', 'agora:', '  R2 [herdr] agora (de #3)', 'próximo:', '  R3 (proposta) próximo', 'depois:', '  R1 (proposta) depois primeiro', 'promovidos: R4→#9 · descartados: R5'].join('\n'),
   )
   // Sem nada saído, não há a última linha.
-  expect(resumoRoadmap(lerRoadmap(linha(evs[2]!)))).toBe('Roadmap · 1 abertos\npróximo:\n  R1 próximo')
+  expect(resumoRoadmap(lerRoadmap(linha(evs[2]!)))).toBe('Roadmap · 1 abertos\npróximo:\n  R1 (proposta) próximo')
 })
 
-test('lembrete na linha do pedido: só sem pendência a fazer e com algo em agora', () => {
-  const itens = lerRoadmap([novoItem('a', 'agora', EM, 'a', 'claude')!, novoItem('b', 'proximo', EM, 'b', 'claude')!, novoItem('c', 'agora', EM, 'c', 'claude')!].map(linha).join(''))
+test('lembrete na linha do pedido: só sem pendência a fazer; o aprovado em agora manda seguir, a proposta manda perguntar (R18)', () => {
+  const ev = (texto: string, h: 'agora' | 'proximo', suf: string, autor: 'claude' | 'operador') => novoItem(texto, h, EM, suf, autor)!
+  const itens = lerRoadmap([ev('a', 'agora', 'a', 'operador'), ev('b', 'proximo', 'b', 'operador'), ev('c', 'agora', 'c', 'operador')].map(linha).join(''))
   expect(lembreteRoadmap(itens, true)).toBe(' · roadmap em agora: R1, R3 (já aprovado: promova com a ferramenta roadmap, acao "promover", e siga neste turno, sem pedir licença)')
   expect(lembreteRoadmap(itens, false)).toBe('')
-  expect(lembreteRoadmap(lerRoadmap(linha(novoItem('b', 'proximo', EM, 'b', 'claude')!)), true)).toBe('')
+  expect(lembreteRoadmap(lerRoadmap(linha(ev('b', 'proximo', 'b', 'operador'))), true)).toBe('')
+  // Proposta do Claude em agora: não é "já aprovado".
+  const mistos = [ev('a', 'agora', 'a', 'operador'), ev('p', 'agora', 'p', 'claude')]
+  expect(lembreteRoadmap(lerRoadmap(mistos.map(linha).join('')), true)).toBe(
+    ' · roadmap em agora: R1 (já aprovado: promova com a ferramenta roadmap, acao "promover", e siga neste turno, sem pedir licença) · propostas em agora esperando o operador: R2 (não promova: pergunte pela AskUserQuestion)',
+  )
+  expect(lembreteRoadmap(lerRoadmap(linha(ev('p', 'agora', 'p', 'claude'))), true)).toBe(' · propostas em agora esperando o operador: R1 (não promova: pergunte pela AskUserQuestion)')
+  // A proposta aprovada depois vira "já aprovado".
+  const aprovada = linha(ev('p', 'agora', 'p', 'claude')) + JSON.stringify({ v: 1, ev: 'aprovar', id: ev('p', 'agora', 'p', 'claude').id, em: EM, por: 'operador' }) + '\n'
+  expect(lembreteRoadmap(lerRoadmap(aprovada), true)).toContain('roadmap em agora: R1 (já aprovado')
+})
+
+test('aprovação ao ler (R18): autor operador ou vindo do objetivo nasce aprovado; aprovar vale só para o item aberto', () => {
+  const p = novoItem('proposta', 'agora', EM, 'p', 'claude')!
+  const op = novoItem('do operador', 'agora', EM, 'o', 'operador')!
+  const obj = novoItem('do objetivo', 'agora', EM, 'j', 'claude', undefined, '#4')!
+  const nota = novoItem('da nota', 'agora', EM, 'n', 'claude', undefined, 'n-123')!
+  const [a, b, c, d] = lerRoadmap([p, op, obj, nota].map(linha).join(''))
+  expect([a!.aprovado, b!.aprovado, c!.aprovado, d!.aprovado]).toEqual([false, true, true, false])
+  expect([a!.autor, b!.autor]).toEqual(['claude', 'operador'])
+  // Aprovar depois de descartar não reabre nem aprova.
+  const t = linha(p) + JSON.stringify({ v: 1, ev: 'descartar', id: p.id, em: EM, motivo: 'm' }) + '\n' + JSON.stringify({ v: 1, ev: 'aprovar', id: p.id, em: EM, por: 'operador' }) + '\n'
+  expect(lerRoadmap(t)[0]).toMatchObject({ estado: 'descartado', aprovado: false })
+  expect(propostas(lerRoadmap([p, op].map(linha).join(''))).map(i => i.n)).toEqual([1])
+  // Linha sem autor (ou com um que não se conhece) é do Claude e é proposta: nada passa por aprovado sem dizer.
+  const semAutor = JSON.stringify({ v: 1, ev: 'item', id: 'r-1', em: EM, texto: 'velho', horizonte: 'agora' }) + '\n'
+  const estranho = JSON.stringify({ v: 1, ev: 'item', id: 'r-2', em: EM, autor: 'sistema', texto: 'x', horizonte: 'agora' }) + '\n'
+  expect(lerRoadmap(semAutor + estranho).map(i => [i.autor, i.aprovado])).toEqual([
+    ['claude', false],
+    ['claude', false],
+  ])
 })
 
 test('destino da triagem: roadmap com ou sem horizonte; outro destino não é roadmap', () => {

@@ -6,8 +6,13 @@
 //
 // Contrato (versão 1): ~/.claude/roadmap/<raiz do projeto, encodeURIComponent>.jsonl, uma linha JSON por evento,
 // só acréscimo, como o caderno. Eventos: `item` (entra), `mover` (muda de horizonte), `promover` (vira a pendência
-// #n do objetivo), `descartar` (sai, com o motivo). O número R1, R2... é a ordem em que o item entrou no arquivo,
-// estável porque nada é reescrito. Quem lê ignora o que não conhece.
+// #n do objetivo), `descartar` (sai, com o motivo), `aprovar` (0.21.0). O número R1, R2... é a ordem em que o item
+// entrou no arquivo, estável porque nada é reescrito. Quem lê ignora o que não conhece.
+//
+// Aprovação (0.21.0, R18): o item que o Claude escreve é PROPOSTA até o operador aprovar (botão Aprovar ou Promover no
+// painel; ou o Claude registra a aprovação dita em mensagem, com a frase dele). Em 16/10 o Claude escreveu e promoveu
+// sozinho as abas do painel (R4), e o operador perdeu a visão centralizada: "decisão sua tomada sozinha". Item escrito
+// pelo operador (nota do caderno) ou vindo do objetivo (adiado, devolvido no encerrar) já nasce aprovado.
 
 import type { EventoRoadmap, Horizonte, ItemRoadmap, Owner } from '../types'
 
@@ -63,12 +68,15 @@ export function lerRoadmap(texto: string): ItemRoadmap[] {
         ...(typeof o.frente === 'string' && o.frente ? { frente: o.frente } : {}),
         ...(typeof o.de === 'string' && o.de ? { de: o.de } : {}),
         estado: 'aberto',
+        autor: o.autor === 'operador' ? 'operador' : 'claude',
+        aprovado: o.autor === 'operador' || (typeof o.de === 'string' && o.de.startsWith('#')),
       })
       continue
     }
     const it = itens.get(o.id)
     if (!it || it.estado !== 'aberto') continue
-    if (o.ev === 'mover' && ehHorizonte(o.horizonte)) it.horizonte = o.horizonte
+    if (o.ev === 'aprovar') it.aprovado = true
+    else if (o.ev === 'mover' && ehHorizonte(o.horizonte)) it.horizonte = o.horizonte
     else if (o.ev === 'promover' && Number.isInteger(o.pendencia)) {
       it.estado = 'promovido'
       it.pendencia = o.pendencia as number
@@ -81,6 +89,8 @@ export function lerRoadmap(texto: string): ItemRoadmap[] {
 }
 
 export const abertos = (itens: ItemRoadmap[]) => itens.filter(i => i.estado === 'aberto')
+/** As propostas do Claude que esperam o operador. */
+export const propostas = (itens: ItemRoadmap[]) => abertos(itens).filter(i => !i.aprovado)
 export const doHorizonte = (itens: ItemRoadmap[], h: Horizonte) => abertos(itens).filter(i => i.horizonte === h)
 const rotulo = (h: Horizonte) => HORIZONTES.find(x => x.h === h)!.rotulo
 const comFrente = (i: ItemRoadmap) => `${i.frente ? `[${i.frente}] ` : ''}${i.texto}`
@@ -91,7 +101,7 @@ export function resumoRoadmap(itens: ItemRoadmap[]): string {
   if (!itens.length) return 'Roadmap vazio.'
   const blocos = HORIZONTES.map(({ h }) => {
     const doH = abertosHoje.filter(i => i.horizonte === h)
-    return doH.length ? [`${rotulo(h)}:`, ...doH.map(i => `  R${i.n} ${comFrente(i)}${i.de ? ` (de ${i.de})` : ''}`)].join('\n') : ''
+    return doH.length ? [`${rotulo(h)}:`, ...doH.map(i => `  R${i.n} ${i.aprovado ? '' : '(proposta) '}${comFrente(i)}${i.de ? ` (de ${i.de})` : ''}`)].join('\n') : ''
   }).filter(Boolean)
   const promovidos = itens.filter(i => i.estado === 'promovido')
   const descartados = itens.filter(i => i.estado === 'descartado')
@@ -108,9 +118,14 @@ export function resumoRoadmap(itens: ItemRoadmap[]): string {
  */
 export function lembreteRoadmap(itens: ItemRoadmap[], semPendencia: boolean): string {
   if (!semPendencia) return ''
-  const agora = doHorizonte(itens, 'agora')
-  if (!agora.length) return ''
-  return ` · roadmap em agora: ${agora.map(i => `R${i.n}`).join(', ')} (já aprovado: promova com a ferramenta roadmap, acao "promover", e siga neste turno, sem pedir licença)`
+  // Só o aprovado é "já aprovado"; a proposta em agora espera o operador (R18).
+  const agora = doHorizonte(itens, 'agora').filter(i => i.aprovado)
+  const esperam = doHorizonte(itens, 'agora').filter(i => !i.aprovado)
+  const partes = [
+    agora.length ? ` · roadmap em agora: ${agora.map(i => `R${i.n}`).join(', ')} (já aprovado: promova com a ferramenta roadmap, acao "promover", e siga neste turno, sem pedir licença)` : '',
+    esperam.length ? ` · propostas em agora esperando o operador: ${esperam.map(i => `R${i.n}`).join(', ')} (não promova: pergunte pela AskUserQuestion)` : '',
+  ]
+  return partes.join('')
 }
 
 /**

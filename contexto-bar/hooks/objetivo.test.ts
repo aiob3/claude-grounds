@@ -254,7 +254,8 @@ test('bloqueio de licença: só com trabalho já aprovado do Claude (a próxima 
   const vezDele = aplicar(g, { acao: 'concluir', ids: [1] }, 'claude', 0, 0).goal!
   expect(bloqueioDeLicenca('Feito. Sigo?', vezDele, [])).toBeUndefined()
   // Sem objetivo, ou com tudo feito: o roadmap em agora é o trabalho aprovado.
-  const agora = [{ n: 9, id: 'r9', texto: 'modo habilitado', horizonte: 'agora' as const, estado: 'aberto' as const }, { n: 4, id: 'r4', texto: 'abas', horizonte: 'proximo' as const, estado: 'aberto' as const }]
+  const ap = { autor: 'operador' as const, aprovado: true }
+  const agora = [{ n: 9, id: 'r9', texto: 'modo habilitado', horizonte: 'agora' as const, estado: 'aberto' as const, ...ap }, { n: 4, id: 'r4', texto: 'abas', horizonte: 'proximo' as const, estado: 'aberto' as const, ...ap }]
   expect(bloqueioDeLicenca('Sigo com R9?', null, agora)).toContain('R9 modo habilitado')
   expect(bloqueioDeLicenca('Sigo com R9?', null, agora)).not.toContain('R4')
   const feito = aplicar(vezDele, { acao: 'concluir', ids: [2] }, 'claude', 0, 0).goal!
@@ -268,9 +269,13 @@ test('bloqueio de licença: só com trabalho já aprovado do Claude (a próxima 
   const ordem = aplicar(null, { acao: 'definir', titulo: 'T', itens: [{ texto: 'pode esperar', dono: 'claude', nivel: 'melhoria' }, { texto: 'trava', dono: 'claude', nivel: 'bloqueante' }] }, 'claude', 0, 0).goal!
   expect(bloqueioDeLicenca('Sigo?', ordem, [])).toContain('#2 trava')
   // Os de agora na ordem do roadmap; promovido não é mais de agora (sobreviventes #5 e #7).
-  const dois = [agora[0]!, { n: 10, id: 'r10', texto: 'disparo', horizonte: 'agora' as const, estado: 'aberto' as const }]
+  const dois = [agora[0]!, { n: 10, id: 'r10', texto: 'disparo', horizonte: 'agora' as const, estado: 'aberto' as const, ...ap }]
   expect(bloqueioDeLicenca('Sigo?', null, dois)).toContain('R9 modo habilitado; R10 disparo')
   expect(bloqueioDeLicenca('Sigo?', null, [{ ...agora[0]!, estado: 'promovido' as const, pendencia: 1 }])).toBeUndefined()
+  // R18: proposta do Claude em agora não é trabalho aprovado; perguntar ao operador é o certo.
+  expect(bloqueioDeLicenca('Sigo com R9?', null, [{ ...agora[0]!, autor: 'claude', aprovado: false }])).toBeUndefined()
+  expect(bloqueioDeLicenca('Sigo?', null, [{ ...agora[0]!, autor: 'claude', aprovado: false }, dois[1]!])).toContain('R10 disparo')
+  expect(bloqueioDeLicenca('Sigo?', null, [{ ...agora[0]!, autor: 'claude', aprovado: false }, dois[1]!])).not.toContain('R9')
 })
 
 test('disparo: declarar por frente (modo, meio, harness); com duas ou mais frentes abertas do Claude, a linha cobra as que faltam', () => {

@@ -95,10 +95,26 @@ export type Horizonte = 'agora' | 'proximo' | 'depois'
 export type EventoRoadmap =
   | { v: number; ev: 'item'; id: string; em: string; autor: Owner; texto: string; horizonte: Horizonte; frente?: string; /** De onde veio: `#7` (pendência adiada), `n-...` (nota do caderno). */ de?: string }
   | { v: number; ev: 'mover'; id: string; em: string; horizonte: Horizonte }
-  | { v: number; ev: 'promover'; id: string; em: string; pendencia: number }
+  | { v: number; ev: 'promover'; id: string; em: string; pendencia: number; /** Quem promoveu (0.21.0); o operador promover aprova. */ por?: Owner }
+  /** 0.21.0 (R18): o operador aprova a proposta (botão), ou o Claude registra a aprovação dita em mensagem, com a frase. */
+  | { v: number; ev: 'aprovar'; id: string; em: string; por: Owner; citacao?: string }
   | { v: number; ev: 'descartar'; id: string; em: string; motivo: string }
 /** Um item com o estado depois de todos os eventos; `n` é a ordem de entrada no arquivo (R1, R2...). */
-export type ItemRoadmap = { n: number; id: string; texto: string; horizonte: Horizonte; frente?: string; de?: string; estado: 'aberto' | 'promovido' | 'descartado'; pendencia?: number; motivo?: string }
+export type ItemRoadmap = {
+  n: number
+  id: string
+  texto: string
+  horizonte: Horizonte
+  frente?: string
+  de?: string
+  estado: 'aberto' | 'promovido' | 'descartado'
+  pendencia?: number
+  motivo?: string
+  /** 0.21.0 (R18): quem escreveu o item. */
+  autor: Owner
+  /** Escrito pelo operador, vindo do objetivo (`de` #n) ou aprovado depois; o resto é proposta do Claude. */
+  aprovado: boolean
+}
 
 /** Quem executa: o modelo e o effort da conversa principal e os subagentes vivos. */
 export type Subagente = { id: string; tipo: string; descricao: string; modelo: string; effort?: string; desde: number }

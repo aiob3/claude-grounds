@@ -103,13 +103,15 @@ const ROADMAP_SPEC = {
     'Roadmap do projeto: o plano aprovado além do objetivo em curso, que sobrevive ao encerrar. Horizonte agora (entra ' +
     'no próximo objetivo), proximo ou depois; frente agrupa um assunto (herdr, painel). Ações: ver; adicionar (itens com ' +
     'texto, horizonte, frente); mover (ids R, horizonte); promover (ids R: viram pendências do objetivo ativo, com nivel e ' +
-    'tamanho); adiar (pendencias: ids do objetivo que saem dele e voltam ao roadmap); descartar (ids R, motivo). Plano que ' +
-    'o operador aprovou vem para cá, não fica só na conversa. Encerrar o objetivo devolve as pendências abertas para agora.',
+    'tamanho); adiar (pendencias: ids do objetivo que saem dele e voltam ao roadmap); descartar (ids R, motivo); aprovar ' +
+    '(ids R + citacao: a frase do operador que aprovou, copiada). Plano que o operador aprovou vem para cá, não fica só na ' +
+    'conversa. Encerrar o objetivo devolve as pendências abertas para agora. O item que você adiciona é PROPOSTA: só ' +
+    'promove depois de o operador aprovar (botão no painel, ou a frase dele em aprovar).',
   isDeferred: false,
   inputSchema: {
     type: 'object',
     properties: {
-      acao: { type: 'string', enum: ['ver', 'adicionar', 'mover', 'promover', 'adiar', 'descartar'] },
+      acao: { type: 'string', enum: ['ver', 'adicionar', 'mover', 'promover', 'adiar', 'descartar', 'aprovar'] },
       itens: {
         type: 'array',
         items: {
@@ -130,6 +132,7 @@ const ROADMAP_SPEC = {
       tamanho: { type: 'string', enum: ['P', 'M', 'G'], description: 'Para promover (padrão M).' },
       dono: { type: 'string', enum: ['claude', 'operador'], description: 'Para promover (padrão claude).' },
       motivo: { type: 'string', description: 'Para descartar: o porquê, em uma frase.' },
+      citacao: { type: 'string', description: 'Para aprovar: a frase do operador que aprova, copiada da mensagem dele.' },
     },
     required: ['acao'],
   },
@@ -347,6 +350,7 @@ type AcaoRoadmap = {
   tamanho?: string
   dono?: string
   motivo?: string
+  citacao?: string
 }
 
 async function mudarRoadmap($: EngineInterface, a: AcaoRoadmap, autor: Owner): Promise<string> {
@@ -389,7 +393,23 @@ async function mudarRoadmap($: EngineInterface, a: AcaoRoadmap, autor: Owner): P
     if (!(await gravarRoadmap($, alvos.map(i => ({ v: VERSAO_ROADMAP, ev: 'descartar', id: i.id, em, motivo }) as EventoRoadmap)))) return fim('Erro: não consegui gravar no roadmap.')
     return fim()
   }
+  if (a.acao === 'aprovar') {
+    // O operador aprova pelo botão; o Claude só registra a aprovação que o operador escreveu, com a frase dele.
+    const citacao = a.citacao?.trim()
+    if (autor === 'claude' && !citacao) return fim('Erro: aprovar pela ferramenta precisa da citacao: a frase do operador que aprovou, copiada. Sem ela, peça a aprovação pela AskUserQuestion.')
+    const novos = alvos.filter(i => !i.aprovado)
+    if (!novos.length) return fim('Nada a aprovar: os itens já estavam aprovados.')
+    if (!(await gravarRoadmap($, novos.map(i => ({ v: VERSAO_ROADMAP, ev: 'aprovar', id: i.id, em, por: autor, ...(citacao ? { citacao } : {}) }) as EventoRoadmap))))
+      return fim('Erro: não consegui gravar no roadmap.')
+    return fim(`${novos.map(i => `R${i.n}`).join(', ')} aprovado${novos.length > 1 ? 's' : ''}.`)
+  }
   if (a.acao === 'promover') {
+    // Proposta do Claude não vira pendência sem o operador (R18); o operador promovendo aprova.
+    const semAprovacao = autor === 'claude' ? alvos.filter(i => !i.aprovado) : []
+    if (semAprovacao.length)
+      return fim(
+        `Erro: R${semAprovacao.map(i => i.n).join(', R')} ${semAprovacao.length > 1 ? 'são propostas' : 'é proposta'} sua: só vira pendência com a aprovação do operador (botão Aprovar ou Promover no painel, ou a frase dele em acao "aprovar"). Pergunte pela AskUserQuestion.`,
+      )
     await carregarObjetivo($)
     await doArquivoAgora($).catch(() => undefined)
     const g = await read($, objetivo)
@@ -400,10 +420,10 @@ async function mudarRoadmap($: EngineInterface, a: AcaoRoadmap, autor: Owner): P
     const dono: Owner = a.dono === 'operador' ? 'operador' : 'claude'
     const r = await mudarObjetivo($, { acao: 'adicionar', itens: alvos.map(i => ({ texto: `${i.frente ? `${i.frente}: ` : ''}${i.texto}`, dono, tamanho, nivel })) }, autor)
     if (r.erro) return fim(`Erro ao promover: ${r.texto}`)
-    await gravarRoadmap($, alvos.map((i, k) => ({ v: VERSAO_ROADMAP, ev: 'promover', id: i.id, em, pendencia: base + k + 1 }) as EventoRoadmap))
+    await gravarRoadmap($, alvos.map((i, k) => ({ v: VERSAO_ROADMAP, ev: 'promover', id: i.id, em, pendencia: base + k + 1, por: autor }) as EventoRoadmap))
     return fim(`${alvos.map((i, k) => `R${i.n} → #${base + k + 1}`).join(', ')} no objetivo "${g.titulo}".`)
   }
-  return fim(`Erro: acao é uma de ver, adicionar, mover, promover, adiar, descartar.`)
+  return fim(`Erro: acao é uma de ver, adicionar, mover, promover, adiar, descartar, aprovar.`)
 }
 
 async function escreverNota($: EngineInterface, texto: string): Promise<void> {
@@ -1275,17 +1295,28 @@ async function desenharPainel($: EngineInterface, e: any, aba: Aba) {
     const abertoPlano = await read($, verRoadmap)
     const contagem = HORIZONTES.map(x => `${x.rotulo} ${doHorizonte(plano, x.h).length}`).join(' · ')
     const linhaPlano = (i: ItemRoadmap) => {
-      const prefixo = `R${i.n} ${i.frente ? `${i.frente}: ` : ''}`
-      const { curto, resto } = encurtar(i.texto, largura - prefixo.length - 2 - (goal ? BOTAO_PROMOVER : 0))
+      // A proposta do Claude aparece marcada e com o botão Aprovar (R18): o que ele escreveu não passa por aprovado.
+      const marca = i.aprovado ? '' : 'proposta · '
+      const prefixo = `R${i.n} ${marca}${i.frente ? `${i.frente}: ` : ''}`
+      // Na proposta, os botões vão para a linha de baixo: em 48 colunas, os dois ao lado deixavam o texto com 5 letras.
+      const { curto, resto } = encurtar(i.texto, largura - prefixo.length - 2 - (i.aprovado && goal ? BOTAO_PROMOVER : 0))
+      const promover = goal ? <Button key={`promover-${i.n}`} label="Promover" onPress={() => void mudarRoadmap($, { acao: 'promover', ids: [i.n] }, 'operador')} /> : null
       return (
         <Box key={`r-${i.id}`} flexDirection="column">
           <Box flexDirection="row" justifyContent="space-between">
             <Text dimColor={i.horizonte === 'depois'}>
-              <Text color="claude">R{i.n}</Text> {i.frente ? <Text dimColor>{i.frente}: </Text> : null}
+              <Text color="claude">R{i.n}</Text> {marca ? <Text color="warning">{marca}</Text> : null}
+              {i.frente ? <Text dimColor>{i.frente}: </Text> : null}
               {curto}
             </Text>
-            {goal ? <Button key={`promover-${i.n}`} label="Promover" onPress={() => void mudarRoadmap($, { acao: 'promover', ids: [i.n] }, 'operador')} /> : null}
+            {i.aprovado ? promover : null}
           </Box>
+          {i.aprovado ? null : (
+            <Box flexDirection="row" paddingLeft={2}>
+              <Button key={`aprovar-${i.n}`} label="Aprovar" onPress={() => void mudarRoadmap($, { acao: 'aprovar', ids: [i.n] }, 'operador')} />
+              {promover}
+            </Box>
+          )}
           {resto ? (
             <Box display="none" hover={{ display: 'flex' }} paddingLeft={prefixo.length}>
               <Text dimColor wrap="wrap">
