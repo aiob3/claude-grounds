@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { centralizar, centroIndicador, encurtar, nomeFerramenta, nomeModelo, textoAtividade, validarIndicadores } from './painel'
+import { centralizar, centroIndicador, encurtar, nomeFerramenta, nomeModelo, textoAtividade, validarIndicadores, validarVizinhos, faixaVizinhos, estadoDoHerdr } from './painel'
 
 test('centralizar: largura exata, sobra à direita quando ímpar, corte com reticências', () => {
   expect(centralizar('ab', 6)).toBe('  ab  ')
@@ -75,4 +75,37 @@ test('indicador com texto: vai ao centro do gauge; sem ele, valor/meta ou o valo
   expect(centroIndicador({ fonte: 'f', id: 'i', rotulo: 'r', valor: 3 })).toBe('3')
   const [v] = validarIndicadores({ versao: 1, fonte: 'p', itens: [{ id: 'a', rotulo: 'r', valor: 1, texto: '   ' }] })
   expect(v).not.toHaveProperty('texto')
+})
+
+test('vizinhos do herdr: só o que segue o contrato; versão ou fonte errada não entra; agente sem pane fica de fora', () => {
+  const ok = { versao: 1, fonte: 'herdr', em: 'x', workspace: 'w1', vizinhos: [
+    { workspace: 'w2', rotulo: 'motor', estado: 'blocked', agentes: [{ pane: 'w2:p1', estado: 'blocked', titulo: 'Retomada' }, { estado: 'idle' }] },
+    { workspace: 'w3', rotulo: '', estado: 'idle', agentes: [] },
+    { workspace: 'w4', rotulo: 'novo', estado: 'outro', agentes: 'não é lista' },
+    'lixo',
+  ] }
+  expect(validarVizinhos(ok)).toEqual([
+    { workspace: 'w2', rotulo: 'motor', estado: 'blocked', agentes: [{ pane: 'w2:p1', estado: 'blocked', titulo: 'Retomada' }] },
+    { workspace: 'w3', rotulo: 'w3', estado: 'idle', agentes: [] },
+    { workspace: 'w4', rotulo: 'novo', estado: 'unknown', agentes: [] },
+  ])
+  expect(validarVizinhos({ ...ok, versao: 2 })).toEqual([])
+  expect(validarVizinhos({ ...ok, fonte: 'outro' })).toEqual([])
+  expect(validarVizinhos({ ...ok, vizinhos: {} })).toEqual([])
+  expect(validarVizinhos(null)).toEqual([])
+  expect(validarVizinhos({ ...ok, vizinhos: [{ rotulo: 'sem id', estado: 'idle', agentes: [] }] })).toEqual([])
+  // Id vazio não é workspace; estado de agente fora do vocabulário vira unknown (sobreviventes #3 e #7).
+  expect(validarVizinhos({ ...ok, vizinhos: [{ workspace: '', rotulo: 'x', estado: 'idle', agentes: [] }] })).toEqual([])
+  expect(validarVizinhos({ ...ok, vizinhos: [{ workspace: 'w2', rotulo: 'x', estado: 'idle', agentes: [{ pane: 'p', estado: 'outro', titulo: 't' }] }] })[0]!.agentes).toEqual([{ pane: 'p', estado: 'unknown', titulo: 't' }])
+})
+
+test('vizinhos na faixa: só quem espera o operador ou terminou; o vocabulário do herdr vira o do painel', () => {
+  const v = (rotulo: string, estado: string) => ({ workspace: rotulo, rotulo, estado: estado as never, agentes: [] })
+  expect(faixaVizinhos([v('a', 'working'), v('b', 'idle')])).toBe('')
+  expect(faixaVizinhos([v('motor', 'blocked'), v('site', 'done'), v('c', 'working')])).toBe('◆ motor esperando você · ✔ site terminou')
+  expect(estadoDoHerdr('idle')).toBe('ocioso')
+  expect(estadoDoHerdr('working')).toBe('trabalhando')
+  expect(estadoDoHerdr('blocked')).toBe('bloqueado')
+  expect(estadoDoHerdr('done')).toBe('concluido')
+  expect(estadoDoHerdr('unknown')).toBe('ocioso')
 })

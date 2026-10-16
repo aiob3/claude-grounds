@@ -1,0 +1,9 @@
+{
+  "name": "herdr-vizinhos",
+  "version": "0.1.0",
+  "description": "Dentro do herdr, mostra no painel do objetivo os outros workspaces e seus agentes, e avisa quando um fica esperando o operador ou termina. Fora do herdr, não faz nada",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "aiob3"
+  }
+}

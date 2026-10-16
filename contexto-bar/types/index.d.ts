@@ -57,6 +57,10 @@ export type SegundoPlano = {
 /** Estado do agente no vocabulário do herdr: idle, working, blocked, done. */
 export type Estado = 'ocioso' | 'trabalhando' | 'bloqueado' | 'concluido'
 
+/** 0.16.0: um workspace vizinho, como o mod herdr-vizinhos o escreve (contrato em painel.ts). */
+export type EstadoHerdr = 'idle' | 'working' | 'blocked' | 'done' | 'unknown'
+export type VizinhoHerdr = { workspace: string; rotulo: string; estado: EstadoHerdr; agentes: { pane: string; estado: EstadoHerdr; titulo: string }[] }
+
 export type Atividade = { estado: Estado; /** Ferramenta em curso, quando trabalhando. */ ferramenta?: string; desde: number }
 
 /** Um número que outro mod publica em ~/.claude/indicadores/<fonte>.json para o painel mostrar. */
@@ -127,6 +131,8 @@ declare module 'claude-code' {
       roadmap: ItemRoadmap[]
       /** Próximo e depois abertos no painel (agora aparece sempre). */
       verRoadmap: boolean
+      /** Os outros workspaces do herdr, do arquivo deste pane; vazio fora do herdr ou sem o mod. */
+      vizinhos: VizinhoHerdr[]
     }
   }
 }

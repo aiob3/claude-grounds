@@ -1407,3 +1407,62 @@ test('faixa: sem objetivo ou com tudo feito, mostra o roadmap e a próxima dele;
   expect(feito).toContain('  ↳ objetivo feito · roadmap: agora 1')
   expect(feito).not.toContain('sem objetivo ativo')
 })
+
+test('herdr: o painel mostra os outros workspaces do arquivo deste pane e a faixa avisa quem espera; sem HERDR_PANE_ID, nada', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  const arqs: Record<string, string> = {}
+  const env: Record<string, string> = { HOME: '/h', HERDR_PANE_ID: 'w1:p1' }
+  on('env.get', (_$, e) => ({ value: env[(e as { name: string }).name] }) as never)
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path in arqs }) as never)
+  on('fs.read', (_$, e) => {
+    const p = (e as { path: string }).path
+    if (p in arqs) return { value: arqs[p] } as never
+    throw new Error('ENOENT')
+  })
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  const ARQ = '/h/.claude/herdr/vizinhos/w1%3Ap1.json'
+  const escrever = (estado: string) =>
+    (arqs[ARQ] = JSON.stringify({ versao: 1, fonte: 'herdr', em: 'x', workspace: 'w1', vizinhos: [{ workspace: 'w2', rotulo: 'motor', estado, agentes: [{ pane: 'w2:p1', estado, titulo: 'Retomada do motor' }] }] }))
+  escrever('working')
+  await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
+  const pane = await painel($)
+  expect(pane).toContain('OUTROS WORKSPACES')
+  expect(pane).toContain('motor')
+  expect(pane).toContain('trabalhando')
+  expect(pane).toContain('Retomada do motor')
+  expect(await barText($)).not.toContain('esperando você')
+  escrever('blocked')
+  await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
+  expect(await barText($)).toContain('◆ motor esperando você')
+  expect(await painel($)).toContain('esperando você')
+  // Fora do herdr (sem o pane), a seção e a linha somem.
+  delete env.HERDR_PANE_ID
+  await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
+  expect(await painel($)).not.toContain('OUTROS WORKSPACES')
+  expect(await barText($)).not.toContain('motor')
+})
+
+test('herdr: com HERDR_PANE_ID, o arquivo dos vizinhos é relido a cada 5 s sem turno; sem ele, nenhum timer', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  const relogio = mock.clock(on, { now: 0 })
+  const arqs: Record<string, string> = {}
+  const env: Record<string, string> = { HOME: '/h', HERDR_PANE_ID: 'w1:p1' }
+  on('env.get', (_$, e) => ({ value: env[(e as { name: string }).name] }) as never)
+  on('fs.exists', (_$, e) => ({ value: (e as { path: string }).path in arqs }) as never)
+  on('fs.read', (_$, e) => {
+    const p = (e as { path: string }).path
+    if (p in arqs) return { value: arqs[p] } as never
+    throw new Error('ENOENT')
+  })
+  on('session.start', () => ({ cwd: '/proj' }) as never)
+  on('tool.register', () => ({ value: undefined }) as never)
+  on('command.register', () => ({ value: undefined }) as never)
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  await $.session.start({ cwd: '/proj' } as never)
+  await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
+  arqs['/h/.claude/herdr/vizinhos/w1%3Ap1.json'] = JSON.stringify({ versao: 1, fonte: 'herdr', em: 'x', workspace: 'w1', vizinhos: [{ workspace: 'w2', rotulo: 'motor', estado: 'blocked', agentes: [] }] })
+  await relogio.advance(4999)
+  expect(await barText($)).not.toContain('motor')
+  await relogio.advance(1)
+  expect(await barText($)).toContain('◆ motor esperando você')
+})

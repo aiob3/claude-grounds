@@ -2,7 +2,7 @@
 
 <p align="center"><a href="README.en.md">English</a> · <b>Português</b></p>
 
-<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 152" src="https://img.shields.io/badge/falhas_reais_achadas-152-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
+<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="testes" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks para configurar: nenhum" src="https://img.shields.io/badge/hooks_para_configurar-nenhum-0f7a3d?style=flat-square"> <img alt="falhas reais achadas: 158" src="https://img.shields.io/badge/falhas_reais_achadas-158-0f7a3d?style=flat-square"> <img alt="licença: MIT" src="https://img.shields.io/badge/licença-MIT-52514e?style=flat-square"></p>
 
 **Os testes que o agente escreve passam. Mas pegam bug?**
 
@@ -17,8 +17,8 @@ sessão para a outra. O objetivo pede a prova. A prova é feita por um modelo in
 planta bugs no código que o agente mudou, e a tarefa só fecha quando os testes pegam. O registro guarda cada rodada
 e recusa número inflado. Não há settings hook para configurar nem gate travando o agente.
 
-Construindo os próprios mods, a prova achou 152 falhas reais de teste. Em três projetos privados, sem relação com
-estes, achou mais 7. Num projeto com 8881 testes, provar uma mudança leva uns 2 minutos e meio,
+Construindo os próprios mods, a prova achou 158 falhas reais de teste. Em três projetos privados, sem relação com
+estes, achou mais 1. Num projeto com 8881 testes, provar uma mudança leva uns 2 minutos e meio,
 2,8 vezes menos que rodar a suíte completa para cada bug plantado, com os mesmos vereditos.
 
 ## O que você ganha
@@ -93,7 +93,7 @@ claude plugin install prova-de-teste@claude-grounds
 
 | Mod | Versão | Papel |
 |---|---|---|
-| [`contexto-bar`](contexto-bar/) | 0.15.1 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
+| [`contexto-bar`](contexto-bar/) | 0.16.0 | faixa de contexto, objetivo por projeto, painel e projeção da janela |
 | [`prova-de-teste`](prova-de-teste/) | 0.14.0 | rodada de mutantes às cegas numa cópia isolada, relatório e log |
 
 O log do `prova-de-teste` vai para `PROVA_DE_TESTE_LOG` ou, sem essa variável, para
@@ -216,7 +216,7 @@ como morto, um caminho devolvido pelo modelo que fazia 18 mutantes não serem ap
 teste. A demo gravada acrescentou o último da lista: o `registrar` aceitava um estado melhor que o executado sem
 justificativa.
 
-<p align="center"><img src="assets/rodadas.svg" alt="152 falhas reais de teste encontradas" width="100%"></p>
+<p align="center"><img src="assets/rodadas.svg" alt="158 falhas reais de teste encontradas" width="100%"></p>
 
 As garantias de honestidade são mecânicas, não promessas:
 

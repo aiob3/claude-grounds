@@ -23,3 +23,5 @@ jobs:
         run: claude plugin test prova-de-teste
       - name: Testes do contexto-bar
         run: claude plugin test contexto-bar
+      - name: Testes do herdr-vizinhos
+        run: claude plugin test herdr-vizinhos

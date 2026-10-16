@@ -1,6 +1,7 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderChildren } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
+import type { VizinhoHerdr } from '../types'
 import type { Atividade, Decisao, EventoRoadmap, Executores, Goal, GoalItem, GroupKey, Horizonte, Indicador, ItemRoadmap, Nivel, Nota, Owner, Segment, Size, Snapshot, TipoNota } from '../types'
 import { alinhamento, aoCarregar, aplicar, aposCompactar, avisoJanela, comando, etiqueta, linhaContexto, notaPublicacao, ordenar, projetar, proxima, resumo, usado } from './objetivo'
 import type { Acao } from './objetivo'
@@ -9,7 +10,7 @@ import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VO
 import type { SegundoPlano } from './segundo-plano'
 import { DECISOES, entrega, GLIFO_DECISAO, idade, lembrete, paraLembrar, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
 import { abertos, destinoRoadmap, doHorizonte, ehHorizonte, faixaRoadmap, HORIZONTES, lembreteRoadmap, lerRoadmap, linha as linhaRoadmap, novoItem, resumoRoadmap, VERSAO_ROADMAP } from './roadmap'
-import { centralizar, centroIndicador, COR_INDICADOR, encurtar, ESTADOS, nomeModelo, textoAtividade, validarIndicadores } from './painel'
+import { centralizar, centroIndicador, COR_INDICADOR, encurtar, estadoDoHerdr, ESTADOS, faixaVizinhos, nomeModelo, textoAtividade, validarIndicadores, validarVizinhos } from './painel'
 import { estiloDoTerminal, gauge, LARGURA_GAUGE, LINHAS_GAUGE, pedacos } from './gauge'
 import type { EstiloGauge } from './gauge'
 
@@ -32,6 +33,7 @@ const rascunho = atom({ plugin: 'contexto-bar', key: 'rascunho' } as const, '')
 const passos = atom({ plugin: 'contexto-bar', key: 'passos' } as const, 0)
 const ultimaEntrega = atom({ plugin: 'contexto-bar', key: 'ultimaEntrega' } as const, {})
 const roadmap = atom({ plugin: 'contexto-bar', key: 'roadmap' } as const, [])
+const vizinhos = atom({ plugin: 'contexto-bar', key: 'vizinhos' } as const, [])
 const verRoadmap = atom({ plugin: 'contexto-bar', key: 'verRoadmap' } as const, false)
 
 export const TOOL_NAME = 'objetivo'
@@ -190,6 +192,7 @@ export function fmtTokens(n: number): string {
 // Lê o detalhamento do /context (estimativa local, sem custo) e guarda para a barra.
 async function refresh($: EngineInterface, hookTexts: Set<string>) {
   await lerIndicadores($).catch(() => undefined)
+  await lerVizinhos($).catch(() => undefined)
   await lerDoCaderno($).catch(() => undefined)
   try {
     const usage = await $.session.usage({ breakdown: 'summary' })
@@ -204,6 +207,25 @@ async function refresh($: EngineInterface, hookTexts: Set<string>) {
   } catch {
     // Sem sessão ligada ainda: tenta de novo no próximo turno.
   }
+}
+
+export const INTERVALO_VIZINHOS_MS = 5000
+let timerVizinhos: Timer | undefined
+
+/** Os outros workspaces do herdr (contrato em painel.ts), do arquivo deste pane; fora do herdr, nenhum. */
+async function lerVizinhos($: EngineInterface): Promise<void> {
+  const [home, pane] = await Promise.all([$.env.get('HOME'), $.env.get('HERDR_PANE_ID')])
+  const arquivo = home && pane ? `${home}/.claude/herdr/vizinhos/${encodeURIComponent(pane)}.json` : undefined
+  let lidos: VizinhoHerdr[] = []
+  if (arquivo && (await $.fs.exists(arquivo).catch(() => false))) {
+    try {
+      lidos = validarVizinhos(JSON.parse(await $.fs.read(arquivo)))
+    } catch {
+      // Arquivo pela metade (o outro mod escrevendo): fica o que estava até a próxima leitura.
+      return
+    }
+  }
+  if (JSON.stringify(await read($, vizinhos)) !== JSON.stringify(lidos)) await update($, vizinhos, () => lidos)
 }
 
 /**
@@ -710,6 +732,11 @@ export const register: Register = on => {
     await carregarObjetivo($)
     await lerDoRoadmap($).catch(() => undefined)
     await semearCache($)
+    // Dentro do herdr, os vizinhos mudam com esta sessão parada: relidos a cada 5 s, a faixa avisa sem esperar um turno.
+    if (!e.agentId && (await $.env.get('HERDR_PANE_ID').catch(() => undefined))) {
+      timerVizinhos?.cancel()
+      timerVizinhos = $.clock.every(INTERVALO_VIZINHOS_MS, () => void lerVizinhos($).catch(() => undefined))
+    }
     return result
   })
 
@@ -872,6 +899,7 @@ export const register: Register = on => {
     const agora = await read($, turno)
     const pc = taxa((await read($, cache))?.acc ?? null)
     const plano = goal && proxima(goal) ? [] : ((await read($, roadmap)) ?? [])
+    const vizinhosNaFaixa = faixaVizinhos(await read($, vizinhos))
 
     const { Box, Text } = $.ui.resolve(e)
     const suffix = ` ${snap.percent}%`
@@ -911,6 +939,11 @@ export const register: Register = on => {
         {!goal || !proxima(goal) ? (
           <Text dimColor={!plano.length} wrap="truncate">
             {faixaRoadmap(plano, e.props.bodyColumns, goal ? '  ↳ objetivo feito' : '◎ sem objetivo ativo')}
+          </Text>
+        ) : null}
+        {vizinhosNaFaixa ? (
+          <Text color="warning" wrap="truncate">
+            {vizinhosNaFaixa}
           </Text>
         ) : null}
       </Box>
@@ -1047,6 +1080,34 @@ export const register: Register = on => {
         ) : null}
       </Box>
     )
+
+    // Os outros workspaces do herdr: uma linha por workspace, o título do agente com o ponteiro em cima.
+    const vs = await read($, vizinhos)
+    const vizinhosBloco = vs.length ? (
+      <Box flexDirection="column" marginTop={1}>
+        <Text weight="bold">OUTROS WORKSPACES</Text>
+        {vs.map(v => {
+          const est = ESTADOS[estadoDoHerdr(v.estado)]
+          return (
+            <Box key={`viz-${v.workspace}`} flexDirection="column">
+              <Text>
+                <Text color={est.cor}>{est.glifo}</Text> {v.rotulo} <Text color={est.cor}>{est.rotulo}</Text>
+              </Text>
+              {v.agentes.length ? (
+                <Box display="none" hover={{ display: 'flex' }} flexDirection="column" paddingLeft={2}>
+                  {v.agentes.map(a => (
+                    <Text key={`viz-${a.pane}`} dimColor wrap="wrap">
+                      {a.pane} · {ESTADOS[estadoDoHerdr(a.estado)].rotulo}
+                      {a.titulo ? ` · ${a.titulo}` : ''}
+                    </Text>
+                  ))}
+                </Box>
+              ) : null}
+            </Box>
+          )
+        })}
+      </Box>
+    ) : null
 
     // O caderno: a porta do operador durante a execução (propósito e contrato em caderno.ts).
     const notas = await read($, caderno)
@@ -1218,6 +1279,7 @@ export const register: Register = on => {
         <Box flexDirection="column">
           {medidores}
           {agoraCard}
+          {vizinhosBloco}
           <Box flexDirection="column" marginTop={1}>
             <Text dimColor>Nenhum objetivo ativo.</Text>
             <Text dimColor>/objetivo texto :: passo que conclui</Text>
@@ -1253,6 +1315,7 @@ export const register: Register = on => {
           {medidores}
         </Box>
         {agoraCard}
+        {vizinhosBloco}
         {suaVez.length ? (
           <Box flexDirection="column" marginTop={1}>
             <Text>

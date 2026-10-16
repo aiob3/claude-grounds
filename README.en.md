@@ -2,7 +2,7 @@
 
 <p align="center"><b>English</b> · <a href="README.md">Português</a></p>
 
-<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="tests" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks to wire up: none" src="https://img.shields.io/badge/hooks_to_wire_up-none-0f7a3d?style=flat-square"> <img alt="real test gaps found: 152" src="https://img.shields.io/badge/real_test_gaps_found-152-0f7a3d?style=flat-square"> <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-52514e?style=flat-square"></p>
+<p align="center"><a href="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml"><img alt="tests" src="https://github.com/aiob3/claude-grounds/actions/workflows/testes.yml/badge.svg"></a> <img alt="Claude Code: mods" src="https://img.shields.io/badge/Claude_Code-mods-2a78d6?style=flat-square"> <img alt="hooks to wire up: none" src="https://img.shields.io/badge/hooks_to_wire_up-none-0f7a3d?style=flat-square"> <img alt="real test gaps found: 158" src="https://img.shields.io/badge/real_test_gaps_found-158-0f7a3d?style=flat-square"> <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-52514e?style=flat-square"></p>
 
 **The tests your agent writes pass. But do they catch bugs?**
 
@@ -17,8 +17,8 @@ session to the next. The goal asks for proof. The proof comes from an independen
 plants bugs in the code the agent changed, and the task only closes when the tests catch them. The record keeps every
 round and refuses inflated numbers. There are no settings hooks to wire up and no gate blocking the agent.
 
-Building the mods themselves, the proof found 152 real test gaps. On three private projects, unrelated to these,
-it found 7 more. On a project with 8881 tests, proving a change takes about 2 and a half minutes,
+Building the mods themselves, the proof found 158 real test gaps. On three private projects, unrelated to these,
+it found 1 more. On a project with 8881 tests, proving a change takes about 2 and a half minutes,
 2.8x less than running the full suite for every planted bug, with the same verdicts.
 
 ## What you get
@@ -94,7 +94,7 @@ claude plugin install prova-de-teste@claude-grounds
 
 | Mod | Version | Role |
 |---|---|---|
-| [`contexto-bar`](contexto-bar/) | 0.15.1 | context band, goal per project, panel and window projection |
+| [`contexto-bar`](contexto-bar/) | 0.16.0 | context band, goal per project, panel and window projection |
 | [`prova-de-teste`](prova-de-teste/) | 0.14.0 | blind mutant round in an isolated copy, report and log |
 
 The `prova-de-teste` log goes to `PROVA_DE_TESTE_LOG` or, without that variable, to
@@ -223,7 +223,7 @@ published, and the instrument found bugs in itself along the way. A mutant that 
 path returned by the model that left 18 mutants unapplied, a test helper mistaken for a test. The recorded demo added
 the last one: `registrar` accepted a better state than the run without justification.
 
-<p align="center"><img src="assets/rodadas-en.svg" alt="152 real test gaps found" width="100%"></p>
+<p align="center"><img src="assets/rodadas-en.svg" alt="158 real test gaps found" width="100%"></p>
 
 The honesty guarantees are mechanical, not promises:
 

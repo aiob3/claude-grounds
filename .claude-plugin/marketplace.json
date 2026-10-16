@@ -11,6 +11,10 @@
     {
       "name": "prova-de-teste",
       "source": "./prova-de-teste"
+    },
+    {
+      "name": "herdr-vizinhos",
+      "source": "./herdr-vizinhos"
     }
   ],
   "description": "claude-grounds: toda afirmação de \"feito\" de um agente precisa de fundamento, com o objetivo visível na jornada e a prova de que os testes pegam bug (EXP-001)"
