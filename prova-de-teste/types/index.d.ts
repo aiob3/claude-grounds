@@ -41,6 +41,8 @@ export type ExecucaoFeita = {
   /** 0.6.0: o teto do estado com os sobreviventes justificados, e quais sobreviveram. */
   estadoSeEquivalentes?: string
   sobreviventesN?: number[]
+  /** 0.14.0: as categorias sem mutante aplicado, que um mutante manual morto pode cobrir. */
+  descobertas?: string[]
   /** 0.7.0: o resumo do custo da rodada (base, por mutante, repositório, diff), que vai ao log. */
   custo?: string
 }

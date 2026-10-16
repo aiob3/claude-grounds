@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { avisoNovos, CABECALHO_LOG, defeitosDoInstrumento, protocoloEm, ehArquivoDeTeste, instrumentoDe, tocaOInstrumento, nomeDe, versaoDe, lacunas, lerArgs, lerResposta, linhaLog, separar } from './prova'
+import { avisoNovos, validarManuais, CABECALHO_LOG, defeitosDoInstrumento, protocoloEm, ehArquivoDeTeste, instrumentoDe, tocaOInstrumento, nomeDe, versaoDe, lacunas, lerArgs, lerResposta, linhaLog, separar } from './prova'
 
 const bloco = (arquivo: string, corpo = '+x') =>
   `diff --git a/${arquivo} b/${arquivo}\nindex 1..2 100644\n--- a/${arquivo}\n+++ b/${arquivo}\n@@ -1 +1 @@\n${corpo}\n`
@@ -192,4 +192,26 @@ test('o protocolo viaja com o mod e o cabeçalho do log novo traz o formato da v
   expect(protocoloEm('/mods/prova-de-teste')).toBe('/mods/prova-de-teste/PROTOCOLO.md')
   expect(CABECALHO_LOG).toContain('v1.2: `<data> | <tarefa>')
   expect(CABECALHO_LOG).toContain('instrumento: <mod x.y.z | manual> | <medição | calibração: defeito>')
+})
+
+test('mutante manual declarado: vai à linha do log com categoria, mutação e quem matou; malformado é recusado', () => {
+  const ok = { tarefa: 't', aplicados: 3, mortos: 3, sobreviventes: 0, reais: 0, estado: 'PROVADO' as const, tempo: 1 }
+  const m = { arquivo: 'hooks/a.ts', linha: 12, categoria: 'empate/ordem', mutacao: 'mover a linha | 13 acima', mortoPor: 'ordem do log' }
+  expect(linhaLog({ ...ok, manuais: [m] }, 'd').linha).toEndWith('| medição | manuais: hooks/a.ts:12 empate/ordem mover a linha / 13 acima → morto por "ordem do log"')
+  expect(linhaLog({ ...ok, manuais: [{ ...m, linha: undefined }, m] }, 'd').linha).toContain('manuais: hooks/a.ts empate/ordem')
+  expect(linhaLog({ ...ok, manuais: [] }, 'd').linha).toEndWith('| medição')
+  // Os números da linha continuam os da execução: o manual não entra em aplicados.
+  expect(linhaLog({ ...ok, manuais: [m] }, 'd').linha).toContain('mutantes: 3/3/0')
+  expect(validarManuais([m])).toBeUndefined()
+  expect(validarManuais(undefined)).toBeUndefined()
+  expect(validarManuais([{ ...m, categoria: 'outra' }])).toContain('categoria')
+  expect(validarManuais([{ ...m, categoria: 'livre' }])).toBeUndefined()
+  expect(validarManuais([{ ...m, mutacao: ' ' }])).toContain('#1')
+  expect(validarManuais([m, { ...m, mortoPor: '' }])).toContain('#2')
+  expect(validarManuais([{ ...m, arquivo: '' }])).toContain('arquivo')
+  // Item nulo na lista (JSON malformado do agente): recusa, não quebra.
+  expect(validarManuais([m, null as never])).toContain('#2: falta arquivo')
+  expect(validarManuais([{ ...m, linha: 0 }])).toContain('linha')
+  expect(validarManuais([{ ...m, linha: 1.5 }])).toContain('linha')
+  expect(linhaLog({ ...ok, manuais: [{ ...m, mortoPor: ' ' }] }, 'd').erro).toContain('mortoPor')
 })

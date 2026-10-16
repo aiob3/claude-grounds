@@ -911,3 +911,26 @@ test('executar em paralelo: se uma das cópias não fica pronta, a rodada vai em
   expect(new Set(m.rodadas.map(x => x.at(-1)))).toEqual(new Set([`${m.TMP}/repo`]))
   expect(r).toContain('Mutantes:   2 aplicados | 1 mortos | 1 sobreviventes')
 })
+
+test('registrar 0.14.0: mutante manual morto cobre a categoria descoberta e vai ao log; os números seguem os da execução (#18)', async ($, on) => {
+  const m = mundo(on, { python: true })
+  await $.tool.call({ tool: 'mcp__prova-de-teste__executar', tarefa: 'dobro' } as never)
+  m.fs.set(LOG_PATH, '# log\n')
+  const base = { tool: 'mcp__prova-de-teste__registrar', tarefa: 'dobro', aplicados: 2, mortos: 1, sobreviventes: 1, reais: 0, tempo: 5, estado: 'PROVADO', equivalentes: [{ n: 1, motivo: 'comuta' }] }
+  const manual = (categoria: string) => ({ arquivo: 'src/calc.py', linha: 2, categoria, mutacao: 'mover a linha', mortoPor: 'test_dobro' })
+  // Sem manual, a categoria descoberta barra, e a mensagem diz quais faltam.
+  const sem = JSON.stringify(await $.tool.call(base as never))
+  expect(sem).toContain('borda/vazio, empate/ordem, null/inválido')
+  expect(sem).toContain('estado máximo é FRACO')
+  // Faltando uma, ainda barra.
+  const quase = JSON.stringify(await $.tool.call({ ...base, manuais: [manual('borda/vazio'), manual('empate/ordem')] } as never))
+  expect(quase).toContain('null/inválido')
+  expect(m.fs.get(LOG_PATH)).toBe('# log\n')
+  // Manual malformado é recusado antes de conferir.
+  expect(JSON.stringify(await $.tool.call({ ...base, manuais: [{ ...manual('borda/vazio'), mortoPor: '' }] } as never))).toContain('mortoPor')
+  // Com as três, grava; aplicados continua o da execução.
+  const ok = JSON.stringify(await $.tool.call({ ...base, manuais: ['borda/vazio', 'empate/ordem', 'null/inválido'].map(manual) } as never))
+  expect(ok).toContain('manuais: src/calc.py:2 borda/vazio mover a linha')
+  expect(m.fs.get(LOG_PATH)).toContain('mutantes: 2/1/1 | reais: 0 | PROVADO')
+  expect(m.fs.get(LOG_PATH)).toContain('null/inválido mover a linha → morto por \"test_dobro\"')
+})

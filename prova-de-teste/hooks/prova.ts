@@ -168,7 +168,32 @@ export type Registro = {
   equivalentes?: { n: number; motivo: string }[]
   /** 0.7.0: o custo medido pelo mod na execução (nunca informado pelo agente). */
   custo?: string
+  /** 0.14.0: mutantes que o agente aplicou à mão, fora da lista; vão à linha, sem entrar em aplicados. */
+  manuais?: Manual[]
 }
+
+/**
+ * 0.14.0: um mutante aplicado à mão. Existe para a categoria que o escolhedor só descreve em prosa (mover uma linha,
+ * trocar a ordem de duas chamadas) e que não cabe num trecho de substituição. O mod não o executou: é declarado,
+ * fica auditável na linha do log e só cobre categoria descoberta, nunca troca os números da execução.
+ */
+export type Manual = { arquivo: string; linha?: number; categoria: string; mutacao: string; mortoPor: string }
+
+/** O erro do primeiro mutante manual malformado; nada quando todos valem. */
+export function validarManuais(ms: Manual[] | undefined): string | undefined {
+  for (const [i, m] of (ms ?? []).entries()) {
+    const n = `mutante manual #${i + 1}`
+    if (!m?.arquivo?.trim()) return `${n}: falta arquivo.`
+    if (m.linha !== undefined && (!Number.isInteger(m.linha) || m.linha < 1)) return `${n}: linha precisa ser um inteiro ≥ 1.`
+    if (!ehCategoria(m.categoria)) return `${n}: categoria precisa ser uma de: ${[...CATEGORIAS, 'livre'].join(', ')}.`
+    if (!m.mutacao?.trim()) return `${n}: falta mutacao.`
+    if (!m.mortoPor?.trim()) return `${n}: falta mortoPor (o teste que falhou com ele; sobrevivente não se declara à mão).`
+  }
+  return undefined
+}
+
+const manualNaLinha = (m: Manual) =>
+  `${m.arquivo.trim()}${m.linha ? `:${m.linha}` : ''} ${m.categoria} ${m.mutacao.trim()} → morto por "${m.mortoPor.trim()}"`
 
 /**
  * v1.2: por que esta rodada calibra o instrumento em vez de medir o método. Vazio = medição.
@@ -223,12 +248,15 @@ export function linhaLog(r: Partial<Registro>, data: string): { linha?: string; 
   }
   if (r.mortos! + r.sobreviventes! !== r.aplicados) return { erro: 'mortos + sobreviventes precisa dar aplicados.' }
   if (!ESTADOS.includes(r.estado as Registro['estado'])) return { erro: `estado precisa ser um de: ${ESTADOS.join(', ')}.` }
+  const manualRuim = validarManuais(r.manuais)
+  if (manualRuim) return { erro: manualRuim }
   const t = r.tarefa.trim().replace(/\s*\|\s*/g, ' / ')
   return {
     linha:
       `${data} | ${t} | v${VERSAO} | mutantes: ${r.aplicados}/${r.mortos}/${r.sobreviventes} | reais: ${r.reais} | ${r.estado} | ${r.tempo}` +
       ` | instrumento: ${r.instrumento ?? `manual v${VERSAO}`} | ${r.defeitos?.length ? `calibração: ${r.defeitos.join('; ').replace(/\s*\|\s*/g, ' / ')}` : 'medição'}` +
       (r.equivalentes?.length ? ` | equivalentes: ${r.equivalentes.map(q => `#${q.n} ${q.motivo.trim()}`).join('; ').replace(/\s*\|\s*/g, ' / ')}` : '') +
+      (r.manuais?.length ? ` | manuais: ${r.manuais.map(manualNaLinha).join('; ').replace(/\s*\|\s*/g, ' / ')}` : '') +
       (r.custo ? ` | custo: ${r.custo.replace(/\s*\|\s*/g, ' / ')}` : ''),
   }
 }

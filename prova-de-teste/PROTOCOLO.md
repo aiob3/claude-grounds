@@ -45,6 +45,7 @@ Para o código **alterado nesta tarefa** (só o diff), aplique **pelo menos 1 mu
 - Confirme a restauração com `git diff` limpo no código-fonte. Sem commit, use `cmp` contra uma cópia e registre qual dos dois usou.
 - Todo SOBREVIVENTE gera uma das duas saídas: reforçar o teste até matá-lo (e o teste novo passa pela R1), ou justificar em uma linha que ele é equivalente.
 - **Equivalente** quer dizer que nenhuma entrada distingue o mutante do original. "Fora do escopo desta tarefa" não é equivalência: se uma entrada válida mostra a diferença (como uma lista de tamanho par), o sobrevivente é real. Com o mod, registrar um estado melhor que o executado exige a justificativa de cada sobrevivente (`equivalentes`), que vai para a linha do log.
+- **Mutante manual** (mod 0.14.0): a categoria que o escolhedor só descreve em prosa, como mover uma linha, não cabe num trecho de substituição. Aplique-a à mão, rode os testes e declare-a no registrar (`manuais`: arquivo, linha, categoria, mutação e o teste que a matou). Ela não entra nos números da execução: vai para a linha do log e cobre a categoria que a escolha deixou descoberta. Só se declara mutante morto.
 
 ### R2.1 — Mutantes escolhidos às cegas (obrigatória quando houver subagente disponível)
 Quem escolhe os mutantes **não pode ter visto os testes**.

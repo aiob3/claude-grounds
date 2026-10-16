@@ -456,3 +456,22 @@ test('largura do paralelo: um quarto dos núcleos até 8, nunca mais que os muta
   expect(larguraDoParalelo(2.7, 32, 5)).toBe(2)
   expect(larguraDoParalelo(Number.NaN, 32, 30)).toBe(8)
 })
+
+test('conferirEstado: mutante manual morto cobre a categoria que a escolha deixou descoberta', () => {
+  const feita = { estado: 'FRACO', estadoSeEquivalentes: 'FRACO', sobreviventesN: [], descobertas: ['empate/ordem'] }
+  const m = (categoria: string) => ({ arquivo: 'a.ts', categoria, mutacao: 'mover linha', mortoPor: 't' })
+  expect(conferirEstado(feita, 'PROVADO', [], [m('empate/ordem')])).toBeUndefined()
+  // Manual de outra categoria não cobre.
+  expect(conferirEstado(feita, 'PROVADO', [], [m('borda/vazio')])).toContain('estado máximo é FRACO')
+  expect(conferirEstado(feita, 'PROVADO', [], [m('livre')])).toContain('empate/ordem')
+  // Duas descobertas: as duas precisam de manual.
+  const duas = { ...feita, descobertas: ['empate/ordem', 'borda/vazio'] }
+  expect(conferirEstado(duas, 'PROVADO', [], [m('empate/ordem')])).toContain('borda/vazio')
+  expect(conferirEstado(duas, 'PROVADO', [], [m('empate/ordem'), m('borda/vazio')])).toBeUndefined()
+  // Sobrevivente sem justificativa continua barrando, com manual ou não.
+  expect(conferirEstado({ ...feita, sobreviventesN: [2] }, 'PROVADO', [], [m('empate/ordem')])).toContain('#2')
+  expect(conferirEstado({ ...feita, sobreviventesN: [2] }, 'PROVADO', [{ n: 2, motivo: 'x' }], [m('empate/ordem')])).toBeUndefined()
+  // NÃO VERIFICADO não sobe com manual; execução antiga sem a lista de descobertas também não.
+  expect(conferirEstado({ ...feita, estado: 'NÃO VERIFICADO', estadoSeEquivalentes: 'NÃO VERIFICADO' }, 'PROVADO', [], [m('empate/ordem')])).toContain('estado máximo é NÃO VERIFICADO')
+  expect(conferirEstado({ estado: 'FRACO', estadoSeEquivalentes: 'FRACO', sobreviventesN: [] }, 'PROVADO', [], [m('empate/ordem')])).toContain('estado máximo é FRACO')
+})

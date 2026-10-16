@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Escolha, ExecucaoFeita, Mutante } from '../types'
-import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, larguraDoParalelo, refazerSozinho, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
+import { ACHAR_NO_VENV, AMBIENTE_DE_TESTE, chaveDoRecorte, larguraDoParalelo, refazerSozinho, pycachesDe, realocar, SOBRESCREVER, aplicarTrecho, comandosPara, contarTestes, planoIncremental, somarTestes, linhasDoDiff, resumoCusto, tamanhoDoRepo, categoriasDescobertas, conferirEstado, erroDeCarga, estadoSeEquivalentes, invalido, conferir, contar, detectarComando, estadoDe, quemMatou, relatorio, resolverArquivo } from './execucao'
 import type { Comando, Execucao, Paralelo, Resultado } from './execucao'
 import { efetividade, indicadoresDeEfetividade } from './placar'
 import { avisoNovos, cortarResposta, LIMITE_ESCOLHA, logDoProjeto, defeitosDoInstrumento, instrumentoDe, CABECALHO_LOG, lacunas, lerArgs, LOG_ENV, logPadrao, lerResposta, linhaLog, montarPrompt, protocoloEm, separar, SISTEMA, tabela, tocaOInstrumento, versaoDe, nomeDe, ehArquivoDeTeste } from './prova'
@@ -58,6 +58,23 @@ const SPEC_REGISTRAR = {
         description:
           'Sobreviventes que você alega equivalentes (n do relatório + motivo de uma linha). Obrigatório para registrar estado melhor que o executado; vai à linha do log. Fora do escopo não é equivalência.',
         items: { type: 'object', properties: { n: { type: 'integer' }, motivo: { type: 'string' } }, required: ['n', 'motivo'] },
+      },
+      manuais: {
+        type: 'array',
+        description:
+          'Mutantes que você aplicou à mão, fora da lista, e que morreram (categoria, mutacao, mortoPor = o teste que falhou; arquivo e linha). ' +
+          'Para a categoria que o escolhedor só descreve em prosa (mover uma linha). Não entram nos números: vão à linha do log e cobrem a categoria descoberta.',
+        items: {
+          type: 'object',
+          properties: {
+            arquivo: { type: 'string' },
+            linha: { type: 'integer' },
+            categoria: { type: 'string', enum: ['borda/vazio', 'empate/ordem', 'null/inválido', 'condição invertida', 'livre'] },
+            mutacao: { type: 'string' },
+            mortoPor: { type: 'string' },
+          },
+          required: ['arquivo', 'categoria', 'mutacao', 'mortoPor'],
+        },
       },
       defeitoInstrumento: {
         type: 'string',
@@ -213,7 +230,7 @@ async function registrar($: EngineInterface, r: Partial<Registro> & { defeitoIns
   // O custo vem do que o mod mediu, nunca do agente.
   const { linha, erro } = linhaLog({ ...r, instrumento, defeitos, custo: feita?.custo }, data)
   if (erro || !linha) return { texto: `Erro: ${erro}`, erro: true }
-  const divergente = feita && (conferir(feita, r) ?? conferirEstado(feita, r.estado!, r.equivalentes ?? []))
+  const divergente = feita && (conferir(feita, r) ?? conferirEstado(feita, r.estado!, r.equivalentes ?? [], r.manuais ?? []))
   if (divergente) return { texto: `Erro: ${divergente}`, erro: true }
   const destino = await destinoDoLog($, feita?.raiz)
   if (!destino) return { texto: `Erro: sem ${LOG_ENV} nem HOME, não sei onde fica o log.`, erro: true }
@@ -594,6 +611,7 @@ async function executar(
       estado: estadoDe(exec),
       estadoSeEquivalentes: estadoSeEquivalentes(exec),
       sobreviventesN: exec.resultados.filter(x => x.situacao === 'SOBREVIVENTE').map(x => x.n),
+      descobertas: categoriasDescobertas(exec.resultados, exec.naoAplicaveis),
       quando: new Date().toISOString(),
       versao: await versaoDoMod($),
       // O diff mexe no próprio mod: a rodada mede o instrumento enquanto ele muda (v1.2: calibração).

@@ -428,9 +428,10 @@ const GRAU = ['NÃO VERIFICADO', 'FRACO', 'PROVADO-PARCIAL', 'PROVADO']
  * como equivalente e sem passar do teto: "fora do escopo" não é equivalência (demo do claude-grounds, 14/10/2026).
  */
 export function conferirEstado(
-  feita: { estado: string; estadoSeEquivalentes?: string; sobreviventesN?: number[] },
+  feita: { estado: string; estadoSeEquivalentes?: string; sobreviventesN?: number[]; descobertas?: string[] },
   estado: string,
   equivalentes: { n: number; motivo: string }[] = [],
+  manuais: { categoria: string }[] = [],
 ): string | undefined {
   if (!feita.sobreviventesN) return undefined
   const estranhos = equivalentes.filter(q => !feita.sobreviventesN!.includes(q.n)).map(q => `#${q.n}`)
@@ -439,7 +440,11 @@ export function conferirEstado(
   const faltam = feita.sobreviventesN.filter(n => !equivalentes.some(q => q.n === n && q.motivo.trim())).map(n => `#${n}`)
   if (faltam.length)
     return `o mod executou ${feita.estado}; para registrar ${estado}, justifique cada sobrevivente como equivalente (sem justificativa: ${faltam.join(', ')}). Fora do escopo não é equivalência: reforce o teste ou registre ${feita.estado}.`
-  if (feita.estadoSeEquivalentes !== 'PROVADO') return `há categoria sem mutante: o estado máximo é ${feita.estadoSeEquivalentes ?? feita.estado}.`
+  // 0.14.0: o mutante manual morto cobre a categoria que a escolha deixou descoberta (só quando a execução diz quais).
+  const semManual = feita.descobertas?.filter(c => !manuais.some(m => m.categoria === c))
+  const teto = feita.estadoSeEquivalentes === 'FRACO' && feita.descobertas?.length && !semManual!.length ? 'PROVADO' : feita.estadoSeEquivalentes
+  if (teto !== 'PROVADO')
+    return `há categoria sem mutante${semManual?.length && teto === 'FRACO' ? ` (${semManual.join(', ')}: declare um mutante manual morto nela ou reforce)` : ''}: o estado máximo é ${feita.estadoSeEquivalentes ?? feita.estado}.`
   if (estado !== 'PROVADO') return 'a escolha às cegas foi aplicada pelo mod: com os sobreviventes justificados, o estado é PROVADO.'
   return undefined
 }
