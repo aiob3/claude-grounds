@@ -113,6 +113,22 @@ export function lembreteRoadmap(itens: ItemRoadmap[], semPendencia: boolean): st
   return ` · roadmap em agora: ${agora.map(i => `R${i.n}`).join(', ')} (promova com a ferramenta roadmap, acao "promover")`
 }
 
+/**
+ * A faixa acima do prompt quando não há o que fazer no objetivo (nenhum ativo ou tudo feito): as contagens do plano
+ * e a próxima dele, a primeira aberta em agora (senão em próximo, senão em depois). Sem isto, a prioridade sumia da
+ * faixa ao encerrar o objetivo, e uma sessão via o que fazer e a outra não (16/10).
+ */
+export function faixaRoadmap(itens: ItemRoadmap[], largura: number, cabeca = '◎ sem objetivo ativo'): string {
+  const ab = abertos(itens)
+  if (!ab.length) return `${cabeca} · roadmap vazio: /objetivo texto :: passo que conclui`
+  const contagem = HORIZONTES.map(x => `${x.rotulo} ${doHorizonte(itens, x.h).length}`).join(' · ')
+  const prox = NOMES.map(h => doHorizonte(itens, h)[0]).find(Boolean)!
+  const base = `${cabeca} · roadmap: ${contagem} · próxima: R${prox.n} `
+  const texto = comFrente(prox)
+  const cabe = Math.max(1, largura - base.length)
+  return base + (texto.length <= cabe ? texto : `${texto.slice(0, cabe - 1).trimEnd()}…`)
+}
+
 /** De onde vem o horizonte num destino de triagem: `roadmap`, `roadmap:agora`, `roadmap proximo`... */
 export function destinoRoadmap(destino: string | undefined): Horizonte | null {
   const m = /^\s*roadmap\b[\s:/-]*(\S+)?/i.exec(destino ?? '')

@@ -1383,3 +1383,27 @@ test('roadmap no painel: agora sempre, próximo e depois pelo botão; Promover s
   pane = await painel($)
   expect(pane).toContain('agora 0 · próximo 1 · depois 1 ▾')
 })
+
+test('faixa: sem objetivo ou com tudo feito, mostra o roadmap e a próxima dele; com pendência a fazer, não (16/10: a prioridade sumia ao encerrar)', async ($, on) => {
+  on('session.usage', () => usageWith(50000))
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  comRoadmap(on)
+  on('tool.call', () => ({ result: { text: 'ok' } }) as never)
+  await $.tool.call({ tool: 'Bash', input: { command: 'true' } } as never)
+  // Sem plano: a linha diz como começar, apagada.
+  const vazia = await barText($)
+  expect(vazia).toContain('◎ sem objetivo ativo · roadmap vazio')
+  expect(vazia).toMatch(/"dimColor":true,"wrap":"truncate"/)
+  await rm($, { acao: 'adicionar', itens: [{ texto: 'mod do herdr só leitura', horizonte: 'agora', frente: 'herdr' }] })
+  // O roadmap é relido no turno; a faixa lê o estado.
+  await contextoDe($, 'e agora?')
+  const sem = await barText($)
+  expect(sem).toContain('◎ sem objetivo ativo · roadmap: agora 1 · próximo 0 · depois 0 · próxima: R1 [herdr] mod do herdr s…')
+  expect(sem).toMatch(/"dimColor":false,"wrap":"truncate"/)
+  await comObjetivo($)
+  expect(await barText($)).not.toContain('roadmap:')
+  for (const n of [1, 2, 3]) await $.tool.call({ tool: TOOL, acao: 'concluir', ids: [n] } as never)
+  const feito = await barText($)
+  expect(feito).toContain('  ↳ objetivo feito · roadmap: agora 1')
+  expect(feito).not.toContain('sem objetivo ativo')
+})

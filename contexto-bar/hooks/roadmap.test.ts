@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { destinoRoadmap, doHorizonte, lembreteRoadmap, lerRoadmap, linha, novoItem, resumoRoadmap } from './roadmap'
+import { destinoRoadmap, doHorizonte, faixaRoadmap, lembreteRoadmap, lerRoadmap, linha, novoItem, resumoRoadmap } from './roadmap'
 
 const EM = '2026-10-16T01:02:03.456Z'
 
@@ -84,4 +84,37 @@ test('destino da triagem: roadmap com ou sem horizonte; outro destino não é ro
   expect(destinoRoadmap('ver o roadmap')).toBeNull()
   expect(destinoRoadmap('roadmaps')).toBeNull()
   expect(destinoRoadmap(undefined)).toBeNull()
+})
+
+test('faixa sem objetivo: a próxima do plano é o primeiro item em agora, com as contagens; vazio diz que não há plano', () => {
+  const a = novoItem('Fase 1 do herdr, mod só de leitura', 'agora', EM, 'a', 'claude', 'herdr')!
+  const b = novoItem('abas', 'proximo', EM, 'b', 'claude')!
+  const c = novoItem('acionamento', 'agora', EM, 'c', 'claude')!
+  const itens = lerRoadmap([a, b, c].map(linha).join(''))
+  expect(faixaRoadmap(itens, 200)).toBe('◎ sem objetivo ativo · roadmap: agora 2 · próximo 1 · depois 0 · próxima: R1 [herdr] Fase 1 do herdr, mod só de leitura')
+  // Sem nada em agora, a próxima sai do próximo.
+  const soProximo = lerRoadmap(linha(b))
+  expect(faixaRoadmap(soProximo, 200)).toBe('◎ sem objetivo ativo · roadmap: agora 0 · próximo 1 · depois 0 · próxima: R1 abas')
+  // Estreito: o texto da próxima é encurtado com reticências e a linha cabe na largura.
+  const curta = faixaRoadmap(itens, 90)
+  expect(curta.length).toBeLessThanOrEqual(90)
+  expect(curta).toEndWith('…')
+  expect(curta).toContain('próxima: R1')
+  // Promovido e descartado não contam.
+  const promovido = lerRoadmap([a, c].map(linha).join('') + JSON.stringify({ v: 1, ev: 'promover', id: a.id, em: EM, pendencia: 2 }) + '\n')
+  expect(faixaRoadmap(promovido, 200)).toContain('agora 1 ·')
+  expect(faixaRoadmap(promovido, 200)).toContain('próxima: R2 acionamento')
+  // No limite: a próxima que cabe exata não é cortada; um caractere a menos corta com a reticência na última coluna.
+  const exata = faixaRoadmap(itens, 200).length
+  expect(faixaRoadmap(itens, exata)).toBe(faixaRoadmap(itens, 200))
+  expect(faixaRoadmap(itens, exata - 1).length).toBe(exata - 1)
+  expect(faixaRoadmap(itens, exata - 1)).toEndWith('leitu…')
+  // Largura menor que o começo da linha: sobra ao menos a reticência.
+  expect(faixaRoadmap(itens, 10)).toEndWith('R1 …')
+  // Descartado não é a próxima nem conta.
+  const descartado = lerRoadmap([a, c].map(linha).join('') + JSON.stringify({ v: 1, ev: 'descartar', id: a.id, em: EM, motivo: 'x' }) + '\n')
+  expect(faixaRoadmap(descartado, 200)).toContain('agora 1 · próximo 0 · depois 0 · próxima: R2 acionamento')
+  const soDescartado = lerRoadmap(linha(a) + JSON.stringify({ v: 1, ev: 'descartar', id: a.id, em: EM, motivo: 'x' }) + '\n')
+  expect(faixaRoadmap(soDescartado, 200)).toContain('roadmap vazio')
+  expect(faixaRoadmap([], 200)).toBe('◎ sem objetivo ativo · roadmap vazio: /objetivo texto :: passo que conclui')
 })

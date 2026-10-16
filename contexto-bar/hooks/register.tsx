@@ -8,7 +8,7 @@ import { CACHE_VAZIO, caminhoTranscript, doTranscript, somar, taxa } from './cac
 import { alertas, avisoAoModelo, caminhoSaida, concluirTarefa, FERRAMENTAS_DE_VOLTA, fimDeTurno, linhasDoPainel, notificacao, registrarTarefa, SP_VAZIO } from './segundo-plano'
 import type { SegundoPlano } from './segundo-plano'
 import { DECISOES, entrega, GLIFO_DECISAO, idade, lembrete, paraLembrar, lerCaderno, linha as linhaCaderno, novaNota, pendenciaDoCaderno, PROPOSITO, semResposta, TIPOS, triagem } from './caderno'
-import { abertos, destinoRoadmap, doHorizonte, ehHorizonte, HORIZONTES, lembreteRoadmap, lerRoadmap, linha as linhaRoadmap, novoItem, resumoRoadmap, VERSAO_ROADMAP } from './roadmap'
+import { abertos, destinoRoadmap, doHorizonte, ehHorizonte, faixaRoadmap, HORIZONTES, lembreteRoadmap, lerRoadmap, linha as linhaRoadmap, novoItem, resumoRoadmap, VERSAO_ROADMAP } from './roadmap'
 import { centralizar, centroIndicador, COR_INDICADOR, encurtar, ESTADOS, nomeModelo, textoAtividade, validarIndicadores } from './painel'
 import { estiloDoTerminal, gauge, LARGURA_GAUGE, LINHAS_GAUGE, pedacos } from './gauge'
 import type { EstiloGauge } from './gauge'
@@ -871,6 +871,7 @@ export const register: Register = on => {
     const goal = await read($, objetivo)
     const agora = await read($, turno)
     const pc = taxa((await read($, cache))?.acc ?? null)
+    const plano = goal && proxima(goal) ? [] : ((await read($, roadmap)) ?? [])
 
     const { Box, Text } = $.ui.resolve(e)
     const suffix = ` ${snap.percent}%`
@@ -907,6 +908,11 @@ export const register: Register = on => {
           ))}
         </Text>
         {goal ? <GoalBand goal={goal} snap={snap} agora={agora} Text={Text} /> : null}
+        {!goal || !proxima(goal) ? (
+          <Text dimColor={!plano.length} wrap="truncate">
+            {faixaRoadmap(plano, e.props.bodyColumns, goal ? '  ↳ objetivo feito' : '◎ sem objetivo ativo')}
+          </Text>
+        ) : null}
       </Box>
     )
   })
