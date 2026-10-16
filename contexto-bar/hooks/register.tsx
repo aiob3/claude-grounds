@@ -655,18 +655,21 @@ async function mudarAuto($: EngineInterface, ligado: boolean): Promise<void> {
 }
 
 async function abrirPainel($: EngineInterface) {
-  // As abas na ordem (Objetivo primeiro); a do objetivo de novo no fim, para ser a mostrada e dizer se o painel foi posto.
-  for (const a of ABAS) await $.ui.open({ id: a.id, title: a.titulo, closeOnEscape: true, columns: 48 }).catch(() => undefined)
+  // A superfície mostra a última aba aberta, e reabrir não a traz para a frente (visto na sessão real, 16/10): as
+  // outras abrem antes e a do objetivo por último, para ser a que o operador vê. A barra de abas fica Caderno, Prova,
+  // Agentes, Objetivo.
+  for (const a of ABAS.slice(1)) await $.ui.open({ id: a.id, title: a.titulo, closeOnEscape: true, columns: 48 }).catch(() => undefined)
   return $.ui.open({ id: PANE, title: ABAS[0].titulo, closeOnEscape: true, columns: 48 })
 }
 
 /** Fecha as abas que vão junto com a que o operador fechou. */
-export async function fecharAsOutras($: Pick<EngineInterface, 'ui'>, e: { id: string; origin: string }): Promise<void> {
-  for (const id of fecharJunto(e.id, e.origin)) await $.ui.close({ id }).catch(() => undefined)
+export async function fecharAsOutras($: Pick<EngineInterface, 'ui'>, e: { id: string; origin: { kind: string } }): Promise<void> {
+  // A origem é um objeto ({ kind }), não o texto: comparar o objeto com 'person' nunca batia (visto na sessão real, 16/10).
+  for (const id of fecharJunto(e.id, e.origin?.kind)) await $.ui.close({ id }).catch(() => undefined)
 }
 
 /** O operador fechou uma aba (Esc, a marca): as outras fecham junto, como o painel de uma aba só fechava. */
-export function fecharJunto(id: string, origem: string): string[] {
+export function fecharJunto(id: string, origem: string | undefined): string[] {
   if (origem !== 'person' || !ABAS.some(a => a.id === id)) return []
   return ABAS.map(a => a.id).filter(x => x !== id)
 }

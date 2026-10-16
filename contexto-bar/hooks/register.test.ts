@@ -190,9 +190,9 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   await $.command.run({ command: 'objetivo', args: 'Entrega :: deploy' } as never)
   const antes = abertos.length
   await $.prompt.submit({ text: 'segue' } as never)
-  // As quatro abas na ordem (Objetivo primeiro); a do objetivo de novo no fim, para ser a mostrada.
-  expect(abertos.slice(antes)).toEqual(['objetivo', 'caderno', 'prova', 'agentes', 'objetivo'])
-  expect(titulos.slice(antes)).toEqual(['Objetivo', 'Caderno', 'Prova', 'Agentes', 'Objetivo'])
+  // As quatro abas; a do objetivo por último, para ser a mostrada (a superfície mostra a última aberta).
+  expect(abertos.slice(antes)).toEqual(['caderno', 'prova', 'agentes', 'objetivo'])
+  expect(titulos.slice(antes)).toEqual(['Caderno', 'Prova', 'Agentes', 'Objetivo'])
   // Desligado, o pedido não abre; ligado de novo, volta a abrir.
   const off = JSON.stringify(await $.command.run({ command: 'objetivo', args: 'auto off' } as never))
   expect(off).toContain('não abre mais sozinho')
@@ -201,7 +201,7 @@ test('com objetivo ativo, cada pedido abre o painel; sem objetivo ou com /objeti
   expect(abertos.length).toBe(n)
   await $.command.run({ command: 'objetivo', args: 'auto on' } as never)
   await $.prompt.submit({ text: 'segue' } as never)
-  expect(abertos.length).toBe(n + 5)
+  expect(abertos.length).toBe(n + 4)
 })
 
 test('se o store do mod falhar, o painel automático continua ligado (sobrevivente #8 da rodada 4)', async ($, on) => {
@@ -221,7 +221,7 @@ test('se o store do mod falhar, o painel automático continua ligado (sobreviven
   await $.command.run({ command: 'objetivo', args: 'Entrega :: deploy' } as never)
   const antes = abertos.length
   await $.prompt.submit({ text: 'segue' } as never)
-  expect(abertos.length).toBe(antes + 5)
+  expect(abertos.length).toBe(antes + 4)
 })
 
 test('o objetivo vive num arquivo por projeto: sessões em projetos diferentes não se apagam; o store antigo migra uma vez', async ($, on) => {
@@ -1570,14 +1570,18 @@ test('abas: o operador fecha uma (Esc) e as outras fecham junto; fechar pelo pr�
   expect(fecharJunto('caderno', 'unload')).toEqual([])
   expect(fecharJunto('outro', 'person')).toEqual([])
   expect(fecharJunto('', 'person')).toEqual([])
+  expect(fecharJunto('prova', undefined)).toEqual([])
 })
 
 test('abas: o hook de fechar chama o close das outras, e um close que falha não para os seguintes (sobrevivente #10 da 0.19.1)', async () => {
   const fechados: string[] = []
   const fake = { ui: { close: async ({ id }: { id: string }) => { fechados.push(id); if (id === 'caderno') throw new Error('já fechado') } } }
-  await fecharAsOutras(fake as never, { id: 'prova', origin: 'person' })
+  // A origem como o motor a entrega: um objeto com kind (o texto solto era a suposição errada da 0.19.1).
+  await fecharAsOutras(fake as never, { id: 'prova', origin: { kind: 'person' } })
   expect(fechados).toEqual(['objetivo', 'caderno', 'agentes'])
   fechados.length = 0
-  await fecharAsOutras(fake as never, { id: 'prova', origin: 'plugin' })
+  await fecharAsOutras(fake as never, { id: 'prova', origin: { kind: 'plugin' } })
+  expect(fechados).toEqual([])
+  await fecharAsOutras(fake as never, { id: 'prova', origin: 'person' as never })
   expect(fechados).toEqual([])
 })
